@@ -1,0 +1,19 @@
+[package]
+name = "mg"
+version = "0.0.1"
+authors = ["Antoni Boucher <bouanto@zoho.com>"]
+description = "Minimal UI library based on GTK+."
+license = "MIT"
+repository = "https://github.com/antoyo/mg"
+documentation = "https://antoyo.github.io/mg/mg/"
+
+[features]
+nightly = []
+
+[dependencies]
+gdk = "^0.5"
+gtk = "^0.1"
+gtk-sys = "^0.3"
+
+[package.metadata.release]
+upload-doc = true

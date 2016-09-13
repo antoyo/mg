@@ -1,0 +1,25 @@
+= Mg
+
+Minimal UI library based on GTK+.
+
+image:https://img.shields.io/travis/antoyo/mg.svg[link="https://travis-ci.org/antoyo/mg"]
+image:https://img.shields.io/coveralls/antoyo/mg.svg[link="https://coveralls.io/github/antoyo/mg"]
+image:https://img.shields.io/crates/v/mg.svg[link="https://crates.io/crates/mg"]
+image:https://img.shields.io/badge/rust-documentation-blue.svg[link="https://antoyo.github.io/mg/mg/"]
+image:https://img.shields.io/crates/d/mg.svg[link="https://crates.io/crates/mg"]
+image:https://img.shields.io/crates/l/mg.svg[link="LICENSE"]
+
+== Installation
+
+Add the following line to the dependencies section of your `Cargo.toml`:
+
+[source,bash]
+----
+mg = "0.0.1"
+----
+
+== Usage
+
+Create a new `Application` to create an MG window.
+Set the main widget with `Application::set_view`.
+Add a callback to react to commands entered by the user with `Application::connect_command`.
