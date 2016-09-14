@@ -14,6 +14,7 @@ nightly = []
 gdk = "^0.5"
 gtk = "^0.1"
 gtk-sys = "^0.3"
+mg-settings = "^0.0.2"
 
 [package.metadata.release]
 upload-doc = true

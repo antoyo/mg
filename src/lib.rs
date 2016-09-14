@@ -30,6 +30,7 @@
 extern crate gdk;
 extern crate gtk;
 extern crate gtk_sys;
+extern crate mg_settings;
 
 mod status_bar;
 
@@ -40,19 +41,24 @@ use gdk::EventKey;
 use gdk::enums::key::{Escape, colon};
 use gtk::{ContainerExt, Grid, Inhibit, IsA, Widget, WidgetExt, Window, WindowExt, WindowType};
 use gtk::Align::Start;
+use mg_settings::{EnumFromStr, Parser};
+use mg_settings::Command::Custom;
+use mg_settings::error::Error;
+use mg_settings::error::ErrorType::{MissingArgument, NoCommand, Parse, UnknownCommand};
 
 use status_bar::StatusBar;
 
 /// Create a new MG application window.
 /// This window contains a status bar where the user can type a command and a central widget.
-pub struct Application {
-    command_callback: RefCell<Option<Box<Fn(&str)>>>,
+pub struct Application<T> {
+    command_callback: RefCell<Option<Box<Fn(T)>>>,
+    settings_parser: RefCell<Parser<T>>,
     status_bar: StatusBar,
     vbox: Grid,
     window: Window,
 }
 
-impl Application {
+impl<T: EnumFromStr + 'static> Application<T> {
     /// Create a new application.
     #[allow(new_without_default)]
     pub fn new() -> Rc<Self> {
@@ -68,10 +74,11 @@ impl Application {
         let status_bar = StatusBar::new();
         grid.attach(status_bar.widget(), 0, 1, 1, 1);
         window.show_all();
-        status_bar.hide_entry();
+        status_bar.hide();
 
         let app = Rc::new(Application {
             command_callback: RefCell::new(None),
+            settings_parser: RefCell::new(Parser::new()),
             status_bar: status_bar,
             vbox: grid,
             window: window,
@@ -91,14 +98,35 @@ impl Application {
     }
 
     /// Add a callback to the command event.
-    pub fn connect_command<F: Fn(&str) + 'static>(&self, callback: F) {
+    pub fn connect_command<F: Fn(T) + 'static>(&self, callback: F) {
         *self.command_callback.borrow_mut() = Some(Box::new(callback));
     }
 
     /// Handle the command activate event.
     fn handle_command(&self, command: Option<String>) {
         if let Some(ref callback) = *self.command_callback.borrow() {
-            callback(&command.unwrap());
+            // NOTE: assume there is always a text in an entry.
+            let result = self.settings_parser.borrow_mut().parse_line(&command.unwrap());
+            match result {
+                Ok(command) => {
+                    match command {
+                        Custom(command) => callback(command),
+                        _ => unimplemented!(),
+                    }
+                },
+                Err(error) => {
+                    if let Some(error) = error.downcast_ref::<Error>() {
+                        let message =
+                            match error.typ {
+                                MissingArgument => "Argument required".to_string(),
+                                NoCommand => return,
+                                Parse => format!("Parse error: unexpected {}, expecting: {}", error.unexpected, error.expected),
+                                UnknownCommand => format!("Not a command: {}", error.unexpected),
+                            };
+                        self.status_bar.show_error(&message);
+                    }
+                },
+            }
         }
         self.status_bar.hide_entry();
     }
@@ -112,7 +140,7 @@ impl Application {
                 Inhibit(true)
             },
             Escape => {
-                self.status_bar.hide_entry();
+                self.status_bar.hide();
                 Inhibit(true)
             },
             _ => Inhibit(false),
@@ -120,7 +148,7 @@ impl Application {
     }
 
     /// Set the main widget.
-    pub fn set_view<T: IsA<Widget> + WidgetExt>(&self, view: &T) {
+    pub fn set_view<W: IsA<Widget> + WidgetExt>(&self, view: &W) {
         view.set_halign(Start);
         view.set_valign(Start);
         view.set_vexpand(true);

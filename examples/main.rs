@@ -21,9 +21,18 @@
 
 extern crate gtk;
 extern crate mg;
+#[macro_use]
+extern crate mg_settings;
 
 use gtk::Label;
 use mg::Application;
+
+use AppCommand::*;
+
+commands!(AppCommand {
+    Open(String),
+    Quit,
+});
 
 fn main() {
     gtk::init().unwrap();
@@ -31,12 +40,15 @@ fn main() {
     let app = Application::new();
     app.set_window_title("First Mg Program");
 
-    app.connect_command(|command| {
-        println!("{}", command);
-    });
-
     let label = Label::new(Some("Mg App"));
     app.set_view(&label);
+
+    app.connect_command(move |command| {
+        match command {
+            Open(url) => label.set_text(&format!("Opening URL {}", url)),
+            Quit => gtk::main_quit(),
+        }
+    });
 
     gtk::main();
 }

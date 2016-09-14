@@ -28,8 +28,9 @@ pub type HBox = ::gtk::Box;
 /// The window status bar.
 pub struct StatusBar {
     entry: Entry,
-    label: Label,
+    colon_label: Label,
     hbox: HBox,
+    message_label: Label,
 }
 
 impl StatusBar {
@@ -37,17 +38,22 @@ impl StatusBar {
     pub fn new() -> Self {
         let hbox = HBox::new(Horizontal, 0);
 
-        let label = Label::new(Some(":"));
-        hbox.add(&label);
+        let message_label = Label::new(None);
+        hbox.add(&message_label);
+
+        let colon_label = Label::new(Some(":"));
+        hbox.add(&colon_label);
 
         let entry = Entry::new();
         entry.set_has_frame(false);
+        entry.set_hexpand(true);
         hbox.add(&entry);
 
         StatusBar {
             entry: entry,
-            label: label,
+            colon_label: colon_label,
             hbox: hbox,
+            message_label: message_label,
         }
     }
 
@@ -56,10 +62,16 @@ impl StatusBar {
         self.entry.connect_activate(move |entry| callback(entry.get_text()));
     }
 
+    /// Hide all the widgets.
+    pub fn hide(&self) {
+        self.hide_entry();
+        self.message_label.hide();
+    }
+
     /// Hide the entry.
     pub fn hide_entry(&self) {
         self.entry.hide();
-        self.label.hide();
+        self.colon_label.hide();
     }
 
     /// Show the entry.
@@ -67,7 +79,15 @@ impl StatusBar {
         self.entry.set_text("");
         self.entry.show();
         self.entry.grab_focus();
-        self.label.show();
+        self.colon_label.show();
+        self.message_label.hide();
+    }
+
+    /// Show an error message.
+    pub fn show_error(&self, message: &str) {
+        // TODO: show a red background.
+        self.message_label.set_text(message);
+        self.message_label.show();
     }
 
     /// Convert to a widget.
