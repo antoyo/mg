@@ -21,7 +21,6 @@
 
 /*
  * TODO: Try to return an Application directly instead of an Rc<Application>.
- * FIXME: do not clear the entry when typing : in the entry.
  * TODO: support shortcuts with number like "50G".
  */
 
@@ -140,8 +139,13 @@ impl<T: EnumFromStr + 'static> Application<T> {
     fn key_press(&self, key: &EventKey) -> Inhibit {
         match key.get_keyval() {
             colon => {
-                self.status_bar.show_entry();
-                Inhibit(true)
+                if !self.status_bar.entry_shown() {
+                    self.status_bar.show_entry();
+                    Inhibit(true)
+                }
+                else {
+                    Inhibit(false)
+                }
             },
             Escape => {
                 self.status_bar.hide();

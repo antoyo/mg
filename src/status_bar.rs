@@ -19,6 +19,8 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+use std::cell::Cell;
+
 use gtk::{ContainerExt, Entry, EntryExt, Label, WidgetExt};
 use gtk::Orientation::Horizontal;
 
@@ -27,8 +29,9 @@ pub type HBox = ::gtk::Box;
 
 /// The window status bar.
 pub struct StatusBar {
-    entry: Entry,
     colon_label: Label,
+    entry: Entry,
+    entry_shown: Cell<bool>,
     hbox: HBox,
     message_label: Label,
 }
@@ -50,8 +53,9 @@ impl StatusBar {
         hbox.add(&entry);
 
         StatusBar {
-            entry: entry,
             colon_label: colon_label,
+            entry: entry,
+            entry_shown: Cell::new(false),
             hbox: hbox,
             message_label: message_label,
         }
@@ -62,6 +66,11 @@ impl StatusBar {
         self.entry.connect_activate(move |entry| callback(entry.get_text()));
     }
 
+    /// Get whether the entry is shown or not.
+    pub fn entry_shown(&self) -> bool {
+        self.entry_shown.get()
+    }
+
     /// Hide all the widgets.
     pub fn hide(&self) {
         self.hide_entry();
@@ -70,12 +79,14 @@ impl StatusBar {
 
     /// Hide the entry.
     pub fn hide_entry(&self) {
+        self.entry_shown.set(false);
         self.entry.hide();
         self.colon_label.hide();
     }
 
     /// Show the entry.
     pub fn show_entry(&self) {
+        self.entry_shown.set(true);
         self.entry.set_text("");
         self.entry.show();
         self.entry.grab_focus();
