@@ -89,9 +89,6 @@ impl StatusBar {
         self.message_label.set_text(message);
         self.message_label.show();
     }
-
-    /// Convert to a widget.
-    pub fn widget(&self) -> &StatusBarWidget {
-        &self.hbox
-    }
 }
+
+is_widget!(StatusBar, hbox);

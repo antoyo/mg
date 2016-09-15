@@ -20,6 +20,8 @@
  */
 
 /*
+ * TODO: Try to return an Application directly instead of an Rc<Application>.
+ * FIXME: do not clear the entry when typing : in the entry.
  * TODO: support shortcuts with number like "50G".
  */
 
@@ -28,10 +30,13 @@
 #![warn(missing_docs)]
 
 extern crate gdk;
+extern crate glib;
 extern crate gtk;
 extern crate gtk_sys;
 extern crate mg_settings;
 
+#[macro_use]
+mod widget;
 mod status_bar;
 
 use std::cell::RefCell;
@@ -40,7 +45,6 @@ use std::rc::Rc;
 use gdk::EventKey;
 use gdk::enums::key::{Escape, colon};
 use gtk::{ContainerExt, Grid, Inhibit, IsA, Widget, WidgetExt, Window, WindowExt, WindowType};
-use gtk::Align::Start;
 use mg_settings::{EnumFromStr, Parser};
 use mg_settings::Command::Custom;
 use mg_settings::error::Error;
@@ -72,7 +76,7 @@ impl<T: EnumFromStr + 'static> Application<T> {
         window.add(&grid);
 
         let status_bar = StatusBar::new();
-        grid.attach(status_bar.widget(), 0, 1, 1, 1);
+        grid.attach(&status_bar, 0, 1, 1, 1);
         window.show_all();
         status_bar.hide();
 
@@ -149,8 +153,7 @@ impl<T: EnumFromStr + 'static> Application<T> {
 
     /// Set the main widget.
     pub fn set_view<W: IsA<Widget> + WidgetExt>(&self, view: &W) {
-        view.set_halign(Start);
-        view.set_valign(Start);
+        view.set_hexpand(true);
         view.set_vexpand(true);
         view.show_all();
         self.vbox.attach(view, 0, 0, 1, 1);
@@ -159,5 +162,10 @@ impl<T: EnumFromStr + 'static> Application<T> {
     /// Set the window title.
     pub fn set_window_title(&self, title: &str) {
         self.window.set_title(title);
+    }
+
+    /// Get the application window.
+    pub fn window(&self) -> &Window {
+        &self.window
     }
 }
