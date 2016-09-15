@@ -26,6 +26,7 @@ extern crate mg_settings;
 
 use gtk::Label;
 use mg::Application;
+use mg_settings::Config;
 
 use AppCommand::*;
 
@@ -37,7 +38,15 @@ commands!(AppCommand {
 fn main() {
     gtk::init().unwrap();
 
-    let app = Application::new();
+    let config = Config {
+        mapping_modes: vec!["n".to_string()],
+    };
+
+    let app = Application::new_with_config(config);
+    if let Err(error) = app.parse_config("main.conf") {
+        // TODO: show in the status bar.
+        println!("{:?}", error);
+    }
     app.set_window_title("First Mg Program");
 
     let label = Label::new(Some("Mg App"));

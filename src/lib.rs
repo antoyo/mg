@@ -34,27 +34,48 @@ extern crate gtk;
 extern crate gtk_sys;
 extern crate mg_settings;
 
+mod key_converter;
 #[macro_use]
 mod widget;
 mod status_bar;
 
 use std::cell::RefCell;
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::BufReader;
 use std::rc::Rc;
 
-use gdk::EventKey;
+use gdk::{CONTROL_MASK, EventKey};
 use gdk::enums::key::{Escape, colon};
 use gtk::{ContainerExt, Grid, Inhibit, IsA, Widget, WidgetExt, Window, WindowExt, WindowType};
-use mg_settings::{EnumFromStr, Parser};
-use mg_settings::Command::Custom;
-use mg_settings::error::Error;
+use mg_settings::{Config, EnumFromStr, Parser};
+use mg_settings::Command::{Custom, Include, Map, Set, Unmap};
+use mg_settings::error::{Error, Result};
 use mg_settings::error::ErrorType::{MissingArgument, NoCommand, Parse, UnknownCommand};
+use mg_settings::key::Key;
 
+use key_converter::gdk_key_to_key;
+use self::ShortcutCommand::{Complete, Incomplete};
 use status_bar::StatusBar;
+
+/// A command from a map command.
+#[derive(Debug)]
+enum ShortcutCommand {
+    /// A complete command that is to be executed.
+    Complete(String),
+    /// An incomplete command where the user needs to complete it and press Enter.
+    Incomplete(String),
+    /// No command.
+    NoCommand,
+}
 
 /// Create a new MG application window.
 /// This window contains a status bar where the user can type a command and a central widget.
 pub struct Application<T> {
     command_callback: RefCell<Option<Box<Fn(T)>>>,
+    current_mode: String,
+    current_shortcut: RefCell<Vec<Key>>,
+    mappings: RefCell<HashMap<String, HashMap<Vec<Key>, String>>>,
     settings_parser: RefCell<Parser<T>>,
     status_bar: StatusBar,
     vbox: Grid,
@@ -65,6 +86,11 @@ impl<T: EnumFromStr + 'static> Application<T> {
     /// Create a new application.
     #[allow(new_without_default)]
     pub fn new() -> Rc<Self> {
+        Application::new_with_config(Config::default())
+    }
+
+    /// Create a new application with configuration.
+    pub fn new_with_config(config: Config) -> Rc<Self> {
         let window = Window::new(WindowType::Toplevel);
         window.connect_delete_event(|_, _| {
             gtk::main_quit();
@@ -81,7 +107,10 @@ impl<T: EnumFromStr + 'static> Application<T> {
 
         let app = Rc::new(Application {
             command_callback: RefCell::new(None),
-            settings_parser: RefCell::new(Parser::new()),
+            current_mode: "n".to_string(),
+            current_shortcut: RefCell::new(vec![]),
+            mappings: RefCell::new(HashMap::new()),
+            settings_parser: RefCell::new(Parser::new_with_config(config)),
             status_bar: status_bar,
             vbox: grid,
             window: window,
@@ -100,6 +129,27 @@ impl<T: EnumFromStr + 'static> Application<T> {
         app
     }
 
+    /// Convert an action String to a command String.
+    fn action_to_command(&self, action: &str) -> ShortcutCommand {
+        if let Some(':') = action.chars().next() {
+            if let Some(index) = action.find("<Enter>") {
+                Complete(action[1..index].to_string())
+            }
+            else {
+                Incomplete(action[1..].to_string())
+            }
+        }
+        else {
+            ShortcutCommand::NoCommand
+        }
+    }
+
+    /// Add the key to the current shortcut.
+    fn add_to_shortcut(&self, key: Key) {
+        let mut shortcut = self.current_shortcut.borrow_mut();
+        shortcut.push(key);
+    }
+
     /// Add a callback to the command event.
     pub fn connect_command<F: Fn(T) + 'static>(&self, callback: F) {
         *self.command_callback.borrow_mut() = Some(Box::new(callback));
@@ -107,31 +157,65 @@ impl<T: EnumFromStr + 'static> Application<T> {
 
     /// Handle the command activate event.
     fn handle_command(&self, command: Option<String>) {
-        if let Some(ref callback) = *self.command_callback.borrow() {
-            // NOTE: assume there is always a text in an entry.
-            let result = self.settings_parser.borrow_mut().parse_line(&command.unwrap());
-            match result {
-                Ok(command) => {
-                    match command {
-                        Custom(command) => callback(command),
-                        _ => unimplemented!(),
+        if let Some(command) = command {
+            if let Some(ref callback) = *self.command_callback.borrow() {
+                let result = self.settings_parser.borrow_mut().parse_line(&command);
+                match result {
+                    Ok(command) => {
+                        match command {
+                            Custom(command) => callback(command),
+                            _ => unimplemented!(),
+                        }
+                    },
+                    Err(error) => {
+                        if let Some(error) = error.downcast_ref::<Error>() {
+                            let message =
+                                match error.typ {
+                                    MissingArgument => "Argument required".to_string(),
+                                    NoCommand => return,
+                                    Parse => format!("Parse error: unexpected {}, expecting: {}", error.unexpected, error.expected),
+                                    UnknownCommand => format!("Not a command: {}", error.unexpected),
+                                };
+                            self.status_bar.show_error(&message);
+                        }
+                    },
+                }
+            }
+            self.status_bar.hide_entry();
+        }
+    }
+
+    /// Handle a possible input of a shortcut.
+    fn handle_shortcut(&self, key: &EventKey) -> Inhibit {
+        if !self.status_bar.entry_shown() {
+            let control_pressed = key.get_state() & CONTROL_MASK == CONTROL_MASK;
+            if let Some(key) = gdk_key_to_key(key.get_keyval(), control_pressed) {
+                self.add_to_shortcut(key);
+                let action = {
+                    let shortcut = self.current_shortcut.borrow();
+                    let mappings = self.mappings.borrow();
+                    mappings[&self.current_mode].get(&*shortcut).cloned()
+                };
+                if let Some(action) = action {
+                    self.reset();
+                    match self.action_to_command(&action) {
+                        Complete(command) => self.handle_command(Some(command)),
+                        Incomplete(command) => {
+                            self.input_command(&command);
+                            return Inhibit(true);
+                        },
+                        ShortcutCommand::NoCommand => (),
                     }
-                },
-                Err(error) => {
-                    if let Some(error) = error.downcast_ref::<Error>() {
-                        let message =
-                            match error.typ {
-                                MissingArgument => "Argument required".to_string(),
-                                NoCommand => return,
-                                Parse => format!("Parse error: unexpected {}, expecting: {}", error.unexpected, error.expected),
-                                UnknownCommand => format!("Not a command: {}", error.unexpected),
-                            };
-                        self.status_bar.show_error(&message);
-                    }
-                },
+                }
             }
         }
-        self.status_bar.hide_entry();
+        Inhibit(false)
+    }
+
+    /// Input the specified command.
+    fn input_command(&self, command: &str) {
+        self.status_bar.show_entry();
+        self.status_bar.set_command(&format!("{} ", command));
     }
 
     /// Handle the key press event.
@@ -140,6 +224,7 @@ impl<T: EnumFromStr + 'static> Application<T> {
         match key.get_keyval() {
             colon => {
                 if !self.status_bar.entry_shown() {
+                    self.reset();
                     self.status_bar.show_entry();
                     Inhibit(true)
                 }
@@ -148,11 +233,39 @@ impl<T: EnumFromStr + 'static> Application<T> {
                 }
             },
             Escape => {
-                self.status_bar.hide();
+                self.reset();
                 Inhibit(true)
             },
-            _ => Inhibit(false),
+            _ => self.handle_shortcut(key),
         }
+    }
+
+    /// Parse a configuration file.
+    pub fn parse_config(&self, filename: &str) -> Result<()> {
+        let file = try!(File::open(filename));
+        let buf_reader = BufReader::new(file);
+        let commands = try!(self.settings_parser.borrow_mut().parse(buf_reader));
+        for command in commands {
+            match command {
+                Custom(_) => (), // TODO: call the callback?
+                Include(_) => (), // TODO: parse the included file.
+                Map { action, keys, mode } => {
+                    let mut mappings = self.mappings.borrow_mut();
+                    let mappings = mappings.entry(mode).or_insert_with(HashMap::new);
+                    mappings.insert(keys, action);
+                },
+                Set(_, _) => (), // TODO: set settings.
+                Unmap { .. } => (), // TODO
+            }
+        }
+        Ok(())
+    }
+
+    /// Handle the escape event.
+    fn reset(&self) {
+        self.status_bar.hide();
+        let mut shortcut = self.current_shortcut.borrow_mut();
+        shortcut.clear();
     }
 
     /// Set the main widget.

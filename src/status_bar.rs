@@ -21,7 +21,7 @@
 
 use std::cell::Cell;
 
-use gtk::{ContainerExt, Entry, EntryExt, Label, WidgetExt};
+use gtk::{ContainerExt, EditableExt, Entry, EntryExt, Label, WidgetExt};
 use gtk::Orientation::Horizontal;
 
 pub type StatusBarWidget = HBox;
@@ -82,6 +82,12 @@ impl StatusBar {
         self.entry_shown.set(false);
         self.entry.hide();
         self.colon_label.hide();
+    }
+
+    /// Set the text of the command entry.
+    pub fn set_command(&self, command: &str) {
+        self.entry.set_text(command);
+        self.entry.set_position(command.len() as i32);
     }
 
     /// Show the entry.
