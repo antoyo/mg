@@ -194,7 +194,8 @@ impl<T: EnumFromStr + 'static> Application<T> {
                 let action = {
                     let shortcut = self.current_shortcut.borrow();
                     let mappings = self.mappings.borrow();
-                    mappings[&self.current_mode].get(&*shortcut).cloned()
+                    mappings.get(&self.current_mode)
+                        .and_then(|mappings| mappings.get(&*shortcut).cloned())
                 };
                 if let Some(action) = action {
                     self.reset();
