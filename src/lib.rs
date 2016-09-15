@@ -20,7 +20,7 @@
  */
 
 /*
- * TODO: When no shortcut is possible, clear the keys buffer.
+ * TODO: Show the current shortcut in the status bar.
  * TODO: Try to return an Application directly instead of an Rc<Application>.
  * TODO: support shortcuts with number like "50G".
  */
@@ -207,6 +207,9 @@ impl<T: EnumFromStr + 'static> Application<T> {
                         },
                     }
                 }
+                else if self.no_possible_shortcut() {
+                    self.reset();
+                }
             }
         }
         Inhibit(false)
@@ -238,6 +241,20 @@ impl<T: EnumFromStr + 'static> Application<T> {
             },
             _ => self.handle_shortcut(key),
         }
+    }
+
+    /// Check if there are no possible shortcuts.
+    fn no_possible_shortcut(&self) -> bool {
+        let current_shortcut = self.current_shortcut.borrow();
+        let mappings = self.mappings.borrow();
+        if let Some(mappings) = mappings.get(&self.current_mode) {
+            for key in mappings.keys() {
+                if key.starts_with(&*current_shortcut) {
+                    return false;
+                }
+            }
+        }
+        true
     }
 
     /// Parse a configuration file.
