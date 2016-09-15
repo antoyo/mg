@@ -20,6 +20,7 @@
  */
 
 /*
+ * TODO: When no shortcut is possible, clear the keys buffer.
  * TODO: Try to return an Application directly instead of an Rc<Application>.
  * TODO: support shortcuts with number like "50G".
  */
@@ -43,6 +44,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
+use std::path::Path;
 use std::rc::Rc;
 
 use gdk::{CONTROL_MASK, EventKey};
@@ -65,8 +67,6 @@ enum ShortcutCommand {
     Complete(String),
     /// An incomplete command where the user needs to complete it and press Enter.
     Incomplete(String),
-    /// No command.
-    NoCommand,
 }
 
 /// Create a new MG application window.
@@ -140,7 +140,7 @@ impl<T: EnumFromStr + 'static> Application<T> {
             }
         }
         else {
-            ShortcutCommand::NoCommand
+            Complete(action.to_string())
         }
     }
 
@@ -205,7 +205,6 @@ impl<T: EnumFromStr + 'static> Application<T> {
                             self.input_command(&command);
                             return Inhibit(true);
                         },
-                        ShortcutCommand::NoCommand => (),
                     }
                 }
             }
@@ -242,7 +241,7 @@ impl<T: EnumFromStr + 'static> Application<T> {
     }
 
     /// Parse a configuration file.
-    pub fn parse_config(&self, filename: &str) -> Result<()> {
+    pub fn parse_config<P: AsRef<Path>>(&self, filename: P) -> Result<()> {
         let file = try!(File::open(filename));
         let buf_reader = BufReader::new(file);
         let commands = try!(self.settings_parser.borrow_mut().parse(buf_reader));
