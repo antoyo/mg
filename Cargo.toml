@@ -12,6 +12,7 @@ nightly = []
 
 [dependencies]
 gdk = "^0.5"
+gdk-sys = "^0.3"
 glib = "^0.1"
 gtk = "^0.1"
 gtk-sys = "^0.3"

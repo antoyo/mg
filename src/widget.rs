@@ -56,6 +56,24 @@ macro_rules! is_widget {
             }
         }
 
+        impl<'a> ::glib::translate::ToGlibPtr<'a, *mut ::glib::object::GObject> for $widget {
+            type Storage = <::glib::object::ObjectRef as
+                ::glib::translate::ToGlibPtr<'a, *mut ::glib::object::GObject>>::Storage;
+
+            #[inline]
+            fn to_glib_none(&'a self)
+                    -> ::glib::translate::Stash<'a, *mut ::glib::object::GObject, Self> {
+                let stash: ::glib::translate::Stash<'a, *mut _, _> = self.$inner_widget.to_glib_none();
+                ::glib::translate::Stash(stash.0 as *mut _, stash.1)
+            }
+
+            #[inline]
+            fn to_glib_full(&self) -> *mut ::glib::object::GObject {
+                let widget: *mut _ = self.$inner_widget.to_glib_full();
+                widget as *mut _
+            }
+        }
+
         impl Into<::glib::object::ObjectRef> for $widget {
             fn into(self) -> ::glib::object::ObjectRef {
                 self.$inner_widget.into()
@@ -79,5 +97,6 @@ macro_rules! is_widget {
         }
 
         impl ::gtk::IsA<::gtk::Widget> for $widget {}
+        impl ::gtk::IsA<::glib::Object> for $widget {}
     };
 }

@@ -31,6 +31,7 @@
 #![warn(missing_docs)]
 
 extern crate gdk;
+extern crate gdk_sys;
 extern crate glib;
 extern crate gtk;
 extern crate gtk_sys;
@@ -50,7 +51,9 @@ use std::rc::Rc;
 
 use gdk::{CONTROL_MASK, EventKey};
 use gdk::enums::key::{Escape, colon};
-use gtk::{ContainerExt, Grid, Inhibit, IsA, Widget, WidgetExt, Window, WindowExt, WindowType};
+use gdk_sys::GdkRGBA;
+use gtk::{ContainerExt, Grid, Inhibit, IsA, Widget, WidgetExt, Window, WindowExt, WindowType, STATE_FLAG_NORMAL};
+use gtk::prelude::WidgetExtManual;
 use mg_settings::{Config, EnumFromStr, Parser};
 use mg_settings::Command::{Custom, Include, Map, Set, Unmap};
 use mg_settings::error::{Error, Result};
@@ -60,6 +63,11 @@ use mg_settings::key::Key;
 use key_converter::gdk_key_to_key;
 use self::ShortcutCommand::{Complete, Incomplete};
 use status_bar::{StatusBar, StatusBarItem};
+
+const BLACK: &'static GdkRGBA = &GdkRGBA { red: 0.0, green: 0.0, blue: 0.0, alpha: 1.0 };
+const RED: &'static GdkRGBA = &GdkRGBA { red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0 };
+const TRANSPARENT: &'static GdkRGBA = &GdkRGBA { red: 0.0, green: 0.0, blue: 0.0, alpha: 0.0 };
+const WHITE: &'static GdkRGBA = &GdkRGBA { red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0 };
 
 /// A command from a map command.
 #[derive(Debug)]
@@ -77,6 +85,7 @@ pub struct Application<T> {
     current_mode: String,
     current_shortcut: RefCell<Vec<Key>>,
     mappings: RefCell<HashMap<String, HashMap<Vec<Key>, String>>>,
+    message: StatusBarItem,
     settings_parser: RefCell<Parser<T>>,
     status_bar: StatusBar,
     vbox: Grid,
@@ -106,16 +115,21 @@ impl<T: EnumFromStr + 'static> Application<T> {
         window.show_all();
         status_bar.hide();
 
+        let message = StatusBarItem::new().left();
+
         let app = Rc::new(Application {
             command_callback: RefCell::new(None),
             current_mode: "n".to_string(),
             current_shortcut: RefCell::new(vec![]),
             mappings: RefCell::new(HashMap::new()),
+            message: message,
             settings_parser: RefCell::new(Parser::new_with_config(config)),
             status_bar: status_bar,
             vbox: grid,
             window: window,
         });
+
+        app.status_bar.add_item(&app.message);
 
         {
             let instance = app.clone();
@@ -163,6 +177,13 @@ impl<T: EnumFromStr + 'static> Application<T> {
         *self.command_callback.borrow_mut() = Some(Box::new(callback));
     }
 
+    /// Show an error to the user.
+    pub fn error(&self, error: &str) {
+        self.message.set_text(error);
+        self.status_bar.override_background_color(STATE_FLAG_NORMAL, RED);
+        self.status_bar.override_color(STATE_FLAG_NORMAL, WHITE);
+    }
+
     /// Handle the command activate event.
     fn handle_command(&self, command: Option<String>) {
         if let Some(command) = command {
@@ -184,7 +205,7 @@ impl<T: EnumFromStr + 'static> Application<T> {
                                     Parse => format!("Parse error: unexpected {}, expecting: {}", error.unexpected, error.expected),
                                     UnknownCommand => format!("Not a command: {}", error.unexpected),
                                 };
-                            self.status_bar.show_error(&message);
+                            self.error(&message);
                         }
                     },
                 }
@@ -288,7 +309,10 @@ impl<T: EnumFromStr + 'static> Application<T> {
 
     /// Handle the escape event.
     fn reset(&self) {
+        self.status_bar.override_background_color(STATE_FLAG_NORMAL, TRANSPARENT);
+        self.status_bar.override_color(STATE_FLAG_NORMAL, BLACK);
         self.status_bar.hide();
+        self.message.hide();
         let mut shortcut = self.current_shortcut.borrow_mut();
         shortcut.clear();
     }

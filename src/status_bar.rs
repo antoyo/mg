@@ -33,16 +33,12 @@ pub struct StatusBar {
     entry: Entry,
     entry_shown: Cell<bool>,
     hbox: HBox,
-    message_label: Label,
 }
 
 impl StatusBar {
     /// Create a new status bar.
     pub fn new() -> Self {
         let hbox = HBox::new(Horizontal, 0);
-
-        let message_label = Label::new(None);
-        hbox.add(&message_label);
 
         let colon_label = Label::new(Some(":"));
         hbox.add(&colon_label);
@@ -57,14 +53,18 @@ impl StatusBar {
             entry: entry,
             entry_shown: Cell::new(false),
             hbox: hbox,
-            message_label: message_label,
         }
     }
 
     /// Add an item.
     pub fn add_item(&self, item: &StatusBarItem) {
         item.label.show();
-        self.hbox.pack_end(item, false, false, 3);
+        if item.left {
+            self.hbox.pack_start(item, false, false, 3);
+        }
+        else {
+            self.hbox.pack_end(item, false, false, 3);
+        }
     }
 
     /// Connect the active entry event.
@@ -80,7 +80,6 @@ impl StatusBar {
     /// Hide all the widgets.
     pub fn hide(&self) {
         self.hide_entry();
-        self.message_label.hide();
     }
 
     /// Hide the entry.
@@ -103,14 +102,6 @@ impl StatusBar {
         self.entry.show();
         self.entry.grab_focus();
         self.colon_label.show();
-        self.message_label.hide();
-    }
-
-    /// Show an error message.
-    pub fn show_error(&self, message: &str) {
-        // TODO: show a red background.
-        self.message_label.set_text(message);
-        self.message_label.show();
     }
 }
 
@@ -119,6 +110,7 @@ is_widget!(StatusBar, hbox);
 /// A status bar text item.
 pub struct StatusBarItem {
     label: Label,
+    left: bool,
 }
 
 impl StatusBarItem {
@@ -127,12 +119,20 @@ impl StatusBarItem {
     pub fn new() -> Self {
         StatusBarItem {
             label: Label::new(None),
+            left: false,
         }
+    }
+
+    /// Set the item to be on the left.
+    pub fn left(mut self) -> Self {
+        self.left = true;
+        self
     }
 
     /// Set the item text.
     pub fn set_text(&self, text: &str) {
         self.label.set_text(text);
+        self.label.show();
     }
 }
 

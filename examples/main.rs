@@ -49,8 +49,7 @@ fn main() {
     item2.set_text("Test");
     item.set_text("Rightmost");
     if let Err(error) = app.parse_config("main.conf") {
-        // TODO: show in the status bar.
-        println!("{:?}", error);
+        app.error(error.description());
     }
     app.set_window_title("First Mg Program");
 
