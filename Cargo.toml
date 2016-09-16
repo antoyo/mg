@@ -14,8 +14,10 @@ nightly = []
 gdk = "^0.5"
 gdk-sys = "^0.3"
 glib = "^0.1"
+gobject-sys = "^0.3"
 gtk = "^0.1"
 gtk-sys = "^0.3"
+libc = "^0.2"
 mg-settings = "^0.0.2"
 
 [package.metadata.release]

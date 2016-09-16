@@ -19,50 +19,20 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-extern crate gtk;
-extern crate mg;
-#[macro_use]
-extern crate mg_settings;
+use std::ffi::CString;
 
-use gtk::Label;
-use mg::Application;
-use mg_settings::Config;
+use glib::{IsA, Object, ObjectExt};
+use gobject_sys::{GObject, g_object_set};
+use libc::c_void;
 
-use AppCommand::*;
+pub trait ObjectExtManual {
+    fn set_data(&self, key: &str, data: i32);
+}
 
-commands!(AppCommand {
-    Open(String),
-    Quit,
-});
-
-fn main() {
-    gtk::init().unwrap();
-
-    let config = Config {
-        mapping_modes: vec!["n".to_string()],
-    };
-
-    let app = Application::new_with_config(config);
-    app.use_dark_theme();
-    let item = app.add_statusbar_item();
-    item.set_text("Item");
-    let item2 = app.add_statusbar_item();
-    item2.set_text("Test");
-    item.set_text("Rightmost");
-    if let Err(error) = app.parse_config("main.conf") {
-        app.error(error.description());
+impl<O: ObjectExt + IsA<Object>> ObjectExtManual for O {
+    fn set_data(&self, key: &str, data: i32) {
+        let object: *mut GObject = self.to_glib_full();
+        let key = CString::new(key).unwrap();
+        unsafe { g_object_set(object as *mut _, key.as_ptr(), data, 0 as *mut c_void) };
     }
-    app.set_window_title("First Mg Program");
-
-    let label = Label::new(Some("Mg App"));
-    app.set_view(&label);
-
-    app.connect_command(move |command| {
-        match command {
-            Open(url) => label.set_text(&format!("Opening URL {}", url)),
-            Quit => gtk::main_quit(),
-        }
-    });
-
-    gtk::main();
 }

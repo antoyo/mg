@@ -33,11 +33,15 @@
 extern crate gdk;
 extern crate gdk_sys;
 extern crate glib;
+extern crate gobject_sys;
 extern crate gtk;
 extern crate gtk_sys;
+extern crate libc;
 extern crate mg_settings;
 
 mod key_converter;
+mod gobject;
+mod style_context;
 #[macro_use]
 mod widget;
 mod status_bar;
@@ -49,10 +53,10 @@ use std::io::BufReader;
 use std::path::Path;
 use std::rc::Rc;
 
-use gdk::{CONTROL_MASK, EventKey};
+use gdk::{EventKey, RGBA, CONTROL_MASK};
 use gdk::enums::key::{Escape, colon};
 use gdk_sys::GdkRGBA;
-use gtk::{ContainerExt, Grid, Inhibit, IsA, Widget, WidgetExt, Window, WindowExt, WindowType, STATE_FLAG_NORMAL};
+use gtk::{ContainerExt, Grid, Inhibit, IsA, Settings, Widget, WidgetExt, Window, WindowExt, WindowType, STATE_FLAG_NORMAL};
 use gtk::prelude::WidgetExtManual;
 use mg_settings::{Config, EnumFromStr, Parser};
 use mg_settings::Command::{Custom, Include, Map, Set, Unmap};
@@ -61,10 +65,11 @@ use mg_settings::error::ErrorType::{MissingArgument, NoCommand, Parse, UnknownCo
 use mg_settings::key::Key;
 
 use key_converter::gdk_key_to_key;
+use gobject::ObjectExtManual;
 use self::ShortcutCommand::{Complete, Incomplete};
 use status_bar::{StatusBar, StatusBarItem};
+use style_context::StyleContextExtManual;
 
-const BLACK: &'static GdkRGBA = &GdkRGBA { red: 0.0, green: 0.0, blue: 0.0, alpha: 1.0 };
 const RED: &'static GdkRGBA = &GdkRGBA { red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0 };
 const TRANSPARENT: &'static GdkRGBA = &GdkRGBA { red: 0.0, green: 0.0, blue: 0.0, alpha: 0.0 };
 const WHITE: &'static GdkRGBA = &GdkRGBA { red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0 };
@@ -84,6 +89,7 @@ pub struct Application<T> {
     command_callback: RefCell<Option<Box<Fn(T)>>>,
     current_mode: String,
     current_shortcut: RefCell<Vec<Key>>,
+    foreground_color: RefCell<RGBA>,
     mappings: RefCell<HashMap<String, HashMap<Vec<Key>, String>>>,
     message: StatusBarItem,
     settings_parser: RefCell<Parser<T>>,
@@ -115,12 +121,15 @@ impl<T: EnumFromStr + 'static> Application<T> {
         window.show_all();
         status_bar.hide();
 
+        let foreground_color = Application::<T>::get_foreground_color(&window);
+
         let message = StatusBarItem::new().left();
 
         let app = Rc::new(Application {
             command_callback: RefCell::new(None),
             current_mode: "n".to_string(),
             current_shortcut: RefCell::new(vec![]),
+            foreground_color: RefCell::new(foreground_color),
             mappings: RefCell::new(HashMap::new()),
             message: message,
             settings_parser: RefCell::new(Parser::new_with_config(config)),
@@ -182,6 +191,12 @@ impl<T: EnumFromStr + 'static> Application<T> {
         self.message.set_text(error);
         self.status_bar.override_background_color(STATE_FLAG_NORMAL, RED);
         self.status_bar.override_color(STATE_FLAG_NORMAL, WHITE);
+    }
+
+    /// Get the color of the text.
+    fn get_foreground_color(window: &Window) -> RGBA {
+        let style_context = window.get_style_context().unwrap();
+        style_context.get_color(STATE_FLAG_NORMAL)
     }
 
     /// Handle the command activate event.
@@ -310,7 +325,7 @@ impl<T: EnumFromStr + 'static> Application<T> {
     /// Handle the escape event.
     fn reset(&self) {
         self.status_bar.override_background_color(STATE_FLAG_NORMAL, TRANSPARENT);
-        self.status_bar.override_color(STATE_FLAG_NORMAL, BLACK);
+        self.status_bar.override_color(STATE_FLAG_NORMAL, &self.foreground_color.borrow());
         self.status_bar.hide();
         self.message.hide();
         let mut shortcut = self.current_shortcut.borrow_mut();
@@ -328,6 +343,13 @@ impl<T: EnumFromStr + 'static> Application<T> {
     /// Set the window title.
     pub fn set_window_title(&self, title: &str) {
         self.window.set_title(title);
+    }
+
+    /// Use the dark variant of the theme if available.
+    pub fn use_dark_theme(&self) {
+        let settings = Settings::get_default().unwrap();
+        settings.set_data("gtk-application-prefer-dark-theme", 1);
+        *self.foreground_color.borrow_mut() = Application::<T>::get_foreground_color(&self.window);
     }
 
     /// Get the application window.
