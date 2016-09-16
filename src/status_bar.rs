@@ -69,9 +69,9 @@ impl StatusBar {
 
     /// Adjust the look of the entry.
     fn adjust_entry(entry: &Entry) {
+        entry.set_name("mg-input-command");
         let style_context = entry.get_style_context().unwrap();
-        style_context.add_class("mg-input-command");
-        let style = ".mg-input-command {
+        let style = "#mg-input-command {
             box-shadow: none;
             padding: 0;
         }";
