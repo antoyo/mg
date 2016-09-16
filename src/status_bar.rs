@@ -21,7 +21,7 @@
 
 use std::cell::Cell;
 
-use gtk::{BoxExt, ContainerExt, EditableExt, Entry, EntryExt, Label, WidgetExt};
+use gtk::{BoxExt, ContainerExt, CssProvider, EditableExt, Entry, EntryExt, Label, WidgetExt, STYLE_PROVIDER_PRIORITY_APPLICATION};
 use gtk::Orientation::Horizontal;
 
 pub type StatusBarWidget = HBox;
@@ -39,13 +39,13 @@ impl StatusBar {
     /// Create a new status bar.
     pub fn new() -> Self {
         let hbox = HBox::new(Horizontal, 0);
+        hbox.set_size_request(1, 20);
 
         let colon_label = Label::new(Some(":"));
         hbox.add(&colon_label);
 
         let entry = Entry::new();
-        entry.set_has_frame(false);
-        entry.set_hexpand(true);
+        StatusBar::adjust_entry(&entry);
         hbox.add(&entry);
 
         StatusBar {
@@ -65,6 +65,21 @@ impl StatusBar {
         else {
             self.hbox.pack_end(item, false, false, 3);
         }
+    }
+
+    /// Adjust the look of the entry.
+    fn adjust_entry(entry: &Entry) {
+        let style_context = entry.get_style_context().unwrap();
+        style_context.add_class("mg-input-command");
+        let style = ".mg-input-command {
+            box-shadow: none;
+            padding: 0;
+        }";
+        let provider = CssProvider::new();
+        provider.load_from_data(style).unwrap();
+        style_context.add_provider(&provider, STYLE_PROVIDER_PRIORITY_APPLICATION);
+        entry.set_has_frame(false);
+        entry.set_hexpand(true);
     }
 
     /// Connect the active entry event.
