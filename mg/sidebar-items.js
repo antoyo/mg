@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Application","Create a new MG application window. This window contains a status bar where the user can type a command and a central widget."]]});

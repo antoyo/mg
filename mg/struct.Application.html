@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `Application` struct in crate `mg`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, Application">
+
+    <title>mg::Application - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../main.css">
+    
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'><a href='index.html'>mg</a></p><script>window.sidebarCurrent = {name: 'Application', ty: 'struct', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content struct">
+<h1 class='fqn'><span class='in-band'>Struct <a href='index.html'>mg</a>::<wbr><a class='struct' href=''>Application</a></span><span class='out-of-band'><span id='render-detail'>
+                   <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                       [<span class='inner'>&#x2212;</span>]
+                   </a>
+               </span><a id='src-238' class='srclink' href='../src/mg/src/lib.rs.html#83-93' title='goto source code'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct Application&lt;T&gt; {
+    // some fields omitted
+}</pre><div class='docblock'><p>Create a new MG application window.
+This window contains a status bar where the user can type a command and a central widget.</p>
+</div><h2 id='methods'>Methods</h2><h3 class='impl'><span class='in-band'><code>impl&lt;T:&nbsp;EnumFromStr + 'static&gt; <a class='struct' href='../mg/struct.Application.html' title='mg::Application'>Application</a>&lt;T&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a id='src-249' class='srclink' href='../src/mg/src/lib.rs.html#95-337' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.new' class='method'><span id='new.v' class='invisible'><code>fn <a href='#method.new' class='fnname'>new</a>() -&gt; <a class='struct' href='https://doc.rust-lang.org/nightly/alloc/rc/struct.Rc.html' title='alloc::rc::Rc'>Rc</a>&lt;Self&gt;</code></span></h4>
+<div class='docblock'><p>Create a new application.</p>
+</div><h4 id='method.new_with_config' class='method'><span id='new_with_config.v' class='invisible'><code>fn <a href='#method.new_with_config' class='fnname'>new_with_config</a>(config: Config) -&gt; <a class='struct' href='https://doc.rust-lang.org/nightly/alloc/rc/struct.Rc.html' title='alloc::rc::Rc'>Rc</a>&lt;Self&gt;</code></span></h4>
+<div class='docblock'><p>Create a new application with configuration.</p>
+</div><h4 id='method.add_statusbar_item' class='method'><span id='add_statusbar_item.v' class='invisible'><code>fn <a href='#method.add_statusbar_item' class='fnname'>add_statusbar_item</a>(&amp;self) -&gt; StatusBarItem</code></span></h4>
+<div class='docblock'><p>Create a new status bar item.</p>
+</div><h4 id='method.connect_command' class='method'><span id='connect_command.v' class='invisible'><code>fn <a href='#method.connect_command' class='fnname'>connect_command</a>&lt;F:&nbsp;<a class='trait' href='https://doc.rust-lang.org/nightly/core/ops/trait.Fn.html' title='core::ops::Fn'>Fn</a>(T) + 'static&gt;(&amp;self, callback: F)</code></span></h4>
+<div class='docblock'><p>Add a callback to the command event.</p>
+</div><h4 id='method.error' class='method'><span id='error.v' class='invisible'><code>fn <a href='#method.error' class='fnname'>error</a>(&amp;self, error: &amp;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>)</code></span></h4>
+<div class='docblock'><p>Show an error to the user.</p>
+</div><h4 id='method.parse_config' class='method'><span id='parse_config.v' class='invisible'><code>fn <a href='#method.parse_config' class='fnname'>parse_config</a>&lt;P:&nbsp;<a class='trait' href='https://doc.rust-lang.org/nightly/core/convert/trait.AsRef.html' title='core::convert::AsRef'>AsRef</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/std/path/struct.Path.html' title='std::path::Path'>Path</a>&gt;&gt;(&amp;self, filename: P) -&gt; Result&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt;</code></span></h4>
+<div class='docblock'><p>Parse a configuration file.</p>
+</div><h4 id='method.set_view' class='method'><span id='set_view.v' class='invisible'><code>fn <a href='#method.set_view' class='fnname'>set_view</a>&lt;W:&nbsp;IsA&lt;Widget&gt; + WidgetExt&gt;(&amp;self, view: &amp;W)</code></span></h4>
+<div class='docblock'><p>Set the main widget.</p>
+</div><h4 id='method.set_window_title' class='method'><span id='set_window_title.v' class='invisible'><code>fn <a href='#method.set_window_title' class='fnname'>set_window_title</a>(&amp;self, title: &amp;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>)</code></span></h4>
+<div class='docblock'><p>Set the window title.</p>
+</div><h4 id='method.window' class='method'><span id='window.v' class='invisible'><code>fn <a href='#method.window' class='fnname'>window</a>(&amp;self) -&gt; &amp;Window</code></span></h4>
+<div class='docblock'><p>Get the application window.</p>
+</div></div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                    <dt>+</dt>
+                    <dd>Collapse/expand all sections</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code> or <code>* -> vec</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../";
+        window.currentCrate = "mg";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../jquery.js"></script>
+    <script src="../main.js"></script>
+    
+    <script defer src="../search-index.js"></script>
+</body>
+</html>
