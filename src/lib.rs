@@ -21,6 +21,7 @@
 
 /*
  * TODO: Show the current shortcut in the status bar.
+ * TODO: Set a fixed height to the status bar.
  * TODO: Try to return an Application directly instead of an Rc<Application>.
  * TODO: support shortcuts with number like "50G".
  */
@@ -58,7 +59,7 @@ use mg_settings::key::Key;
 
 use key_converter::gdk_key_to_key;
 use self::ShortcutCommand::{Complete, Incomplete};
-use status_bar::StatusBar;
+use status_bar::{StatusBar, StatusBarItem};
 
 /// A command from a map command.
 #[derive(Debug)]
@@ -142,6 +143,13 @@ impl<T: EnumFromStr + 'static> Application<T> {
         else {
             Complete(action.to_string())
         }
+    }
+
+    /// Create a new status bar item.
+    pub fn add_statusbar_item(&self) -> StatusBarItem {
+        let item = StatusBarItem::new();
+        self.status_bar.add_item(&item);
+        item
     }
 
     /// Add the key to the current shortcut.

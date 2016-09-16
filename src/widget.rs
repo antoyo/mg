@@ -28,7 +28,7 @@ macro_rules! is_widget {
 
             #[inline]
             fn to_glib_none(&'a self) -> ::glib::translate::Stash<'a, *const ::gtk_sys::GtkWidget, Self> {
-                let stash: ::glib::translate::Stash<'a, *const ::gtk_sys::GtkBox, ::gtk::Box> = self.$inner_widget.to_glib_none();
+                let stash: ::glib::translate::Stash<'a, *const _, _> = self.$inner_widget.to_glib_none();
                 ::glib::translate::Stash(stash.0 as *const _, stash.1)
             }
 
@@ -45,7 +45,7 @@ macro_rules! is_widget {
 
             #[inline]
             fn to_glib_none(&'a self) -> ::glib::translate::Stash<'a, *mut ::gtk_sys::GtkWidget, Self> {
-                let stash: ::glib::translate::Stash<'a, *mut ::gtk_sys::GtkBox, ::gtk::Box> = self.$inner_widget.to_glib_none();
+                let stash: ::glib::translate::Stash<'a, *mut _, _> = self.$inner_widget.to_glib_none();
                 ::glib::translate::Stash(stash.0 as *mut _, stash.1)
             }
 

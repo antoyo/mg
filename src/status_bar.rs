@@ -21,7 +21,7 @@
 
 use std::cell::Cell;
 
-use gtk::{ContainerExt, EditableExt, Entry, EntryExt, Label, WidgetExt};
+use gtk::{BoxExt, ContainerExt, EditableExt, Entry, EntryExt, Label, WidgetExt};
 use gtk::Orientation::Horizontal;
 
 pub type StatusBarWidget = HBox;
@@ -59,6 +59,12 @@ impl StatusBar {
             hbox: hbox,
             message_label: message_label,
         }
+    }
+
+    /// Add an item.
+    pub fn add_item(&self, item: &StatusBarItem) {
+        item.label.show();
+        self.hbox.pack_end(item, false, false, 3);
     }
 
     /// Connect the active entry event.
@@ -109,3 +115,25 @@ impl StatusBar {
 }
 
 is_widget!(StatusBar, hbox);
+
+/// A status bar text item.
+pub struct StatusBarItem {
+    label: Label,
+}
+
+impl StatusBarItem {
+    /// Create a new status bar item.
+    #[allow(new_without_default)]
+    pub fn new() -> Self {
+        StatusBarItem {
+            label: Label::new(None),
+        }
+    }
+
+    /// Set the item text.
+    pub fn set_text(&self, text: &str) {
+        self.label.set_text(text);
+    }
+}
+
+is_widget!(StatusBarItem, label);
