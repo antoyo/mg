@@ -16,10 +16,7 @@ gdk-sys = "^0.3"
 glib = "^0.1"
 gtk = "^0.1"
 gtk-sys = "^0.3"
-
-[dependencies.mg-settings]
-git = "https://github.com/antoyo/mg-settings"
-version = "0.0.2-pre"
+mg-settings = "^0.0.2"
 
 [package.metadata.release]
 upload-doc = true
