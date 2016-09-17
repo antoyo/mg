@@ -46,6 +46,7 @@ mod style_context;
 mod widget;
 mod status_bar;
 
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs::File;
@@ -276,7 +277,14 @@ impl<T: EnumFromStr + 'static> Application<T> {
         for (variable, function) in variables.iter() {
             command = command.replace(&format!("<{}>", variable), &function());
         }
-        self.status_bar.set_command(&format!("{} ", command));
+        let text: Cow<str> =
+            if command.contains(' ') {
+                command.into()
+            }
+            else {
+                format!("{} ", command).into()
+            };
+        self.status_bar.set_command(&text);
     }
 
     /// Handle the key press event.
