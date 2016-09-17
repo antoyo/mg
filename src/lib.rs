@@ -70,7 +70,8 @@ use mg_settings::key::Key;
 use key_converter::gdk_key_to_key;
 use gobject::ObjectExtManual;
 use self::ShortcutCommand::{Complete, Incomplete};
-use status_bar::{StatusBar, StatusBarItem};
+use status_bar::StatusBar;
+pub use status_bar::StatusBarItem;
 use style_context::StyleContextExtManual;
 
 #[macro_export]
