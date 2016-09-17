@@ -23,7 +23,6 @@
 
 /*
  * TODO: Show the current shortcut in the status bar.
- * TODO: Set a fixed height to the status bar.
  * TODO: Try to return an Application directly instead of an Rc<Application>.
  * TODO: support shortcuts with number like "50G".
  * TODO: Associate a color with modes.
@@ -230,8 +229,14 @@ impl<T: EnumFromStr + 'static> Application<T> {
         style_context.get_color(STATE_FLAG_NORMAL)
     }
 
+    /// Get the current mode.
+    fn get_mode(&self) -> String {
+        self.current_mode.borrow().clone()
+    }
+
     /// Handle the command activate event.
     fn handle_command(&self, command: Option<String>) {
+        self.set_mode("normal");
         if let Some(command) = command {
             if let Some(ref callback) = *self.command_callback.borrow() {
                 let result = self.settings_parser.borrow_mut().parse_line(&command);
@@ -251,7 +256,6 @@ impl<T: EnumFromStr + 'static> Application<T> {
                                     Parse => format!("Parse error: unexpected {}, expecting: {}", error.unexpected, error.expected),
                                     UnknownCommand => format!("Not a command: {}", error.unexpected),
                                 };
-                            self.set_mode("normal");
                             self.error(&message);
                         }
                     },
@@ -263,6 +267,7 @@ impl<T: EnumFromStr + 'static> Application<T> {
 
     /// Handle a possible input of a shortcut.
     fn handle_shortcut(&self, key: &EventKey) -> Inhibit {
+        let mode = self.get_mode();
         if !self.status_bar.entry_shown() {
             let control_pressed = key.get_state() & CONTROL_MASK == CONTROL_MASK;
             if let Some(key) = gdk_key_to_key(key.get_keyval(), control_pressed) {
@@ -288,11 +293,17 @@ impl<T: EnumFromStr + 'static> Application<T> {
                 }
             }
         }
-        Inhibit(false)
+        if mode == "normal" {
+            Inhibit(true)
+        }
+        else {
+            Inhibit(false)
+        }
     }
 
     /// Input the specified command.
     fn input_command(&self, command: &str) {
+        self.set_mode("command");
         self.status_bar.show_entry();
         let variables = self.variables.borrow();
         let mut command = command.to_string();
@@ -312,8 +323,7 @@ impl<T: EnumFromStr + 'static> Application<T> {
     /// Handle the key press event.
     #[allow(non_upper_case_globals)]
     fn key_press(&self, key: &EventKey) -> Inhibit {
-        let mode = self.current_mode.borrow().clone();
-        match mode.as_ref() {
+        match self.get_mode().as_ref() {
             "normal" => {
                 match key.get_keyval() {
                     colon => {
@@ -409,8 +419,8 @@ impl<T: EnumFromStr + 'static> Application<T> {
 
     /// Show the current mode if it is not the normal mode.
     fn show_mode(&self) {
-        let mode = self.current_mode.borrow();
-        if *mode != "normal" && *mode != "command" {
+        let mode = self.get_mode();
+        if mode != "normal" && mode != "command" {
             self.message.set_text(&mode);
         }
         else {

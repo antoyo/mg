@@ -25,7 +25,8 @@ extern crate mg;
 #[macro_use]
 extern crate mg_settings;
 
-use gtk::Label;
+use gtk::{ContainerExt, Entry, Label, WidgetExt};
+use gtk::Orientation::Vertical;
 use mg::Application;
 
 use AppCommand::*;
@@ -55,8 +56,12 @@ fn main() {
     app.add_variable("url", || "http://duckduckgo.com/lite".to_string());
     app.set_window_title("First Mg Program");
 
+    let vbox = gtk::Box::new(Vertical, 0);
     let label = Label::new(Some("Mg App"));
-    app.set_view(&label);
+    vbox.add(&label);
+    let entry = Entry::new();
+    vbox.add(&entry);
+    app.set_view(&vbox);
 
     {
         let mg_app = app.clone();
@@ -69,6 +74,8 @@ fn main() {
             }
         });
     }
+
+    entry.grab_focus();
 
     gtk::main();
 }
