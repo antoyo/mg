@@ -20,6 +20,7 @@
  */
 
 /// Implement the IsA<Widget> trait for `$widget` where `$inner_widget` is a `Widget`.
+#[macro_export]
 macro_rules! is_widget {
     ($widget:ident, $inner_widget:ident) => {
         impl<'a> ::glib::translate::ToGlibPtr<'a, *const ::gtk_sys::GtkWidget> for $widget {
