@@ -77,7 +77,7 @@ use style_context::StyleContextExtManual;
 #[macro_export]
 macro_rules! hash {
     ($($key:expr => $value:expr),* $(,)*) => {{
-        let mut hashmap = std::collections::HashMap::new();
+        let mut hashmap = ::std::collections::HashMap::new();
         $(hashmap.insert($key.into(), $value.into());)*
         hashmap
     }};
