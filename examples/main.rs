@@ -52,6 +52,7 @@ fn main() {
     if let Err(error) = app.parse_config("main.conf") {
         app.error(error.description());
     }
+    app.add_variable("url", || "http://duckduckgo.com/lite".to_string());
     app.set_window_title("First Mg Program");
 
     let label = Label::new(Some("Mg App"));

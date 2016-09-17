@@ -95,6 +95,7 @@ pub struct Application<T> {
     settings_parser: RefCell<Parser<T>>,
     status_bar: StatusBar,
     vbox: Grid,
+    variables: RefCell<HashMap<String, Box<Fn() -> String>>>,
     window: Window,
 }
 
@@ -135,6 +136,7 @@ impl<T: EnumFromStr + 'static> Application<T> {
             settings_parser: RefCell::new(Parser::new_with_config(config)),
             status_bar: status_bar,
             vbox: grid,
+            variables: RefCell::new(HashMap::new()),
             window: window,
         });
 
@@ -179,6 +181,13 @@ impl<T: EnumFromStr + 'static> Application<T> {
     fn add_to_shortcut(&self, key: Key) {
         let mut shortcut = self.current_shortcut.borrow_mut();
         shortcut.push(key);
+    }
+
+    /// Add a variable that can be used in mappings.
+    /// The placeholder will be replaced by the value return by the function.
+    pub fn add_variable<F: Fn() -> String + 'static>(&self, variable_name: &str, function: F) {
+        let mut variables = self.variables.borrow_mut();
+        variables.insert(variable_name.to_string(), Box::new(function));
     }
 
     /// Add a callback to the command event.
@@ -262,6 +271,11 @@ impl<T: EnumFromStr + 'static> Application<T> {
     /// Input the specified command.
     fn input_command(&self, command: &str) {
         self.status_bar.show_entry();
+        let variables = self.variables.borrow();
+        let mut command = command.to_string();
+        for (variable, function) in variables.iter() {
+            command = command.replace(&format!("<{}>", variable), &function());
+        }
         self.status_bar.set_command(&format!("{} ", command));
     }
 
