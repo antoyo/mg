@@ -20,17 +20,19 @@
  */
 
 extern crate gtk;
+#[macro_use]
 extern crate mg;
 #[macro_use]
 extern crate mg_settings;
 
 use gtk::Label;
 use mg::Application;
-use mg_settings::Config;
 
 use AppCommand::*;
 
 commands!(AppCommand {
+    Insert,
+    Normal,
     Open(String),
     Quit,
 });
@@ -38,11 +40,10 @@ commands!(AppCommand {
 fn main() {
     gtk::init().unwrap();
 
-    let config = Config {
-        mapping_modes: vec!["n".to_string()],
-    };
-
-    let app = Application::new_with_config(config);
+    let app = Application::new_with_config(hash! {
+        "i" => "insert",
+        "n" => "normal",
+    });
     app.use_dark_theme();
     let item = app.add_statusbar_item();
     item.set_text("Item");
@@ -50,7 +51,7 @@ fn main() {
     item2.set_text("Test");
     item.set_text("Rightmost");
     if let Err(error) = app.parse_config("main.conf") {
-        app.error(error.description());
+        app.error(&error.to_string());
     }
     app.add_variable("url", || "http://duckduckgo.com/lite".to_string());
     app.set_window_title("First Mg Program");
@@ -58,12 +59,17 @@ fn main() {
     let label = Label::new(Some("Mg App"));
     app.set_view(&label);
 
-    app.connect_command(move |command| {
-        match command {
-            Open(url) => label.set_text(&format!("Opening URL {}", url)),
-            Quit => gtk::main_quit(),
-        }
-    });
+    {
+        let mg_app = app.clone();
+        app.connect_command(move |command| {
+            match command {
+                Insert => mg_app.set_mode("insert"),
+                Normal => mg_app.set_mode("normal"),
+                Open(url) => label.set_text(&format!("Opening URL {}", url)),
+                Quit => gtk::main_quit(),
+            }
+        });
+    }
 
     gtk::main();
 }

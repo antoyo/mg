@@ -19,11 +19,14 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#![allow(let_and_return)]
+
 /*
  * TODO: Show the current shortcut in the status bar.
  * TODO: Set a fixed height to the status bar.
  * TODO: Try to return an Application directly instead of an Rc<Application>.
  * TODO: support shortcuts with number like "50G".
+ * TODO: Associate a color with modes.
  */
 
 //! Minimal UI library based on GTK+.
@@ -71,6 +74,17 @@ use self::ShortcutCommand::{Complete, Incomplete};
 use status_bar::{StatusBar, StatusBarItem};
 use style_context::StyleContextExtManual;
 
+#[macro_export]
+macro_rules! hash {
+    ($($key:expr => $value:expr),* $(,)*) => {{
+        let mut hashmap = std::collections::HashMap::new();
+        $(hashmap.insert($key.into(), $value.into());)*
+        hashmap
+    }};
+}
+
+type Modes = HashMap<String, String>;
+
 const RED: &'static GdkRGBA = &GdkRGBA { red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0 };
 const TRANSPARENT: &'static GdkRGBA = &GdkRGBA { red: 0.0, green: 0.0, blue: 0.0, alpha: 0.0 };
 const WHITE: &'static GdkRGBA = &GdkRGBA { red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0 };
@@ -88,10 +102,11 @@ enum ShortcutCommand {
 /// This window contains a status bar where the user can type a command and a central widget.
 pub struct Application<T> {
     command_callback: RefCell<Option<Box<Fn(T)>>>,
-    current_mode: String,
+    current_mode: RefCell<String>,
     current_shortcut: RefCell<Vec<Key>>,
     foreground_color: RefCell<RGBA>,
     mappings: RefCell<HashMap<String, HashMap<Vec<Key>, String>>>,
+    modes: Modes,
     message: StatusBarItem,
     settings_parser: RefCell<Parser<T>>,
     status_bar: StatusBar,
@@ -104,11 +119,14 @@ impl<T: EnumFromStr + 'static> Application<T> {
     /// Create a new application.
     #[allow(new_without_default)]
     pub fn new() -> Rc<Self> {
-        Application::new_with_config(Config::default())
+        Application::new_with_config(hash!{})
     }
 
     /// Create a new application with configuration.
-    pub fn new_with_config(config: Config) -> Rc<Self> {
+    pub fn new_with_config(modes: Modes) -> Rc<Self> {
+        let config = Config {
+            mapping_modes: modes.keys().cloned().collect()
+        };
         let window = Window::new(WindowType::Toplevel);
         window.connect_delete_event(|_, _| {
             gtk::main_quit();
@@ -129,10 +147,11 @@ impl<T: EnumFromStr + 'static> Application<T> {
 
         let app = Rc::new(Application {
             command_callback: RefCell::new(None),
-            current_mode: "n".to_string(),
+            current_mode: RefCell::new("normal".to_string()),
             current_shortcut: RefCell::new(vec![]),
             foreground_color: RefCell::new(foreground_color),
             mappings: RefCell::new(HashMap::new()),
+            modes: modes,
             message: message,
             settings_parser: RefCell::new(Parser::new_with_config(config)),
             status_bar: status_bar,
@@ -230,6 +249,7 @@ impl<T: EnumFromStr + 'static> Application<T> {
                                     Parse => format!("Parse error: unexpected {}, expecting: {}", error.unexpected, error.expected),
                                     UnknownCommand => format!("Not a command: {}", error.unexpected),
                                 };
+                            self.set_mode("normal");
                             self.error(&message);
                         }
                     },
@@ -248,7 +268,7 @@ impl<T: EnumFromStr + 'static> Application<T> {
                 let action = {
                     let shortcut = self.current_shortcut.borrow();
                     let mappings = self.mappings.borrow();
-                    mappings.get(&self.current_mode)
+                    mappings.get(&*self.current_mode.borrow())
                         .and_then(|mappings| mappings.get(&*shortcut).cloned())
                 };
                 if let Some(action) = action {
@@ -290,22 +310,34 @@ impl<T: EnumFromStr + 'static> Application<T> {
     /// Handle the key press event.
     #[allow(non_upper_case_globals)]
     fn key_press(&self, key: &EventKey) -> Inhibit {
-        match key.get_keyval() {
-            colon => {
-                if !self.status_bar.entry_shown() {
-                    self.reset();
-                    self.status_bar.show_entry();
-                    Inhibit(true)
-                }
-                else {
-                    Inhibit(false)
+        let mode = self.current_mode.borrow().clone();
+        match mode.as_ref() {
+            "normal" => {
+                match key.get_keyval() {
+                    colon => {
+                        self.set_mode("command");
+                        self.reset();
+                        self.status_bar.show_entry();
+                        Inhibit(true)
+                    },
+                    Escape => {
+                        self.reset();
+                        Inhibit(true)
+                    },
+                    _ => self.handle_shortcut(key),
                 }
             },
-            Escape => {
-                self.reset();
-                Inhibit(true)
+            "command" => {
+                match key.get_keyval() {
+                    Escape => {
+                        self.set_mode("normal");
+                        self.reset();
+                        Inhibit(true)
+                    },
+                    _ => self.handle_shortcut(key),
+                }
             },
-            _ => self.handle_shortcut(key),
+            _ => self.handle_shortcut(key)
         }
     }
 
@@ -313,7 +345,7 @@ impl<T: EnumFromStr + 'static> Application<T> {
     fn no_possible_shortcut(&self) -> bool {
         let current_shortcut = self.current_shortcut.borrow();
         let mappings = self.mappings.borrow();
-        if let Some(mappings) = mappings.get(&self.current_mode) {
+        if let Some(mappings) = mappings.get(&*self.current_mode.borrow()) {
             for key in mappings.keys() {
                 if key.starts_with(&*current_shortcut) {
                     return false;
@@ -334,7 +366,7 @@ impl<T: EnumFromStr + 'static> Application<T> {
                 Include(_) => (), // TODO: parse the included file.
                 Map { action, keys, mode } => {
                     let mut mappings = self.mappings.borrow_mut();
-                    let mappings = mappings.entry(mode).or_insert_with(HashMap::new);
+                    let mappings = mappings.entry(self.modes[&mode].clone()).or_insert_with(HashMap::new);
                     mappings.insert(keys, action);
                 },
                 Set(_, _) => (), // TODO: set settings.
@@ -349,9 +381,15 @@ impl<T: EnumFromStr + 'static> Application<T> {
         self.status_bar.override_background_color(STATE_FLAG_NORMAL, TRANSPARENT);
         self.status_bar.override_color(STATE_FLAG_NORMAL, &self.foreground_color.borrow());
         self.status_bar.hide();
-        self.message.hide();
+        self.show_mode();
         let mut shortcut = self.current_shortcut.borrow_mut();
         shortcut.clear();
+    }
+
+    /// Set the current mode.
+    pub fn set_mode(&self, mode: &str) {
+        *self.current_mode.borrow_mut() = mode.to_string();
+        self.show_mode();
     }
 
     /// Set the main widget.
@@ -365,6 +403,17 @@ impl<T: EnumFromStr + 'static> Application<T> {
     /// Set the window title.
     pub fn set_window_title(&self, title: &str) {
         self.window.set_title(title);
+    }
+
+    /// Show the current mode if it is not the normal mode.
+    fn show_mode(&self) {
+        let mode = self.current_mode.borrow();
+        if *mode != "normal" && *mode != "command" {
+            self.message.set_text(&mode);
+        }
+        else {
+            self.message.set_text("");
+        }
     }
 
     /// Use the dark variant of the theme if available.
