@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["Application","Create a new MG application window. This window contains a status bar where the user can type a command and a central widget."]]});
+initSidebarItems({"macro":[["is_widget","Implement the IsA<Widget> trait for `$widget` where `$inner_widget` is a `Widget`."]],"struct":[["Application","Create a new MG application window. This window contains a status bar where the user can type a command and a central widget."]]});

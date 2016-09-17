@@ -144,6 +144,7 @@
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
+<span id="103">103</span>
 </pre><pre class='rust '>
 <span class='comment'>/*
  * Copyright (c) 2016 Boucher, Antoni &lt;bouanto@zoho.com&gt;
@@ -167,6 +168,7 @@
  */</span>
 
 <span class='doccomment'>/// Implement the IsA&lt;Widget&gt; trait for `$widget` where `$inner_widget` is a `Widget`.</span>
+<span class='attribute'>#[<span class='ident'>macro_export</span>]</span>
 <span class='macro'>macro_rules</span><span class='macro'>!</span> <span class='ident'>is_widget</span> {
     (<span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>widget</span>:<span class='ident'>ident</span>, <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>inner_widget</span>:<span class='ident'>ident</span>) <span class='op'>=&gt;</span> {
         <span class='kw'>impl</span><span class='op'>&lt;</span><span class='lifetime'>&#39;a</span><span class='op'>&gt;</span> ::<span class='ident'>glib</span>::<span class='ident'>translate</span>::<span class='ident'>ToGlibPtr</span><span class='op'>&lt;</span><span class='lifetime'>&#39;a</span>, <span class='op'>*</span><span class='kw'>const</span> ::<span class='ident'>gtk_sys</span>::<span class='ident'>GtkWidget</span><span class='op'>&gt;</span> <span class='kw'>for</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>widget</span> {

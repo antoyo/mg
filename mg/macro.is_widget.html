@@ -4,10 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="generator" content="rustdoc">
-    <meta name="description" content="API documentation for the Rust `mg` crate.">
-    <meta name="keywords" content="rust, rustlang, rust-lang, mg">
+    <meta name="description" content="API documentation for the Rust `is_widget` macro in crate `mg`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, is_widget">
 
-    <title>mg - Rust</title>
+    <title>mg::is_widget - Rust</title>
 
     <link rel="stylesheet" type="text/css" href="../rustdoc.css">
     <link rel="stylesheet" type="text/css" href="../main.css">
@@ -28,7 +28,7 @@
 
     <nav class="sidebar">
         
-        <p class='location'></p><script>window.sidebarCurrent = {name: 'mg', ty: 'mod', relpath: '../'};</script>
+        <p class='location'><a href='index.html'>mg</a></p><script>window.sidebarCurrent = {name: 'is_widget', ty: 'macro', relpath: ''};</script><script defer src="sidebar-items.js"></script>
     </nav>
 
     <nav class="sub">
@@ -42,31 +42,18 @@
         </form>
     </nav>
 
-    <section id='main' class="content mod">
-<h1 class='fqn'><span class='in-band'>Crate <a class='mod' href=''>mg</a></span><span class='out-of-band'><span id='render-detail'>
+    <section id='main' class="content macro">
+<h1 class='fqn'><span class='in-band'>Macro <a href='index.html'>mg</a>::<wbr><a class='macro' href=''>is_widget</a></span><span class='out-of-band'><span id='render-detail'>
                    <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                        [<span class='inner'>&#x2212;</span>]
                    </a>
-               </span><a id='src-0' class='srclink' href='../src/mg/src/lib.rs.html#29-359' title='goto source code'>[src]</a></span></h1>
-<div class='docblock'><p>Minimal UI library based on GTK+.</p>
-</div><h2 id='macros' class='section-header'><a href="#macros">Macros</a></h2>
-<table>
-                       <tr class=' module-item'>
-                           <td><a class='macro' href='macro.is_widget.html'
-                                  title='mg::is_widget'>is_widget</a></td>
-                           <td class='docblock short'>
-                                <p>Implement the IsA<Widget> trait for <code>$widget</code> where <code>$inner_widget</code> is a <code>Widget</code>.</p>
-                           </td>
-                       </tr></table><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
-<table>
-                       <tr class=' module-item'>
-                           <td><a class='struct' href='struct.Application.html'
-                                  title='mg::Application'>Application</a></td>
-                           <td class='docblock short'>
-                                <p>Create a new MG application window.
-This window contains a status bar where the user can type a command and a central widget.</p>
-                           </td>
-                       </tr></table></section>
+               </span><a id='src-417' class='srclink' href='../src/mg/src/widget.rs.html#24-103' title='goto source code'>[src]</a></span></h1>
+<pre class='rust macro'>
+<span class='macro'>macro_rules</span><span class='macro'>!</span> <span class='ident'>is_widget</span> {
+    (<span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>widget</span>:<span class='ident'>ident</span>, <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>inner_widget</span>:<span class='ident'>ident</span>) <span class='op'>=&gt;</span> { ... };
+}</pre>
+<div class='docblock'><p>Implement the IsA<Widget> trait for <code>$widget</code> where <code>$inner_widget</code> is a <code>Widget</code>.</p>
+</div></section>
     <section id='search' class="content hidden"></section>
 
     <section class="footer"></section>
