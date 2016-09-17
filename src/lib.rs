@@ -123,9 +123,11 @@ impl<T: EnumFromStr + 'static> Application<T> {
     }
 
     /// Create a new application with configuration.
-    pub fn new_with_config(modes: Modes) -> Rc<Self> {
+    pub fn new_with_config(mut modes: Modes) -> Rc<Self> {
+        modes.insert("n".to_string(), "normal".to_string());
+        modes.insert("c".to_string(), "command".to_string());
         let config = Config {
-            mapping_modes: modes.keys().cloned().collect()
+            mapping_modes: modes.keys().cloned().collect(),
         };
         let window = Window::new(WindowType::Toplevel);
         window.connect_delete_event(|_, _| {

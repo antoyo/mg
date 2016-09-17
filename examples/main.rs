@@ -42,7 +42,6 @@ fn main() {
 
     let app = Application::new_with_config(hash! {
         "i" => "insert",
-        "n" => "normal",
     });
     app.use_dark_theme();
     let item = app.add_statusbar_item();
