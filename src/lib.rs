@@ -20,7 +20,6 @@
  */
 
 /*
- * TODO: set_mode() is called too often.
  * TODO: support non-"always" in special commands.
  * TODO: different event for activate event of special commands.
  * TODO: Disable focusing next element when hitting tab in the command entry.
@@ -227,7 +226,10 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
 
         {
             let instance = app.clone();
-            app.status_bar.connect_activate(move |command| instance.handle_command(command));
+            app.status_bar.connect_activate(move |command| {
+                instance.set_mode("normal");
+                instance.handle_command(command);
+            });
         }
 
         {
@@ -362,7 +364,6 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
 
     /// Handle the command activate event.
     fn handle_command(&self, command: Option<String>) {
-        self.set_mode("normal");
         if let Some(command) = command {
             let identifier = self.current_command_mode.get();
             if identifier == ':' {
