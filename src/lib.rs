@@ -20,7 +20,9 @@
  */
 
 /*
+ * TODO: set_mode() is called too often.
  * TODO: support non-"always" in special commands.
+ * TODO: different event for activate event of special commands.
  * TODO: Disable focusing next element when hitting tab in the command entry.
  * TODO: Show the current shortcut in the status bar.
  * TODO: Try to return an Application directly instead of an Rc<Application>.
@@ -163,6 +165,7 @@ pub struct Application<S, T> {
     mappings: RefCell<HashMap<String, HashMap<Vec<Key>, String>>>,
     modes: Modes,
     message: StatusBarItem,
+    mode_changed_callback: RefCell<Option<Box<Fn(&str)>>>,
     settings_parser: RefCell<Parser<T>>,
     special_command_callback: RefCell<Option<Box<Fn(S)>>>,
     status_bar: StatusBar,
@@ -211,6 +214,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
             mappings: RefCell::new(HashMap::new()),
             modes: modes,
             message: message,
+            mode_changed_callback: RefCell::new(None),
             settings_parser: RefCell::new(Parser::new_with_config(config)),
             special_command_callback: RefCell::new(None),
             status_bar: status_bar,
@@ -328,7 +332,12 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
         *self.command_callback.borrow_mut() = Some(Box::new(callback));
     }
 
-    /// Add a callback to the command event.
+    /// Add a callback to change mode event.
+    pub fn connect_mode_changed<F: Fn(&str) + 'static>(&self, callback: F) {
+        *self.mode_changed_callback.borrow_mut() = Some(Box::new(callback));
+    }
+
+    /// Add a callback to the special command event.
     pub fn connect_special_command<F: Fn(S) + 'static>(&self, callback: F) {
         *self.special_command_callback.borrow_mut() = Some(Box::new(callback));
     }
@@ -540,6 +549,9 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
     pub fn set_mode(&self, mode: &str) {
         *self.current_mode.borrow_mut() = mode.to_string();
         self.show_mode();
+        if let Some(ref callback) = *self.mode_changed_callback.borrow() {
+            callback(mode);
+        }
     }
 
     /// Set the main widget.

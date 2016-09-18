@@ -69,6 +69,8 @@ fn main() {
     vbox.add(&entry);
     app.set_view(&vbox);
 
+    app.connect_mode_changed(|mode| println!("{}", mode));
+
     {
         let mg_app = app.clone();
         app.connect_command(move |command| {
