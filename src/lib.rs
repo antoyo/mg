@@ -358,7 +358,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
     }
 
     /// Get the current mode.
-    fn get_mode(&self) -> String {
+    pub fn get_mode(&self) -> String {
         self.current_mode.borrow().clone()
     }
 
