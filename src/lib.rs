@@ -168,6 +168,7 @@ pub struct Application<S, T> {
     modes: Modes,
     message: StatusBarItem,
     mode_changed_callback: RefCell<Option<Box<Fn(&str)>>>,
+    mode_label: StatusBarItem,
     settings_parser: RefCell<Parser<T>>,
     special_command_callback: RefCell<Option<Box<Fn(S)>>>,
     status_bar: StatusBar,
@@ -205,6 +206,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
 
         let foreground_color = Application::<S, T>::get_foreground_color(&window);
 
+        let mode_label = StatusBarItem::new().left();
         let message = StatusBarItem::new().left();
 
         let app = Rc::new(Application {
@@ -217,6 +219,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
             modes: modes,
             message: message,
             mode_changed_callback: RefCell::new(None),
+            mode_label: mode_label,
             settings_parser: RefCell::new(Parser::new_with_config(config)),
             special_command_callback: RefCell::new(None),
             status_bar: status_bar,
@@ -225,6 +228,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
             window: window,
         });
 
+        app.status_bar.add_item(&app.mode_label);
         app.status_bar.add_item(&app.message);
 
         {
@@ -538,6 +542,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
         self.status_bar.override_background_color(STATE_FLAG_NORMAL, TRANSPARENT);
         self.status_bar.override_color(STATE_FLAG_NORMAL, &self.foreground_color.borrow());
         self.status_bar.hide();
+        self.message.set_text("");
         self.show_mode();
         let mut shortcut = self.current_shortcut.borrow_mut();
         shortcut.clear();
@@ -575,10 +580,10 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
     fn show_mode(&self) {
         let mode = self.get_mode();
         if mode != "normal" && mode != "command" {
-            self.message.set_text(&mode);
+            self.mode_label.set_text(&mode);
         }
         else {
-            self.message.set_text("");
+            self.mode_label.set_text("");
         }
     }
 
