@@ -20,6 +20,7 @@
  */
 
 /*
+ * TODO: fix the size of the status bar.
  * TODO: support non-"always" in special commands.
  * TODO: different event for activate event of special commands.
  * TODO: Disable focusing next element when hitting tab in the command entry.
@@ -87,8 +88,7 @@ macro_rules! hash {
 
 #[macro_export]
 macro_rules! special_commands {
-    ($enum_name:ident { $command:ident ( $identifier:expr ), } ) => {
-    };
+    // TODO: use $(always) instead of always.
     ($enum_name:ident { $( $command:ident ( $identifier:expr , always ),)* } ) => {
         enum $enum_name {
             $( $command(String), )*

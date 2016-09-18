@@ -11,14 +11,32 @@ documentation = "https://antoyo.github.io/mg/mg/"
 nightly = []
 
 [dependencies]
-gdk = "^0.5"
-gdk-sys = "^0.3"
-glib = "^0.1"
-gobject-sys = "^0.3"
-gtk = "^0.1"
-gtk-sys = "^0.3"
 libc = "^0.2"
 mg-settings = "^0.0.2"
+
+[dependencies.gdk]
+git = "https://github.com/gtk-rs/gdk"
+version = "0.5.0"
+
+[dependencies.gdk-sys]
+git = "https://github.com/gtk-rs/sys"
+version = "0.3.1"
+
+[dependencies.glib]
+git = "https://github.com/gtk-rs/glib"
+version = "0.1.0"
+
+[dependencies.gobject-sys]
+git = "https://github.com/gtk-rs/sys"
+version = "0.3.1"
+
+[dependencies.gtk]
+git = "https://github.com/gtk-rs/gtk"
+version = "0.1.0"
+
+[dependencies.gtk-sys]
+git = "https://github.com/gtk-rs/sys"
+version = "0.3.1"
 
 [package.metadata.release]
 upload-doc = true
