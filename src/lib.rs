@@ -89,28 +89,31 @@ macro_rules! hash {
 macro_rules! special_commands {
     ($enum_name:ident { $command:ident ( $identifier:expr ), } ) => {
     };
-    ($enum_name:ident { $command:ident ( $identifier:expr , always ), } ) => {
+    ($enum_name:ident { $( $command:ident ( $identifier:expr , always ),)* } ) => {
         enum $enum_name {
-            $command(String),
+            $( $command(String), )*
         }
 
         impl $crate::SpecialCommand for $enum_name {
             fn identifier_to_command(identifier: char, input: &str) -> ::std::result::Result<Self, String> {
                 match identifier {
-                    $identifier => Ok($command(input.to_string())),
+                    $( $identifier => Ok($command(input.to_string())), )*
                     _ => Err(format!("unknown identifier {}", identifier)),
                 }
             }
 
             fn is_always(identifier: char) -> bool {
                 match identifier {
-                    $identifier => true,
+                    $( $identifier )|* => true,
                     _ => false,
                 }
             }
 
             fn is_identifier(character: char) -> bool {
-                character == $identifier
+                match character {
+                    $( $identifier )|* => true,
+                    _ => false,
+                }
             }
         }
     };

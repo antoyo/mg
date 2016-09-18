@@ -40,8 +40,8 @@ commands!(AppCommand {
 });
 
 special_commands!(SpecialCommand {
+    BackwardSearch('?', always),
     Search('/', always),
-    //ReverseSearch('?'),
 });
 
 fn main() {
@@ -86,6 +86,7 @@ fn main() {
     {
         app.connect_special_command(move |command| {
             match command {
+                BackwardSearch(input) => println!("Searching backward for {}", input),
                 Search(input) => println!("Searching for {}", input),
             }
         });
