@@ -312,7 +312,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
                 self.set_mode("normal");
                 self.set_current_identifier(':');
                 self.reset();
-                Inhibit(true)
+                Inhibit(false)
             },
             _ => self.handle_shortcut(key),
         }
@@ -477,7 +477,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
             },
             Escape => {
                 self.reset();
-                Inhibit(true)
+                Inhibit(false)
             },
             keyval => {
                 let character = keyval as u8 as char;
