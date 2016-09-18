@@ -29,9 +29,9 @@ pub type HBox = ::gtk::Box;
 
 /// The window status bar.
 pub struct StatusBar {
-    colon_label: Label,
     entry: Entry,
     entry_shown: Cell<bool>,
+    identifier_label: Label,
     hbox: HBox,
 }
 
@@ -41,17 +41,17 @@ impl StatusBar {
         let hbox = HBox::new(Horizontal, 0);
         hbox.set_size_request(1, 20);
 
-        let colon_label = Label::new(Some(":"));
-        hbox.add(&colon_label);
+        let identifier_label = Label::new(Some(":"));
+        hbox.add(&identifier_label);
 
         let entry = Entry::new();
         StatusBar::adjust_entry(&entry);
         hbox.add(&entry);
 
         StatusBar {
-            colon_label: colon_label,
             entry: entry,
             entry_shown: Cell::new(false),
+            identifier_label: identifier_label,
             hbox: hbox,
         }
     }
@@ -92,6 +92,11 @@ impl StatusBar {
         self.entry_shown.get()
     }
 
+    /// Get the text of the command entry.
+    pub fn get_command(&self) -> Option<String> {
+        self.entry.get_text()
+    }
+
     /// Hide all the widgets.
     pub fn hide(&self) {
         self.hide_entry();
@@ -101,7 +106,7 @@ impl StatusBar {
     pub fn hide_entry(&self) {
         self.entry_shown.set(false);
         self.entry.hide();
-        self.colon_label.hide();
+        self.identifier_label.hide();
     }
 
     /// Set the text of the command entry.
@@ -110,13 +115,18 @@ impl StatusBar {
         self.entry.set_position(command.len() as i32);
     }
 
+    /// Set the identifier label text.
+    pub fn set_identifier(&self, identifier: &str) {
+        self.identifier_label.set_text(identifier);
+    }
+
     /// Show the entry.
     pub fn show_entry(&self) {
         self.entry_shown.set(true);
         self.entry.set_text("");
         self.entry.show();
         self.entry.grab_focus();
-        self.colon_label.show();
+        self.identifier_label.show();
     }
 }
 

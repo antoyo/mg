@@ -19,9 +19,9 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#![allow(let_and_return)]
-
 /*
+ * TODO: support non-"always" in special commands.
+ * TODO: Disable focusing next element when hitting tab in the command entry.
  * TODO: Show the current shortcut in the status bar.
  * TODO: Try to return an Application directly instead of an Rc<Application>.
  * TODO: support shortcuts with number like "50G".
@@ -49,7 +49,7 @@ mod widget;
 mod status_bar;
 
 use std::borrow::Cow;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
@@ -62,13 +62,14 @@ use gdk_sys::GdkRGBA;
 use gtk::{ContainerExt, Grid, Inhibit, IsA, Settings, Widget, WidgetExt, Window, WindowExt, WindowType, STATE_FLAG_NORMAL};
 use gtk::prelude::WidgetExtManual;
 use mg_settings::{Config, EnumFromStr, Parser};
-use mg_settings::Command::{Custom, Include, Map, Set, Unmap};
+use mg_settings::Command::{self, Custom, Include, Map, Set, Unmap};
 use mg_settings::error::{Error, Result};
 use mg_settings::error::ErrorType::{MissingArgument, NoCommand, Parse, UnknownCommand};
 use mg_settings::key::Key;
 
 use key_converter::gdk_key_to_key;
 use gobject::ObjectExtManual;
+use self::ActivationType::{Current, Final};
 use self::ShortcutCommand::{Complete, Incomplete};
 use status_bar::StatusBar;
 pub use status_bar::StatusBarItem;
@@ -83,11 +84,64 @@ macro_rules! hash {
     }};
 }
 
+#[macro_export]
+macro_rules! special_commands {
+    ($enum_name:ident { $command:ident ( $identifier:expr ), } ) => {
+    };
+    ($enum_name:ident { $command:ident ( $identifier:expr , always ), } ) => {
+        enum $enum_name {
+            $command(String),
+        }
+
+        impl $crate::SpecialCommand for $enum_name {
+            fn identifier_to_command(identifier: char, input: &str) -> ::std::result::Result<Self, String> {
+                match identifier {
+                    $identifier => Ok($command(input.to_string())),
+                    _ => Err(format!("unknown identifier {}", identifier)),
+                }
+            }
+
+            fn is_always(identifier: char) -> bool {
+                match identifier {
+                    $identifier => true,
+                    _ => false,
+                }
+            }
+
+            fn is_identifier(character: char) -> bool {
+                character == $identifier
+            }
+        }
+    };
+}
+
+/// Trait for converting an identifier like "/" to a special command.
+pub trait SpecialCommand
+    where Self: Sized
+{
+    /// Convert an identifier like "/" to a special command.
+    fn identifier_to_command(identifier: char, input: &str) -> std::result::Result<Self, String>;
+
+    /// Check if the identifier is declared `always`.
+    /// The always option means that the command is activated every time a character is typed (like
+    /// incremental search).
+    fn is_always(identifier: char) -> bool;
+
+    /// Check if a character is a special command identifier.
+    fn is_identifier(character: char) -> bool;
+}
+
 type Modes = HashMap<String, String>;
 
 const RED: &'static GdkRGBA = &GdkRGBA { red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0 };
 const TRANSPARENT: &'static GdkRGBA = &GdkRGBA { red: 0.0, green: 0.0, blue: 0.0, alpha: 0.0 };
 const WHITE: &'static GdkRGBA = &GdkRGBA { red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0 };
+
+#[derive(PartialEq)]
+enum ActivationType {
+    Current,
+    Final,
+}
 
 /// A command from a map command.
 #[derive(Debug)]
@@ -100,8 +154,9 @@ enum ShortcutCommand {
 
 /// Create a new MG application window.
 /// This window contains a status bar where the user can type a command and a central widget.
-pub struct Application<T> {
+pub struct Application<S, T> {
     command_callback: RefCell<Option<Box<Fn(T)>>>,
+    current_command_mode: Cell<char>,
     current_mode: RefCell<String>,
     current_shortcut: RefCell<Vec<Key>>,
     foreground_color: RefCell<RGBA>,
@@ -109,17 +164,17 @@ pub struct Application<T> {
     modes: Modes,
     message: StatusBarItem,
     settings_parser: RefCell<Parser<T>>,
+    special_command_callback: RefCell<Option<Box<Fn(S)>>>,
     status_bar: StatusBar,
     vbox: Grid,
     variables: RefCell<HashMap<String, Box<Fn() -> String>>>,
     window: Window,
 }
 
-impl<T: EnumFromStr + 'static> Application<T> {
+impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
     /// Create a new application.
-    #[allow(new_without_default)]
     pub fn new() -> Rc<Self> {
-        Application::new_with_config(hash!{})
+        Application::new_with_config(HashMap::new())
     }
 
     /// Create a new application with configuration.
@@ -143,12 +198,13 @@ impl<T: EnumFromStr + 'static> Application<T> {
         window.show_all();
         status_bar.hide();
 
-        let foreground_color = Application::<T>::get_foreground_color(&window);
+        let foreground_color = Application::<S, T>::get_foreground_color(&window);
 
         let message = StatusBarItem::new().left();
 
         let app = Rc::new(Application {
             command_callback: RefCell::new(None),
+            current_command_mode: Cell::new(':'),
             current_mode: RefCell::new("normal".to_string()),
             current_shortcut: RefCell::new(vec![]),
             foreground_color: RefCell::new(foreground_color),
@@ -156,6 +212,7 @@ impl<T: EnumFromStr + 'static> Application<T> {
             modes: modes,
             message: message,
             settings_parser: RefCell::new(Parser::new_with_config(config)),
+            special_command_callback: RefCell::new(None),
             status_bar: status_bar,
             vbox: grid,
             variables: RefCell::new(HashMap::new()),
@@ -172,6 +229,11 @@ impl<T: EnumFromStr + 'static> Application<T> {
         {
             let instance = app.clone();
             app.window.connect_key_press_event(move |_, key| instance.key_press(key));
+        }
+
+        {
+            let instance = app.clone();
+            app.window.connect_key_release_event(move |_, key| instance.key_release(key));
         }
 
         app
@@ -212,9 +274,63 @@ impl<T: EnumFromStr + 'static> Application<T> {
         variables.insert(variable_name.to_string(), Box::new(function));
     }
 
+    /// Call the callback with the command or show an error if the command cannot be parsed.
+    fn call_command(&self, callback: &Box<Fn(T)>, command: Result<Command<T>>) {
+        match command {
+            Ok(command) => {
+                match command {
+                    Custom(command) => callback(command),
+                    _ => unimplemented!(),
+                }
+            },
+            Err(error) => {
+                if let Some(error) = error.downcast_ref::<Error>() {
+                    let message =
+                        match error.typ {
+                            MissingArgument => "Argument required".to_string(),
+                            NoCommand => return,
+                            Parse => format!("Parse error: unexpected {}, expecting: {}", error.unexpected, error.expected),
+                            UnknownCommand => format!("Not a command: {}", error.unexpected),
+                        };
+                    self.error(&message);
+                }
+            },
+        }
+    }
+
+    /// Handle the key press event for the command mode.
+    #[allow(non_upper_case_globals)]
+    fn command_key_press(&self, key: &EventKey) -> Inhibit {
+        match key.get_keyval() {
+            Escape => {
+                self.set_mode("normal");
+                self.set_current_identifier(':');
+                self.reset();
+                Inhibit(true)
+            },
+            _ => self.handle_shortcut(key),
+        }
+    }
+
+    /// Handle the key release event for the command mode.
+    fn command_key_release(&self, _key: &EventKey) -> Inhibit {
+        let identifier = self.current_command_mode.get();
+        if identifier != ':' && S::is_always(identifier) {
+            if let Some(command) = self.status_bar.get_command() {
+                self.handle_special_command(Current, &command);
+            }
+        }
+        Inhibit(false)
+    }
+
     /// Add a callback to the command event.
     pub fn connect_command<F: Fn(T) + 'static>(&self, callback: F) {
         *self.command_callback.borrow_mut() = Some(Box::new(callback));
+    }
+
+    /// Add a callback to the command event.
+    pub fn connect_special_command<F: Fn(S) + 'static>(&self, callback: F) {
+        *self.special_command_callback.borrow_mut() = Some(Box::new(callback));
     }
 
     /// Show an error to the user.
@@ -239,28 +355,15 @@ impl<T: EnumFromStr + 'static> Application<T> {
     fn handle_command(&self, command: Option<String>) {
         self.set_mode("normal");
         if let Some(command) = command {
-            if let Some(ref callback) = *self.command_callback.borrow() {
-                let result = self.settings_parser.borrow_mut().parse_line(&command);
-                match result {
-                    Ok(command) => {
-                        match command {
-                            Custom(command) => callback(command),
-                            _ => unimplemented!(),
-                        }
-                    },
-                    Err(error) => {
-                        if let Some(error) = error.downcast_ref::<Error>() {
-                            let message =
-                                match error.typ {
-                                    MissingArgument => "Argument required".to_string(),
-                                    NoCommand => return,
-                                    Parse => format!("Parse error: unexpected {}, expecting: {}", error.unexpected, error.expected),
-                                    UnknownCommand => format!("Not a command: {}", error.unexpected),
-                                };
-                            self.error(&message);
-                        }
-                    },
+            let identifier = self.current_command_mode.get();
+            if identifier == ':' {
+                if let Some(ref callback) = *self.command_callback.borrow() {
+                    let result = self.settings_parser.borrow_mut().parse_line(&command);
+                    self.call_command(callback, result);
                 }
+            }
+            else {
+                self.handle_special_command(Final, &command);
             }
             self.status_bar.hide_entry();
         }
@@ -302,6 +405,19 @@ impl<T: EnumFromStr + 'static> Application<T> {
         }
     }
 
+    /// Handle a special command activate or key press event.
+    fn handle_special_command(&self, activation_type: ActivationType, command: &str) {
+        if let Some(ref callback) = *self.special_command_callback.borrow() {
+            let identifier = self.current_command_mode.get();
+            if let Ok(special_command) = S::identifier_to_command(identifier, command) {
+                callback(special_command);
+                if activation_type == Final {
+                    self.set_current_identifier(':');
+                }
+            }
+        }
+    }
+
     /// Input the specified command.
     fn input_command(&self, command: &str) {
         self.set_mode("command");
@@ -322,35 +438,50 @@ impl<T: EnumFromStr + 'static> Application<T> {
     }
 
     /// Handle the key press event.
-    #[allow(non_upper_case_globals)]
     fn key_press(&self, key: &EventKey) -> Inhibit {
         match self.get_mode().as_ref() {
-            "normal" => {
-                match key.get_keyval() {
-                    colon => {
-                        self.set_mode("command");
-                        self.reset();
-                        self.status_bar.show_entry();
-                        Inhibit(true)
-                    },
-                    Escape => {
-                        self.reset();
-                        Inhibit(true)
-                    },
-                    _ => self.handle_shortcut(key),
-                }
-            },
-            "command" => {
-                match key.get_keyval() {
-                    Escape => {
-                        self.set_mode("normal");
-                        self.reset();
-                        Inhibit(true)
-                    },
-                    _ => self.handle_shortcut(key),
-                }
-            },
+            "normal" => self.normal_key_press(key),
+            "command" => self.command_key_press(key),
             _ => self.handle_shortcut(key)
+        }
+    }
+
+    /// Handle the key release event.
+    fn key_release(&self, key: &EventKey) -> Inhibit {
+        match self.get_mode().as_ref() {
+            "command" => self.command_key_release(key),
+            _ => Inhibit(false),
+        }
+    }
+
+    /// Handle the key press event for the normal mode.
+    #[allow(non_upper_case_globals)]
+    fn normal_key_press(&self, key: &EventKey) -> Inhibit {
+        match key.get_keyval() {
+            colon => {
+                self.set_current_identifier(':');
+                self.set_mode("command");
+                self.reset();
+                self.status_bar.show_entry();
+                Inhibit(true)
+            },
+            Escape => {
+                self.reset();
+                Inhibit(true)
+            },
+            keyval => {
+                let character = keyval as u8 as char;
+                if S::is_identifier(character) {
+                    self.set_current_identifier(character);
+                    self.set_mode("command");
+                    self.reset();
+                    self.status_bar.show_entry();
+                    Inhibit(true)
+                }
+                else {
+                    self.handle_shortcut(key)
+                }
+            },
         }
     }
 
@@ -399,6 +530,12 @@ impl<T: EnumFromStr + 'static> Application<T> {
         shortcut.clear();
     }
 
+    /// Set the current (special) command identifier.
+    fn set_current_identifier(&self, identifier: char) {
+        self.current_command_mode.set(identifier);
+        self.status_bar.set_identifier(&identifier.to_string());
+    }
+
     /// Set the current mode.
     pub fn set_mode(&self, mode: &str) {
         *self.current_mode.borrow_mut() = mode.to_string();
@@ -433,7 +570,7 @@ impl<T: EnumFromStr + 'static> Application<T> {
     pub fn use_dark_theme(&self) {
         let settings = Settings::get_default().unwrap();
         settings.set_data("gtk-application-prefer-dark-theme", 1);
-        *self.foreground_color.borrow_mut() = Application::<T>::get_foreground_color(&self.window);
+        *self.foreground_color.borrow_mut() = Application::<S, T>::get_foreground_color(&self.window);
     }
 
     /// Get the application window.

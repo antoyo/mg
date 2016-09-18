@@ -30,12 +30,18 @@ use gtk::Orientation::Vertical;
 use mg::Application;
 
 use AppCommand::*;
+use SpecialCommand::*;
 
 commands!(AppCommand {
     Insert,
     Normal,
     Open(String),
     Quit,
+});
+
+special_commands!(SpecialCommand {
+    Search('/', always),
+    //ReverseSearch('?'),
 });
 
 fn main() {
@@ -71,6 +77,14 @@ fn main() {
                 Normal => mg_app.set_mode("normal"),
                 Open(url) => label.set_text(&format!("Opening URL {}", url)),
                 Quit => gtk::main_quit(),
+            }
+        });
+    }
+
+    {
+        app.connect_special_command(move |command| {
+            match command {
+                Search(input) => println!("Searching for {}", input),
             }
         });
     }
