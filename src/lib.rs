@@ -21,6 +21,8 @@
 
 /*
  * TODO: fix the size of the status bar.
+ * TODO: supports shortcuts like <C-a> and <C-w> in the command entry.
+ * TODO: smart home (with Ctrl-A) in the command text entry.
  * TODO: support non-"always" in special commands.
  * TODO: different event for activate event of special commands.
  * TODO: Disable focusing next element when hitting tab in the command entry.
@@ -484,7 +486,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
             },
             Escape => {
                 self.reset();
-                Inhibit(false)
+                self.handle_shortcut(key)
             },
             keyval => {
                 let character = keyval as u8 as char;
