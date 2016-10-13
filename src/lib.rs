@@ -343,6 +343,11 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
         *self.command_callback.borrow_mut() = Some(Box::new(callback));
     }
 
+    /// Add a callback to the window key press event.
+    pub fn connect_key_press_event<F: Fn(&Window, &EventKey) -> Inhibit + 'static>(&self, callback: F) {
+        self.window.connect_key_press_event(callback);
+    }
+
     /// Add a callback to change mode event.
     pub fn connect_mode_changed<F: Fn(&str) + 'static>(&self, callback: F) {
         *self.mode_changed_callback.borrow_mut() = Some(Box::new(callback));
