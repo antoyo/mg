@@ -139,6 +139,7 @@ pub trait SpecialCommand
 
 type Modes = HashMap<String, String>;
 
+const BLUE: &'static GdkRGBA = &GdkRGBA { red: 0.0, green: 0.0, blue: 1.0, alpha: 1.0 };
 const RED: &'static GdkRGBA = &GdkRGBA { red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0 };
 const TRANSPARENT: &'static GdkRGBA = &GdkRGBA { red: 0.0, green: 0.0, blue: 0.0, alpha: 0.0 };
 const WHITE: &'static GdkRGBA = &GdkRGBA { red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0 };
@@ -476,6 +477,13 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
             "command" => self.command_key_release(key),
             _ => Inhibit(false),
         }
+    }
+
+    /// Show a message to the user.
+    pub fn message(&self, message: &str) {
+        self.message.set_text(message);
+        self.status_bar.override_background_color(STATE_FLAG_NORMAL, BLUE);
+        self.status_bar.override_color(STATE_FLAG_NORMAL, WHITE);
     }
 
     /// Handle the key press event for the normal mode.
