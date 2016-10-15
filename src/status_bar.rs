@@ -109,8 +109,8 @@ impl StatusBar {
         self.identifier_label.hide();
     }
 
-    /// Set the text of the command entry.
-    pub fn set_command(&self, command: &str) {
+    /// Set the text of the input entry.
+    pub fn set_input(&self, command: &str) {
         self.entry.set_text(command);
         self.entry.set_position(command.len() as i32);
     }
@@ -126,6 +126,11 @@ impl StatusBar {
         self.entry.set_text("");
         self.entry.show();
         self.entry.grab_focus();
+        self.show_identifier();
+    }
+
+    /// Show the identifier label.
+    pub fn show_identifier(&self) {
         self.identifier_label.show();
     }
 }

@@ -54,6 +54,7 @@ mod status_bar;
 
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
+use std::char;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
@@ -162,11 +163,14 @@ enum ShortcutCommand {
 /// Create a new MG application window.
 /// This window contains a status bar where the user can type a command and a central widget.
 pub struct Application<S, T> {
+    answer: RefCell<Option<String>>,
     command_callback: RefCell<Option<Box<Fn(T)>>>,
+    choices: RefCell<Vec<char>>,
     current_command_mode: Cell<char>,
     current_mode: RefCell<String>,
     current_shortcut: RefCell<Vec<Key>>,
     foreground_color: RefCell<RGBA>,
+    input_callback: RefCell<Option<Box<Fn(Option<String>)>>>,
     mappings: RefCell<HashMap<String, HashMap<Vec<Key>, String>>>,
     modes: Modes,
     message: StatusBarItem,
@@ -190,6 +194,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
     pub fn new_with_config(mut modes: Modes) -> Rc<Self> {
         modes.insert("n".to_string(), "normal".to_string());
         modes.insert("c".to_string(), "command".to_string());
+        modes.insert("i".to_string(), "input".to_string());
         let config = Config {
             mapping_modes: modes.keys().cloned().collect(),
         };
@@ -213,11 +218,14 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
         let message = StatusBarItem::new().left();
 
         let app = Rc::new(Application {
+            answer: RefCell::new(None),
             command_callback: RefCell::new(None),
+            choices: RefCell::new(vec![]),
             current_command_mode: Cell::new(':'),
             current_mode: RefCell::new("normal".to_string()),
             current_shortcut: RefCell::new(vec![]),
             foreground_color: RefCell::new(foreground_color),
+            input_callback: RefCell::new(None),
             mappings: RefCell::new(HashMap::new()),
             modes: modes,
             message: message,
@@ -236,9 +244,19 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
 
         {
             let instance = app.clone();
-            app.status_bar.connect_activate(move |command| {
-                instance.set_mode("normal");
-                instance.handle_command(command);
+            app.status_bar.connect_activate(move |input| {
+                if instance.get_mode() == "input" {
+                    if let Some(ref callback) = *instance.input_callback.borrow() {
+                        *instance.answer.borrow_mut() = input.clone();
+                        callback(input);
+                    }
+                    instance.set_current_identifier(':');
+                    *instance.input_callback.borrow_mut() = None;
+                }
+                else {
+                    instance.set_mode("normal");
+                    instance.handle_command(input);
+                }
             });
         }
 
@@ -290,6 +308,59 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
         variables.insert(variable_name.to_string(), Box::new(function));
     }
 
+    /// Ask a question to the user and block until the user provides it (or cancel).
+    pub fn blocking_input(&self, message: &str, default_answer: &str) -> Option<String> {
+        self.status_bar.set_identifier(&format!("{} ", message));
+        self.status_bar.show_entry();
+        self.status_bar.set_input(default_answer);
+        *self.answer.borrow_mut() = None;
+        *self.input_callback.borrow_mut() = Some(Box::new(|_| {
+            gtk::main_quit();
+        }));
+        self.set_mode("input");
+        self.status_bar.override_background_color(STATE_FLAG_NORMAL, BLUE);
+        self.status_bar.override_color(STATE_FLAG_NORMAL, WHITE);
+        gtk::main();
+        self.set_mode("normal");
+        self.reset();
+        self.set_current_identifier(':');
+        self.answer.borrow().clone()
+    }
+
+    /// Ask a multiple-choice question to the user and block until the user provides it (or cancel).
+    pub fn blocking_question(&self, message: &str, choices: &[char]) -> Option<char> {
+        {
+            let app_choices = &mut *self.choices.borrow_mut();
+            app_choices.clear();
+            app_choices.extend_from_slice(choices);
+        }
+        let choices: Vec<_> = choices.iter().map(|c| c.to_string()).collect();
+        let choices = choices.join("/");
+        self.status_bar.set_identifier(&format!("{} ({}) ", message, choices));
+        self.status_bar.show_identifier();
+        *self.answer.borrow_mut() = None;
+        *self.input_callback.borrow_mut() = Some(Box::new(|_| {
+            gtk::main_quit();
+        }));
+        self.set_mode("input");
+        self.status_bar.override_background_color(STATE_FLAG_NORMAL, BLUE);
+        self.status_bar.override_color(STATE_FLAG_NORMAL, WHITE);
+        gtk::main();
+        let app_choices = &mut *self.choices.borrow_mut();
+        app_choices.clear();
+        self.set_mode("normal");
+        self.reset();
+        self.set_current_identifier(':');
+        (*self.answer.borrow())
+            .as_ref()
+            .and_then(|answer| answer.chars().next())
+    }
+
+    /// Ask a yes-no question to the user and block until the user provides it (or cancel).
+    pub fn blocking_yes_no_question(&self, message: &str) -> bool {
+        self.blocking_question(message, &['y', 'n']) == Some('y')
+    }
+
     /// Call the callback with the command or show an error if the command cannot be parsed.
     fn call_command(&self, callback: &Box<Fn(T)>, command: Result<Command<T>>) {
         match command {
@@ -319,9 +390,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
     fn command_key_press(&self, key: &EventKey) -> Inhibit {
         match key.get_keyval() {
             Escape => {
-                self.set_mode("normal");
-                self.set_current_identifier(':');
-                self.reset();
+                self.return_to_normal_mode();
                 Inhibit(false)
             },
             _ => self.handle_shortcut(key),
@@ -443,6 +512,17 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
         }
     }
 
+    /// Ask a question to the user.
+    pub fn input<F: Fn(Option<String>) + 'static>(&self, message: &str, default_answer: &str, callback: F) {
+        self.set_mode("input");
+        self.status_bar.set_identifier(&format!("{} ", message));
+        self.status_bar.show_entry();
+        self.status_bar.set_input(default_answer);
+        *self.input_callback.borrow_mut() = Some(Box::new(callback));
+        self.status_bar.override_background_color(STATE_FLAG_NORMAL, BLUE);
+        self.status_bar.override_color(STATE_FLAG_NORMAL, WHITE);
+    }
+
     /// Input the specified command.
     fn input_command(&self, command: &str) {
         self.set_mode("command");
@@ -459,7 +539,32 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
             else {
                 format!("{} ", command).into()
             };
-        self.status_bar.set_command(&text);
+        self.status_bar.set_input(&text);
+    }
+
+    /// Handle the key press event for the input mode.
+    #[allow(non_upper_case_globals)]
+    fn input_key_press(&self, key: &EventKey) -> Inhibit {
+        match key.get_keyval() {
+            Escape => {
+                self.return_to_normal_mode();
+                if let Some(ref callback) = *self.input_callback.borrow() {
+                    callback(None);
+                }
+                *self.input_callback.borrow_mut() = None;
+                Inhibit(false)
+            },
+            keyval => {
+                if let Some(character) = char::from_u32(keyval) {
+                    if (*self.choices.borrow()).contains(&character) {
+                        *self.answer.borrow_mut() = Some(character.to_string());
+                        gtk::main_quit();
+                        return Inhibit(true);
+                    }
+                }
+                Inhibit(false)
+            },
+        }
     }
 
     /// Handle the key press event.
@@ -467,6 +572,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
         match self.get_mode().as_ref() {
             "normal" => self.normal_key_press(key),
             "command" => self.command_key_press(key),
+            "input" => self.input_key_press(key),
             _ => self.handle_shortcut(key)
         }
     }
@@ -563,6 +669,13 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
         shortcut.clear();
     }
 
+    /// Go back to the normal mode from command or input mode.
+    fn return_to_normal_mode(&self) {
+        self.set_mode("normal");
+        self.set_current_identifier(':');
+        self.reset();
+    }
+
     /// Set the current (special) command identifier.
     fn set_current_identifier(&self, identifier: char) {
         self.current_command_mode.set(identifier);
@@ -594,7 +707,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
     /// Show the current mode if it is not the normal mode.
     fn show_mode(&self) {
         let mode = self.get_mode();
-        if mode != "normal" && mode != "command" {
+        if mode != "normal" && mode != "command" && mode != "input" {
             self.mode_label.set_text(&mode);
         }
         else {
