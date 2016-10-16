@@ -270,13 +270,15 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
         {
             let instance = app.clone();
             app.status_bar.connect_activate(move |input| {
-                if instance.get_mode() == "input" {
+                let mode = instance.get_mode();
+                if mode == "input" || mode == "blocking-input" {
                     if let Some(ref callback) = *instance.input_callback.borrow() {
                         *instance.answer.borrow_mut() = input.clone();
                         callback(input);
                     }
-                    instance.set_current_identifier(':');
+                    instance.return_to_normal_mode();
                     *instance.input_callback.borrow_mut() = None;
+                    (*instance.choices.borrow_mut()).clear();
                 }
                 else {
                     instance.set_mode("normal");
@@ -342,13 +344,10 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
         *self.input_callback.borrow_mut() = Some(Box::new(|_| {
             gtk::main_quit();
         }));
-        self.set_mode("input");
+        self.set_mode("blocking-input");
         self.status_bar.override_background_color(STATE_FLAG_NORMAL, BLUE);
         self.status_bar.override_color(STATE_FLAG_NORMAL, WHITE);
         gtk::main();
-        self.set_mode("normal");
-        self.reset();
-        self.set_current_identifier(':');
         self.answer.borrow().clone()
     }
 
@@ -367,15 +366,12 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
         *self.input_callback.borrow_mut() = Some(Box::new(|_| {
             gtk::main_quit();
         }));
-        self.set_mode("input");
+        self.set_mode("blocking-input");
         self.status_bar.override_background_color(STATE_FLAG_NORMAL, BLUE);
         self.status_bar.override_color(STATE_FLAG_NORMAL, WHITE);
         gtk::main();
-        let app_choices = &mut *self.choices.borrow_mut();
-        app_choices.clear();
-        self.set_mode("normal");
-        self.reset();
-        self.set_current_identifier(':');
+        self.return_to_normal_mode();
+        (*self.choices.borrow_mut()).clear();
         (*self.answer.borrow())
             .as_ref()
             .and_then(|answer| answer.chars().next())
@@ -600,8 +596,16 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
             keyval => {
                 if let Some(character) = char::from_u32(keyval) {
                     if (*self.choices.borrow()).contains(&character) {
-                        *self.answer.borrow_mut() = Some(character.to_string());
-                        gtk::main_quit();
+                        if self.get_mode() == "blocking-input" {
+                            *self.answer.borrow_mut() = Some(character.to_string());
+                            gtk::main_quit();
+                        }
+                        else if let Some(ref callback) = *self.input_callback.borrow() {
+                            callback(Some(character.to_string()));
+                            self.return_to_normal_mode();
+                            (*self.choices.borrow_mut()).clear();
+                        }
+                        *self.input_callback.borrow_mut() = None;
                         return Inhibit(true);
                     }
                 }
@@ -615,7 +619,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
         match self.get_mode().as_ref() {
             "normal" => self.normal_key_press(key),
             "command" => self.command_key_press(key),
-            "input" => self.input_key_press(key),
+            "blocking-input" | "input" => self.input_key_press(key),
             _ => self.handle_shortcut(key)
         }
     }
@@ -688,17 +692,38 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
         for command in commands {
             match command {
                 Custom(_) => (), // TODO: call the callback?
-                Include(_) => (), // TODO: parse the included file.
+                Include(_) => {}, // TODO: parse the included file.
                 Map { action, keys, mode } => {
                     let mut mappings = self.mappings.borrow_mut();
                     let mappings = mappings.entry(self.modes[&mode].clone()).or_insert_with(HashMap::new);
                     mappings.insert(keys, action);
                 },
-                Set(_, _) => (), // TODO: set settings.
-                Unmap { .. } => (), // TODO
+                Set(_, _) => unimplemented!(), // TODO: set settings.
+                Unmap { .. } => panic!("not yet implemented"), // TODO
             }
         }
         Ok(())
+    }
+
+    /// Ask a multiple-choice question to the user.
+    pub fn question<F: Fn(Option<char>) + 'static>(&self, message: &str, choices: &[char], callback: F) {
+        {
+            let app_choices = &mut *self.choices.borrow_mut();
+            app_choices.clear();
+            app_choices.extend_from_slice(choices);
+        }
+        let choices: Vec<_> = choices.iter().map(|c| c.to_string()).collect();
+        let choices = choices.join("/");
+        self.status_bar.set_identifier(&format!("{} ({}) ", message, choices));
+        self.status_bar.show_identifier();
+        *self.input_callback.borrow_mut() = Some(Box::new(move |answer| {
+            let character = answer.as_ref()
+                .and_then(|answer| answer.chars().next());
+            callback(character);
+        }));
+        self.set_mode("input");
+        self.status_bar.override_background_color(STATE_FLAG_NORMAL, BLUE);
+        self.status_bar.override_color(STATE_FLAG_NORMAL, WHITE);
     }
 
     /// Handle the escape event.
@@ -750,7 +775,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
     /// Show the current mode if it is not the normal mode.
     fn show_mode(&self) {
         let mode = self.get_mode();
-        if mode != "normal" && mode != "command" && mode != "input" {
+        if mode != "normal" && mode != "command" && mode != "input" && mode != "blocking-input" {
             self.mode_label.set_text(&mode);
         }
         else {
