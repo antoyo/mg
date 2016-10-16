@@ -194,7 +194,6 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
     pub fn new_with_config(mut modes: Modes) -> Rc<Self> {
         modes.insert("n".to_string(), "normal".to_string());
         modes.insert("c".to_string(), "command".to_string());
-        modes.insert("i".to_string(), "input".to_string());
         let config = Config {
             mapping_modes: modes.keys().cloned().collect(),
         };
