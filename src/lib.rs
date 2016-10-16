@@ -166,6 +166,7 @@ pub struct Application<S, T> {
     answer: RefCell<Option<String>>,
     command_callback: RefCell<Option<Box<Fn(T)>>>,
     choices: RefCell<Vec<char>>,
+    close_callback: RefCell<Option<Box<Fn()>>>,
     current_command_mode: Cell<char>,
     current_mode: RefCell<String>,
     current_shortcut: RefCell<Vec<Key>>,
@@ -198,10 +199,6 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
             mapping_modes: modes.keys().cloned().collect(),
         };
         let window = Window::new(WindowType::Toplevel);
-        window.connect_delete_event(|_, _| {
-            gtk::main_quit();
-            Inhibit(false)
-        });
 
         let grid = Grid::new();
         window.add(&grid);
@@ -220,6 +217,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
             answer: RefCell::new(None),
             command_callback: RefCell::new(None),
             choices: RefCell::new(vec![]),
+            close_callback: RefCell::new(None),
             current_command_mode: Cell::new(':'),
             current_mode: RefCell::new("normal".to_string()),
             current_shortcut: RefCell::new(vec![]),
@@ -240,6 +238,19 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
 
         app.status_bar.add_item(&app.mode_label);
         app.status_bar.add_item(&app.message);
+
+        {
+            let instance = app.clone();
+            app.window.connect_delete_event(move |_, _| {
+                if let Some(ref callback) = *instance.close_callback.borrow() {
+                    callback();
+                }
+                else {
+                    gtk::main_quit();
+                }
+                Inhibit(true)
+            });
+        }
 
         {
             let instance = app.clone();
@@ -405,6 +416,11 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
             }
         }
         Inhibit(false)
+    }
+
+    /// Connect the close event to the specified callback.
+    pub fn connect_close<F: Fn() + 'static>(&self, callback: F) {
+        *self.close_callback.borrow_mut() = Some(Box::new(callback));
     }
 
     /// Add a callback to the command event.
