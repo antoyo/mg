@@ -154,6 +154,7 @@ pub trait SpecialCommand
 type Modes = HashMap<String, String>;
 
 const BLUE: &'static GdkRGBA = &GdkRGBA { red: 0.0, green: 0.0, blue: 1.0, alpha: 1.0 };
+const ORANGE: &'static GdkRGBA = &GdkRGBA { red: 0.9, green: 0.55, blue: 0.0, alpha: 1.0 };
 const RED: &'static GdkRGBA = &GdkRGBA { red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0 };
 const TRANSPARENT: &'static GdkRGBA = &GdkRGBA { red: 0.0, green: 0.0, blue: 0.0, alpha: 0.0 };
 const WHITE: &'static GdkRGBA = &GdkRGBA { red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0 };
@@ -541,6 +542,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
     /// Show an information message to the user for 5 seconds.
     pub fn info(app: &Rc<Self>, message: &str) {
         app.message.set_text(message);
+        app.reset_colors();
         let app = app.clone();
         let message = Some(message.to_string());
         gtk::timeout_add(INFO_MESSAGE_DURATION, move || {
@@ -728,13 +730,18 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
 
     /// Handle the escape event.
     fn reset(&self) {
-        self.status_bar.override_background_color(STATE_FLAG_NORMAL, TRANSPARENT);
-        self.status_bar.override_color(STATE_FLAG_NORMAL, &self.foreground_color.borrow());
+        self.reset_colors();
         self.status_bar.hide();
         self.message.set_text("");
         self.show_mode();
         let mut shortcut = self.current_shortcut.borrow_mut();
         shortcut.clear();
+    }
+
+    /// Reset the background and foreground colors of the status bar.
+    fn reset_colors(&self) {
+        self.status_bar.override_background_color(STATE_FLAG_NORMAL, TRANSPARENT);
+        self.status_bar.override_color(STATE_FLAG_NORMAL, &self.foreground_color.borrow());
     }
 
     /// Go back to the normal mode from command or input mode.
@@ -788,6 +795,22 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
         let settings = Settings::get_default().unwrap();
         settings.set_data("gtk-application-prefer-dark-theme", 1);
         *self.foreground_color.borrow_mut() = Application::<S, T>::get_foreground_color(&self.window);
+    }
+
+    /// Show a warning message to the user for 5 seconds.
+    pub fn warning(app: &Rc<Self>, message: &str) {
+        app.message.set_text(message);
+        let app = app.clone();
+        let message = Some(message.to_string());
+        app.status_bar.override_background_color(STATE_FLAG_NORMAL, ORANGE);
+        app.status_bar.override_color(STATE_FLAG_NORMAL, WHITE);
+        gtk::timeout_add(INFO_MESSAGE_DURATION, move || {
+            if app.message.get_text() == message {
+                app.message.set_text("");
+                app.reset_colors();
+            }
+            Continue(false)
+        });
     }
 
     /// Get the application window.
