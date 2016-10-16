@@ -153,6 +153,11 @@ impl StatusBarItem {
         }
     }
 
+    /// Get the item text.
+    pub fn get_text(&self) -> Option<String> {
+        self.label.get_text()
+    }
+
     /// Set the item to be on the left.
     pub fn left(mut self) -> Self {
         self.left = true;

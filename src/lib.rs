@@ -64,7 +64,20 @@ use std::rc::Rc;
 use gdk::{EventKey, RGBA, CONTROL_MASK};
 use gdk::enums::key::{Escape, colon};
 use gdk_sys::GdkRGBA;
-use gtk::{ContainerExt, Grid, Inhibit, IsA, Settings, Widget, WidgetExt, Window, WindowExt, WindowType, STATE_FLAG_NORMAL};
+use gtk::{
+    ContainerExt,
+    Continue,
+    Grid,
+    Inhibit,
+    IsA,
+    Settings,
+    Widget,
+    WidgetExt,
+    Window,
+    WindowExt,
+    WindowType,
+    STATE_FLAG_NORMAL,
+};
 use gtk::prelude::WidgetExtManual;
 use mg_settings::{Config, EnumFromStr, Parser};
 use mg_settings::Command::{self, Custom, Include, Map, Set, Unmap};
@@ -144,6 +157,8 @@ const BLUE: &'static GdkRGBA = &GdkRGBA { red: 0.0, green: 0.0, blue: 1.0, alpha
 const RED: &'static GdkRGBA = &GdkRGBA { red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0 };
 const TRANSPARENT: &'static GdkRGBA = &GdkRGBA { red: 0.0, green: 0.0, blue: 0.0, alpha: 0.0 };
 const WHITE: &'static GdkRGBA = &GdkRGBA { red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0 };
+
+const INFO_MESSAGE_DURATION: u32 = 5000;
 
 #[derive(PartialEq)]
 enum ActivationType {
@@ -525,6 +540,19 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
                 }
             }
         }
+    }
+
+    /// Show an information message to the user for 5 seconds.
+    pub fn info(app: &Rc<Self>, message: &str) {
+        app.message.set_text(message);
+        let app = app.clone();
+        let message = Some(message.to_string());
+        gtk::timeout_add(INFO_MESSAGE_DURATION, move || {
+            if app.message.get_text() == message {
+                app.message.set_text("");
+            }
+            Continue(false)
+        });
     }
 
     /// Ask a question to the user.
