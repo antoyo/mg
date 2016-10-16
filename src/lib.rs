@@ -211,8 +211,8 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
 
     /// Create a new application with configuration.
     pub fn new_with_config(mut modes: Modes) -> Rc<Self> {
-        modes.insert("n".to_string(), "normal".to_string());
-        modes.insert("c".to_string(), "command".to_string());
+        assert!(modes.insert("n".to_string(), "normal".to_string()).is_none(), "Duplicate mode prefix n.");
+        assert!(modes.insert("c".to_string(), "command".to_string()).is_none(), "Duplicate mode prefix c.");
         let config = Config {
             mapping_modes: modes.keys().cloned().collect(),
         };
