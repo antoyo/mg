@@ -43,6 +43,8 @@ extern crate gobject_sys;
 extern crate gtk;
 extern crate gtk_sys;
 extern crate libc;
+#[macro_use]
+extern crate log;
 extern crate mg_settings;
 
 mod key_converter;
@@ -457,6 +459,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
 
     /// Show an error to the user.
     pub fn error(&self, error: &str) {
+        error!("{}", error);
         self.message.set_text(error);
         self.status_bar.override_background_color(STATE_FLAG_NORMAL, RED);
         self.status_bar.override_color(STATE_FLAG_NORMAL, WHITE);
@@ -541,6 +544,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
 
     /// Show an information message to the user for 5 seconds.
     pub fn info(app: &Rc<Self>, message: &str) {
+        info!("{}", message);
         app.message.set_text(message);
         app.reset_colors();
         let app = app.clone();
@@ -799,6 +803,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
 
     /// Show a warning message to the user for 5 seconds.
     pub fn warning(app: &Rc<Self>, message: &str) {
+        warn!("{}", message);
         app.message.set_text(message);
         let app = app.clone();
         let message = Some(message.to_string());

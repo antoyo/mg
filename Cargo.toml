@@ -12,6 +12,7 @@ nightly = []
 
 [dependencies]
 libc = "^0.2"
+log = "^0.3"
 mg-settings = "^0.0.4"
 
 [dependencies.gdk]
