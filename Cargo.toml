@@ -12,7 +12,7 @@ nightly = []
 
 [dependencies]
 libc = "^0.2"
-mg-settings = "^0.0.3"
+mg-settings = "^0.0.4"
 
 [dependencies.gdk]
 git = "https://github.com/gtk-rs/gdk"
