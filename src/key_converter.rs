@@ -20,7 +20,7 @@
  */
 
 use gdk::enums::key::{self, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Return, S, T, U, V, W, X, Y, Z, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z};
-use mg_settings::key::Key::{self, Char, Control, Down, Enter, Escape, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12, Left, Right, Space, Tab, Up};
+use mg_settings::key::Key::{self, Char, Control, Down, Enter, Escape, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12, Left, Minus, Plus, Right, Space, Tab, Up};
 
 /// Convert a GDK key to an MG Key.
 #[allow(non_upper_case_globals)]
@@ -94,7 +94,9 @@ pub fn gdk_key_to_key(key: key::Key, control_pressed: bool) -> Option<Key> {
             key::F11 => F11,
             key::F12 => F12,
             key::Left => Left,
+            key::minus => Minus,
             Return => Enter,
+            key::plus => Plus,
             key::Right => Right,
             key::space => Space,
             key::Tab => Tab,
