@@ -34,7 +34,8 @@ use gtk::{
 use entry_completion::EntryCompletionExtManual;
 use gobject::ObjectExtManual;
 
-const DEFAULT_COMPLETER_IDENT: &'static str = "__mg_default";
+pub const DEFAULT_COMPLETER_IDENT: &'static str = "__mg_default";
+pub const NO_COMPLETER_IDENT: &'static str = "__mg_no_completer";
 
 pub trait Completer {
     fn data(&self) -> Vec<(String, String)>;
@@ -76,15 +77,20 @@ impl Completion {
 
     /// Adjust the model by using the specified completer.
     pub fn adjust_model(&self, completer_ident: &str) {
-        let model = ListStore::new(&[Type::String, Type::String]);
-
-        let completer = &self.completers[completer_ident];
-        self.entry_completion.set_data("text-column", completer.text_column());
-        for &(ref col1, ref col2) in &completer.data() {
-            model.insert_with_values(None, &[0, 1], &[&col1, &col2]);
+        if completer_ident == NO_COMPLETER_IDENT {
+            self.entry_completion.set_model::<ListStore>(None);
         }
+        else {
+            let model = ListStore::new(&[Type::String, Type::String]);
 
-        self.entry_completion.set_model(Some(&model));
+            let completer = &self.completers[completer_ident];
+            self.entry_completion.set_data("text-column", completer.text_column());
+            for &(ref col1, ref col2) in &completer.data() {
+                model.insert_with_values(None, &[0, 1], &[&col1, &col2]);
+            }
+
+            self.entry_completion.set_model(Some(&model));
+        }
     }
 
     /// Get the `EntryCompletion`.

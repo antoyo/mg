@@ -90,7 +90,7 @@ use mg_settings::error::{Error, Result};
 use mg_settings::error::ErrorType::{MissingArgument, NoCommand, Parse, UnknownCommand};
 use mg_settings::key::Key;
 
-use completion::Completer;
+use completion::{Completer, DEFAULT_COMPLETER_IDENT, NO_COMPLETER_IDENT};
 use key_converter::gdk_key_to_key;
 use gobject::ObjectExtManual;
 use self::ActivationType::{Current, Final};
@@ -685,6 +685,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static> Appli
     fn normal_key_press(&self, key: &EventKey) -> Inhibit {
         match key.get_keyval() {
             colon => {
+                self.status_bar.set_completer(DEFAULT_COMPLETER_IDENT);
                 self.set_current_identifier(':');
                 self.set_mode("command");
                 self.reset();
@@ -698,6 +699,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static> Appli
             keyval => {
                 let character = keyval as u8 as char;
                 if S::is_identifier(character) {
+                    self.status_bar.set_completer(NO_COMPLETER_IDENT);
                     self.set_current_identifier(character);
                     self.set_mode("command");
                     self.reset();

@@ -41,6 +41,7 @@ pub type HBox = ::gtk::Box;
 
 /// The window status bar.
 pub struct StatusBar {
+    completion: Completion,
     entry: Entry,
     entry_shown: Cell<bool>,
     identifier_label: Label,
@@ -64,6 +65,7 @@ impl StatusBar {
         hbox.add(&entry);
 
         StatusBar {
+            completion: completion,
             entry: entry,
             entry_shown: Cell::new(false),
             identifier_label: identifier_label,
@@ -122,6 +124,11 @@ impl StatusBar {
         self.entry_shown.set(false);
         self.entry.hide();
         self.identifier_label.hide();
+    }
+
+    /// Set the current command completer.
+    pub fn set_completer(&self, completer: &str) {
+        self.completion.adjust_model(completer);
     }
 
     /// Set the text of the input entry.
