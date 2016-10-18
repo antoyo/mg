@@ -85,7 +85,7 @@ use gtk::{
 };
 use gtk::prelude::WidgetExtManual;
 use mg_settings::{Config, EnumFromStr, EnumMetaData, Parser};
-use mg_settings::Command::{self, Custom, Include, Map, Set, Unmap};
+use mg_settings::Command::{self, Custom, Map, Set, Unmap};
 use mg_settings::error::{Error, Result};
 use mg_settings::error::ErrorType::{MissingArgument, NoCommand, Parse, UnknownCommand};
 use mg_settings::key::Key;
@@ -236,11 +236,11 @@ pub struct Application<S, T> {
 impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static> Application<S, T> {
     /// Create a new application.
     pub fn new() -> Rc<Self> {
-        Application::new_with_config(HashMap::new())
+        Application::new_with_config::<&str>(HashMap::new(), None)
     }
 
     /// Create a new application with configuration.
-    pub fn new_with_config(mut modes: Modes) -> Rc<Self> {
+    pub fn new_with_config<P: AsRef<Path>>(mut modes: Modes, include_path: Option<P>) -> Rc<Self> {
         assert!(modes.insert("n".to_string(), "normal".to_string()).is_none(), "Duplicate mode prefix n.");
         assert!(modes.insert("c".to_string(), "command".to_string()).is_none(), "Duplicate mode prefix c.");
         let config = Config {
@@ -261,6 +261,11 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static> Appli
         let mode_label = StatusBarItem::new().left();
         let message = StatusBarItem::new().left();
 
+        let mut parser = Parser::new_with_config(config);
+        if let Some(include_path) = include_path {
+            parser.set_include_path(include_path);
+        }
+
         let app = Rc::new(Application {
             answer: RefCell::new(None),
             command_callback: RefCell::new(None),
@@ -276,7 +281,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static> Appli
             message: message,
             mode_changed_callback: RefCell::new(None),
             mode_label: mode_label,
-            settings_parser: RefCell::new(Parser::new_with_config(config)),
+            settings_parser: RefCell::new(parser),
             special_command_callback: RefCell::new(None),
             status_bar: status_bar,
             vbox: grid,
@@ -728,7 +733,6 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static> Appli
         for command in commands {
             match command {
                 Custom(_) => (), // TODO: call the callback?
-                Include(_) => {}, // TODO: parse the included file.
                 Map { action, keys, mode } => {
                     let mut mappings = self.mappings.borrow_mut();
                     let mappings = mappings.entry(self.modes[&mode].clone()).or_insert_with(HashMap::new);
