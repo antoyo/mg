@@ -236,11 +236,16 @@ pub struct Application<S, T> {
 impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static> Application<S, T> {
     /// Create a new application.
     pub fn new() -> Rc<Self> {
-        Application::new_with_config::<&str>(HashMap::new(), None)
+        Application::new_with_config_and_path::<&str>(HashMap::new(), None)
     }
 
     /// Create a new application with configuration.
-    pub fn new_with_config<P: AsRef<Path>>(mut modes: Modes, include_path: Option<P>) -> Rc<Self> {
+    pub fn new_with_config(modes: Modes) -> Rc<Self> {
+        Application::new_with_config_and_path::<&str>(modes, None)
+    }
+
+    /// Create a new application with configuration and include path.
+    pub fn new_with_config_and_path<P: AsRef<Path>>(mut modes: Modes, include_path: Option<P>) -> Rc<Self> {
         assert!(modes.insert("n".to_string(), "normal".to_string()).is_none(), "Duplicate mode prefix n.");
         assert!(modes.insert("c".to_string(), "command".to_string()).is_none(), "Duplicate mode prefix c.");
         let config = Config {
