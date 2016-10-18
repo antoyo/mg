@@ -19,11 +19,14 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#![feature(proc_macro)]
+
 extern crate gtk;
 #[macro_use]
 extern crate mg;
-#[macro_use]
 extern crate mg_settings;
+#[macro_use]
+extern crate mg_settings_macros;
 
 use gtk::{ContainerExt, Entry, Label, WidgetExt};
 use gtk::Orientation::Vertical;
@@ -32,12 +35,15 @@ use mg::Application;
 use AppCommand::*;
 use SpecialCommand::*;
 
-commands!(AppCommand {
+#[derive(Commands)]
+enum AppCommand {
+    #[completion(hidden)]
+    Follow,
     Insert,
     Normal,
     Open(String),
     Quit,
-});
+}
 
 special_commands!(SpecialCommand {
     BackwardSearch('?', always),
@@ -75,6 +81,7 @@ fn main() {
         let mg_app = app.clone();
         app.connect_command(move |command| {
             match command {
+                Follow => (),
                 Insert => mg_app.set_mode("insert"),
                 Normal => mg_app.set_mode("normal"),
                 Open(url) => label.set_text(&format!("Opening URL {}", url)),

@@ -21,8 +21,20 @@
 
 use std::cell::Cell;
 
-use gtk::{BoxExt, ContainerExt, CssProvider, EditableExt, Entry, EntryExt, Label, WidgetExt, STYLE_PROVIDER_PRIORITY_APPLICATION};
+use gtk::{
+    BoxExt,
+    ContainerExt,
+    CssProvider,
+    EditableExt,
+    Entry,
+    EntryExt,
+    Label,
+    WidgetExt,
+    STYLE_PROVIDER_PRIORITY_APPLICATION,
+};
 use gtk::Orientation::Horizontal;
+
+use completion::{Completer, Completion};
 
 pub type StatusBarWidget = HBox;
 pub type HBox = ::gtk::Box;
@@ -37,7 +49,7 @@ pub struct StatusBar {
 
 impl StatusBar {
     /// Create a new status bar.
-    pub fn new() -> Self {
+    pub fn new(default_completer: Box<Completer>) -> Self {
         let hbox = HBox::new(Horizontal, 0);
         hbox.set_size_request(1, 20);
 
@@ -45,6 +57,9 @@ impl StatusBar {
         hbox.add(&identifier_label);
 
         let entry = Entry::new();
+        let completion = Completion::new(default_completer);
+        entry.set_completion(Some(completion.get_entry_completion()));
+
         StatusBar::adjust_entry(&entry);
         hbox.add(&entry);
 

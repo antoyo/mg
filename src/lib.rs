@@ -47,8 +47,10 @@ extern crate libc;
 extern crate log;
 extern crate mg_settings;
 
-mod key_converter;
+mod completion;
+mod entry_completion;
 mod gobject;
+mod key_converter;
 mod style_context;
 #[macro_use]
 mod widget;
@@ -60,6 +62,7 @@ use std::char;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
+use std::marker::PhantomData;
 use std::path::Path;
 use std::rc::Rc;
 
@@ -81,12 +84,13 @@ use gtk::{
     STATE_FLAG_NORMAL,
 };
 use gtk::prelude::WidgetExtManual;
-use mg_settings::{Config, EnumFromStr, Parser};
+use mg_settings::{Config, EnumFromStr, EnumMetaData, Parser};
 use mg_settings::Command::{self, Custom, Include, Map, Set, Unmap};
 use mg_settings::error::{Error, Result};
 use mg_settings::error::ErrorType::{MissingArgument, NoCommand, Parse, UnknownCommand};
 use mg_settings::key::Key;
 
+use completion::Completer;
 use key_converter::gdk_key_to_key;
 use gobject::ObjectExtManual;
 use self::ActivationType::{Current, Final};
@@ -169,6 +173,32 @@ enum ActivationType {
     Final,
 }
 
+/// A command completer.
+struct CommandCompleter<T> {
+    _phantom: PhantomData<T>,
+}
+
+impl<T> CommandCompleter<T> {
+    fn new() -> CommandCompleter<T> {
+        CommandCompleter {
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<T: EnumMetaData> Completer for CommandCompleter<T> {
+    fn data(&self) -> Vec<(String, String)> {
+        T::get_metadata().iter()
+            .filter(|&(_, metadata)| !metadata.completion_hidden)
+            .map(|(command_name, metadata)| (command_name.clone(), metadata.help_text.clone()))
+            .collect()
+    }
+
+    fn text_column(&self) -> i32 {
+        0
+    }
+}
+
 /// A command from a map command.
 #[derive(Debug)]
 enum ShortcutCommand {
@@ -203,7 +233,7 @@ pub struct Application<S, T> {
     window: Window,
 }
 
-impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
+impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static> Application<S, T> {
     /// Create a new application.
     pub fn new() -> Rc<Self> {
         Application::new_with_config(HashMap::new())
@@ -221,7 +251,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + 'static> Application<S, T> {
         let grid = Grid::new();
         window.add(&grid);
 
-        let status_bar = StatusBar::new();
+        let status_bar = StatusBar::new(Box::new(CommandCompleter::<T>::new()));
         grid.attach(&status_bar, 0, 1, 1, 1);
         window.show_all();
         status_bar.hide();
