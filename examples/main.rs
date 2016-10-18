@@ -43,6 +43,7 @@ enum AppCommand {
     Normal,
     Open(String),
     Quit,
+    WinOpen(String),
 }
 
 special_commands!(SpecialCommand {
@@ -85,6 +86,7 @@ fn main() {
                 Insert => mg_app.set_mode("insert"),
                 Normal => mg_app.set_mode("normal"),
                 Open(url) => label.set_text(&format!("Opening URL {}", url)),
+                WinOpen(url) => label.set_text(&format!("Opening URL {} in new window", url)),
                 Quit => gtk::main_quit(),
             }
         });
