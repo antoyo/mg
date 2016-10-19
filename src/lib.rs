@@ -63,8 +63,9 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::marker::PhantomData;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::result;
 
 use gdk::{EventKey, RGBA, CONTROL_MASK};
 use gdk::enums::key::{Escape, colon};
@@ -89,6 +90,7 @@ use mg_settings::Command::{self, Custom, Map, Set, Unmap};
 use mg_settings::error::{Error, Result};
 use mg_settings::error::ErrorType::{MissingArgument, NoCommand, Parse, UnknownCommand};
 use mg_settings::key::Key;
+use mg_settings::settings;
 
 use completion::{Completer, DEFAULT_COMPLETER_IDENT, NO_COMPLETER_IDENT};
 use key_converter::gdk_key_to_key;
@@ -146,7 +148,7 @@ pub trait SpecialCommand
     where Self: Sized
 {
     /// Convert an identifier like "/" to a special command.
-    fn identifier_to_command(identifier: char, input: &str) -> std::result::Result<Self, String>;
+    fn identifier_to_command(identifier: char, input: &str) -> result::Result<Self, String>;
 
     /// Check if the identifier is declared `always`.
     /// The always option means that the command is activated every time a character is typed (like
@@ -208,9 +210,53 @@ enum ShortcutCommand {
     Incomplete(String),
 }
 
+/// Application builder.
+pub struct ApplicationBuilder<U: settings::Settings> {
+    modes: Option<Modes>,
+    include_path: Option<PathBuf>,
+    settings: Option<U>,
+}
+
+impl<U: settings::Settings + 'static> ApplicationBuilder<U> {
+    /// Create a new application builder.
+    #[allow(new_without_default_derive)]
+    pub fn new() -> Self {
+        ApplicationBuilder {
+            modes: None,
+            include_path: None,
+            settings: None,
+        }
+    }
+
+    /// Create a new application with configuration and include path.
+    pub fn build<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static>(self) -> Rc<Application<S, T, U>> {
+        Application::new(self)
+    }
+
+    /// Set the include path of the configuration files.
+    pub fn include_path<P: AsRef<Path>>(mut self, include_path: P) -> Self {
+        self.include_path = Some(include_path.as_ref().to_path_buf());
+        self
+    }
+
+    /// Set the configuration of the application.
+    pub fn modes(mut self, mut modes: Modes) -> Self {
+        assert!(modes.insert("n".to_string(), "normal".to_string()).is_none(), "Duplicate mode prefix n.");
+        assert!(modes.insert("c".to_string(), "command".to_string()).is_none(), "Duplicate mode prefix c.");
+        self.modes = Some(modes);
+        self
+    }
+
+    /// Set the default settings of the application.
+    pub fn settings(mut self, settings: U) -> Self {
+        self.settings = Some(settings);
+        self
+    }
+}
+
 /// Create a new MG application window.
 /// This window contains a status bar where the user can type a command and a central widget.
-pub struct Application<S, T> {
+pub struct Application<S, T, U: settings::Settings> {
     answer: RefCell<Option<String>>,
     command_callback: RefCell<Option<Box<Fn(T)>>>,
     choices: RefCell<Vec<char>>,
@@ -225,7 +271,9 @@ pub struct Application<S, T> {
     message: StatusBarItem,
     mode_changed_callback: RefCell<Option<Box<Fn(&str)>>>,
     mode_label: StatusBarItem,
+    settings: RefCell<Option<U>>,
     settings_parser: RefCell<Parser<T>>,
+    setting_change_callback: RefCell<Option<Box<Fn(U::Variant)>>>,
     special_command_callback: RefCell<Option<Box<Fn(S)>>>,
     status_bar: StatusBar,
     vbox: Grid,
@@ -233,24 +281,13 @@ pub struct Application<S, T> {
     window: Window,
 }
 
-impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static> Application<S, T> {
-    /// Create a new application.
-    pub fn new() -> Rc<Self> {
-        Application::new_with_config_and_path::<&str>(HashMap::new(), None)
-    }
-
-    /// Create a new application with configuration.
-    pub fn new_with_config(modes: Modes) -> Rc<Self> {
-        Application::new_with_config_and_path::<&str>(modes, None)
-    }
-
-    /// Create a new application with configuration and include path.
-    pub fn new_with_config_and_path<P: AsRef<Path>>(mut modes: Modes, include_path: Option<P>) -> Rc<Self> {
-        assert!(modes.insert("n".to_string(), "normal".to_string()).is_none(), "Duplicate mode prefix n.");
-        assert!(modes.insert("c".to_string(), "command".to_string()).is_none(), "Duplicate mode prefix c.");
+impl<'a, S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static, U: settings::Settings + 'static> Application<S, T, U> {
+    fn new(builder: ApplicationBuilder<U>) -> Rc<Self> {
+        let modes = builder.modes.unwrap_or_default();
         let config = Config {
             mapping_modes: modes.keys().cloned().collect(),
         };
+
         let window = Window::new(WindowType::Toplevel);
 
         let grid = Grid::new();
@@ -261,13 +298,13 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static> Appli
         window.show_all();
         status_bar.hide();
 
-        let foreground_color = Application::<S, T>::get_foreground_color(&window);
+        let foreground_color = Application::<S, T, U>::get_foreground_color(&window);
 
         let mode_label = StatusBarItem::new().left();
         let message = StatusBarItem::new().left();
 
         let mut parser = Parser::new_with_config(config);
-        if let Some(include_path) = include_path {
+        if let Some(include_path) = builder.include_path {
             parser.set_include_path(include_path);
         }
 
@@ -286,7 +323,9 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static> Appli
             message: message,
             mode_changed_callback: RefCell::new(None),
             mode_label: mode_label,
+            settings: RefCell::new(builder.settings),
             settings_parser: RefCell::new(parser),
+            setting_change_callback: RefCell::new(None),
             special_command_callback: RefCell::new(None),
             status_bar: status_bar,
             vbox: grid,
@@ -431,6 +470,15 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static> Appli
             Ok(command) => {
                 match command {
                     Custom(command) => callback(command),
+                    Set(name, value) => {
+                        match U::to_variant(&name, value) {
+                            Ok(setting) => self.set_setting(setting),
+                            Err(error) => {
+                                let message = format!("Error setting value: {}", error);
+                                self.error(&message);
+                            },
+                        }
+                    },
                     _ => unimplemented!(),
                 }
             },
@@ -446,6 +494,13 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static> Appli
                     self.error(&message);
                 }
             },
+        }
+    }
+
+    /// Call the setting changed callback.
+    fn call_setting_callback(&self, setting: U::Variant) {
+        if let Some(ref callback) = *self.setting_change_callback.borrow() {
+            callback(setting);
         }
     }
 
@@ -490,6 +545,11 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static> Appli
     /// Add a callback to change mode event.
     pub fn connect_mode_changed<F: Fn(&str) + 'static>(&self, callback: F) {
         *self.mode_changed_callback.borrow_mut() = Some(Box::new(callback));
+    }
+
+    /// Add a callback to setting changed event.
+    pub fn connect_setting_changed<F: Fn(U::Variant) + 'static>(&self, callback: F) {
+        *self.setting_change_callback.borrow_mut() = Some(Box::new(callback));
     }
 
     /// Add a callback to the special command event.
@@ -734,9 +794,9 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static> Appli
 
     /// Parse a configuration file.
     pub fn parse_config<P: AsRef<Path>>(&self, filename: P) -> Result<()> {
-        let file = try!(File::open(filename));
+        let file = File::open(filename)?;
         let buf_reader = BufReader::new(file);
-        let commands = try!(self.settings_parser.borrow_mut().parse(buf_reader));
+        let commands = self.settings_parser.borrow_mut().parse(buf_reader)?;
         for command in commands {
             match command {
                 Custom(_) => (), // TODO: call the callback?
@@ -745,7 +805,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static> Appli
                     let mappings = mappings.entry(self.modes[&mode].clone()).or_insert_with(HashMap::new);
                     mappings.insert(keys, action);
                 },
-                Set(_, _) => unimplemented!(), // TODO: set settings.
+                Set(name, value) => self.set_setting(U::to_variant(&name, value)?),
                 Unmap { .. } => panic!("not yet implemented"), // TODO
             }
         }
@@ -796,6 +856,14 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static> Appli
         self.reset();
     }
 
+    /// Get the application settings.
+    pub fn set_setting(&self, setting: U::Variant) {
+        if let Some(ref mut settings) = *self.settings.borrow_mut() {
+            settings.set_value(setting.clone());
+            self.call_setting_callback(setting);
+        }
+    }
+
     /// Set the current (special) command identifier.
     fn set_current_identifier(&self, identifier: char) {
         self.current_command_mode.set(identifier);
@@ -839,7 +907,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static> Appli
     pub fn use_dark_theme(&self) {
         let settings = Settings::get_default().unwrap();
         settings.set_data("gtk-application-prefer-dark-theme", 1);
-        *self.foreground_color.borrow_mut() = Application::<S, T>::get_foreground_color(&self.window);
+        *self.foreground_color.borrow_mut() = Application::<S, T, U>::get_foreground_color(&self.window);
     }
 
     /// Show a warning message to the user for 5 seconds.

@@ -30,9 +30,10 @@ extern crate mg_settings_macros;
 
 use gtk::{ContainerExt, Entry, Label, WidgetExt};
 use gtk::Orientation::Vertical;
-use mg::Application;
+use mg::ApplicationBuilder;
 
 use AppCommand::*;
+use AppSettingsVariant::*;
 use SpecialCommand::*;
 
 #[derive(Commands)]
@@ -46,6 +47,13 @@ enum AppCommand {
     WinOpen(String),
 }
 
+#[derive(Settings)]
+struct AppSettings {
+    title: String,
+    title_len: i64,
+    width: i64,
+}
+
 special_commands!(SpecialCommand {
     BackwardSearch('?', always),
     Search('/', always),
@@ -54,9 +62,12 @@ special_commands!(SpecialCommand {
 fn main() {
     gtk::init().unwrap();
 
-    let app = Application::new_with_config(hash! {
-        "i" => "insert",
-    });
+    let app = ApplicationBuilder::new()
+        .modes(hash! {
+            "i" => "insert",
+        })
+        .settings(AppSettings::new())
+        .build();
     app.use_dark_theme();
     let item = app.add_statusbar_item();
     item.set_text("Item");
@@ -76,7 +87,25 @@ fn main() {
     vbox.add(&entry);
     app.set_view(&vbox);
 
-    app.connect_mode_changed(|mode| println!("{}", mode));
+    {
+        let mg_app = app.clone();
+        app.connect_setting_changed(move |setting| {
+            match setting {
+                Title(title) => mg_app.set_window_title(&title),
+                TitleLen(len) => mg_app.set_window_title(&format!("New title len: {}", len)),
+                Width(_) => (),
+            }
+        });
+    }
+
+    {
+        let mg_app = app.clone();
+        app.connect_mode_changed(move |mode| {
+            if mode != "normal" {
+                mg_app.set_setting(Title(mode.to_string()));
+            }
+        });
+    }
 
     {
         let mg_app = app.clone();
