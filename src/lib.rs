@@ -85,7 +85,7 @@ use gtk::{
     STATE_FLAG_NORMAL,
 };
 use gtk::prelude::WidgetExtManual;
-use mg_settings::{Config, EnumFromStr, EnumMetaData, Parser};
+use mg_settings::{Config, EnumFromStr, EnumMetaData, Parser, Value};
 use mg_settings::Command::{self, Custom, Map, Set, Unmap};
 use mg_settings::error::{Error, Result};
 use mg_settings::error::ErrorType::{MissingArgument, NoCommand, Parse, UnknownCommand};
@@ -273,7 +273,7 @@ pub struct Application<S, T, U: settings::Settings> {
     mode_label: StatusBarItem,
     settings: RefCell<Option<U>>,
     settings_parser: RefCell<Parser<T>>,
-    setting_change_callback: RefCell<Option<Box<Fn(U::Variant)>>>,
+    setting_change_callback: RefCell<Option<Box<Fn(U::VariantSet)>>>,
     special_command_callback: RefCell<Option<Box<Fn(S)>>>,
     status_bar: StatusBar,
     vbox: Grid,
@@ -498,7 +498,7 @@ impl<'a, S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static, U
     }
 
     /// Call the setting changed callback.
-    fn call_setting_callback(&self, setting: U::Variant) {
+    fn call_setting_callback(&self, setting: U::VariantSet) {
         if let Some(ref callback) = *self.setting_change_callback.borrow() {
             callback(setting);
         }
@@ -548,7 +548,7 @@ impl<'a, S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static, U
     }
 
     /// Add a callback to setting changed event.
-    pub fn connect_setting_changed<F: Fn(U::Variant) + 'static>(&self, callback: F) {
+    pub fn connect_setting_changed<F: Fn(U::VariantSet) + 'static>(&self, callback: F) {
         *self.setting_change_callback.borrow_mut() = Some(Box::new(callback));
     }
 
@@ -574,6 +574,14 @@ impl<'a, S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static, U
     /// Get the current mode.
     pub fn get_mode(&self) -> String {
         self.current_mode.borrow().clone()
+    }
+
+    /// Get a setting value.
+    pub fn get_setting(&self, setting: U::VariantGet) -> Option<Value> {
+        self.settings.borrow().as_ref()
+            .and_then(|settings| {
+                settings.get(&setting.to_string())
+            })
     }
 
     /// Handle the command activate event.
@@ -856,8 +864,8 @@ impl<'a, S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static, U
         self.reset();
     }
 
-    /// Get the application settings.
-    pub fn set_setting(&self, setting: U::Variant) {
+    /// Set a setting value.
+    pub fn set_setting(&self, setting: U::VariantSet) {
         if let Some(ref mut settings) = *self.settings.borrow_mut() {
             settings.set_value(setting.clone());
             self.call_setting_callback(setting);

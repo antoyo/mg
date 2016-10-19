@@ -28,6 +28,8 @@ extern crate mg_settings;
 #[macro_use]
 extern crate mg_settings_macros;
 
+use std::rc::Rc;
+
 use gtk::{ContainerExt, Entry, Label, WidgetExt};
 use gtk::Orientation::Vertical;
 use mg::ApplicationBuilder;
@@ -83,6 +85,7 @@ fn main() {
     let vbox = gtk::Box::new(Vertical, 0);
     let label = Label::new(Some("Mg App"));
     vbox.add(&label);
+    let label = Rc::new(label);
     let entry = Entry::new();
     vbox.add(&entry);
     app.set_view(&vbox);
@@ -100,8 +103,10 @@ fn main() {
 
     {
         let mg_app = app.clone();
+        let label = label.clone();
         app.connect_mode_changed(move |mode| {
             if mode != "normal" {
+                label.set_text(&format!("Title was: {:?}", mg_app.get_setting(AppSettings::Title)));
                 mg_app.set_setting(Title(mode.to_string()));
             }
         });
@@ -109,6 +114,7 @@ fn main() {
 
     {
         let mg_app = app.clone();
+        let label = label.clone();
         app.connect_command(move |command| {
             match command {
                 Follow => (),
