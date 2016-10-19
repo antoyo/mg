@@ -87,7 +87,7 @@ use gtk::{
 use gtk::prelude::WidgetExtManual;
 use mg_settings::{Config, EnumFromStr, EnumMetaData, Parser, Value};
 use mg_settings::Command::{self, Custom, Map, Set, Unmap};
-use mg_settings::error::{Error, Result};
+use mg_settings::error::{Error, Result, SettingError};
 use mg_settings::error::ErrorType::{MissingArgument, NoCommand, Parse, UnknownCommand};
 use mg_settings::key::Key;
 use mg_settings::settings;
@@ -201,6 +201,38 @@ impl<T: EnumMetaData> Completer for CommandCompleter<T> {
     }
 }
 
+#[doc(hidden)]
+pub struct NoSettings;
+
+#[doc(hidden)]
+pub enum NoSettingsGet { }
+
+impl ::std::fmt::Display for NoSettingsGet {
+    fn fmt(&self, formatter: &mut ::std::fmt::Formatter) -> ::std::result::Result<(), ::std::fmt::Error> {
+        write!(formatter, "")
+    }
+}
+
+#[doc(hidden)]
+#[derive(Clone)]
+pub enum NoSettingsSet { }
+
+impl ::mg_settings::settings::Settings for NoSettings {
+    type VariantGet = NoSettingsGet;
+    type VariantSet = NoSettingsSet;
+
+    fn get(&self, _name: &str) -> Option<Value> {
+        None
+    }
+
+    fn to_variant(name: &str, _value: Value) -> result::Result<Self::VariantSet, SettingError> {
+        Err(SettingError::UnknownSetting(name.to_string()))
+    }
+
+    fn set_value(&mut self, _value: Self::VariantSet) {
+    }
+}
+
 /// A command from a map command.
 #[derive(Debug)]
 enum ShortcutCommand {
@@ -209,6 +241,9 @@ enum ShortcutCommand {
     /// An incomplete command where the user needs to complete it and press Enter.
     Incomplete(String),
 }
+
+/// Alias for an application builder without settings.
+pub type SimpleApplicationBuilder = ApplicationBuilder<NoSettings>;
 
 /// Application builder.
 pub struct ApplicationBuilder<U: settings::Settings> {
