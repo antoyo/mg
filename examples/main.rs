@@ -50,7 +50,7 @@ enum AppCommand {
 }
 
 #[derive(Settings)]
-struct AppSettings {
+pub struct AppSettings {
     title: String,
     title_len: i64,
     width: i64,
@@ -106,7 +106,8 @@ fn main() {
         let label = label.clone();
         app.connect_mode_changed(move |mode| {
             if mode != "normal" {
-                label.set_text(&format!("Title was: {:?}", mg_app.get_setting(AppSettings::Title)));
+                let title = &mg_app.settings().title;
+                label.set_text(&format!("Title was: {}", title));
                 mg_app.set_setting(Title(mode.to_string()));
             }
         });
