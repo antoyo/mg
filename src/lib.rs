@@ -211,10 +211,6 @@ pub enum NoSettingsVariant { }
 impl ::mg_settings::settings::Settings for NoSettings {
     type Variant = NoSettingsVariant;
 
-    fn get(&self, _name: &str) -> Option<Value> {
-        None
-    }
-
     fn to_variant(name: &str, _value: Value) -> result::Result<Self::Variant, SettingError> {
         Err(SettingError::UnknownSetting(name.to_string()))
     }

@@ -36,7 +36,15 @@ use mg::ApplicationBuilder;
 
 use AppCommand::*;
 use AppSettingsVariant::*;
+use CustomSetting::*;
 use SpecialCommand::*;
+
+#[derive(Debug, Setting)]
+pub enum CustomSetting {
+    #[default]
+    Choice,
+    OtherChoice,
+}
 
 #[derive(Commands)]
 enum AppCommand {
@@ -51,6 +59,7 @@ enum AppCommand {
 
 #[derive(Settings)]
 pub struct AppSettings {
+    custom: CustomSetting,
     title: String,
     title_len: i64,
     width: i64,
@@ -92,8 +101,10 @@ fn main() {
 
     {
         let mg_app = app.clone();
+        let label = label.clone();
         app.connect_setting_changed(move |setting| {
             match setting {
+                Custom(setting) => label.set_text(&format!("custom setting is: {:?}", setting)),
                 Title(title) => mg_app.set_window_title(&title),
                 TitleLen(len) => mg_app.set_window_title(&format!("New title len: {}", len)),
                 Width(_) => (),
