@@ -112,16 +112,15 @@ macro_rules! hash {
 
 #[macro_export]
 macro_rules! special_commands {
-    // TODO: use $(always) instead of always.
     ($enum_name:ident { $( $command:ident ( $identifier:expr , always ),)* } ) => {
-        enum $enum_name {
+        pub enum $enum_name {
             $( $command(String), )*
         }
 
         impl $crate::SpecialCommand for $enum_name {
             fn identifier_to_command(identifier: char, input: &str) -> ::std::result::Result<Self, String> {
                 match identifier {
-                    $( $identifier => Ok($command(input.to_string())), )*
+                    $( $identifier => Ok($enum_name::$command(input.to_string())), )*
                     _ => Err(format!("unknown identifier {}", identifier)),
                 }
             }
