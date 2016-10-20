@@ -819,7 +819,11 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static, U: se
         let commands = self.settings_parser.borrow_mut().parse(buf_reader)?;
         for command in commands {
             match command {
-                Custom(_) => (), // TODO: call the callback?
+                Custom(command) => {
+                    if let Some(ref callback) = *self.command_callback.borrow() {
+                        callback(command);
+                    }
+                },
                 Map { action, keys, mode } => {
                     let mut mappings = self.mappings.borrow_mut();
                     let mappings = mappings.entry(self.modes[&mode].clone()).or_insert_with(HashMap::new);
