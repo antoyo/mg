@@ -20,7 +20,6 @@
  */
 
 /*
- * FIXME: go back to normal completion when deleting text from no completion.
  * TODO: setting value completion.
  * TODO: do not expand the completion view.
  * TODO: set the size of the status bar according to the size of the font.

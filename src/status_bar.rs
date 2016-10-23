@@ -177,12 +177,11 @@ impl StatusBar {
     pub fn select_completer(&self) {
         if let Some(text) = self.entry.get_text() {
             let text = text.trim_left();
-            let current_completer = self.completion.current_completer();
             if let Some(space_index) = text.find(' ') {
                 let command = &text[..space_index];
                 self.set_completer(command);
             }
-            else if current_completer != NO_COMPLETER_IDENT {
+            else {
                 self.set_completer(DEFAULT_COMPLETER_IDENT);
             }
         }
