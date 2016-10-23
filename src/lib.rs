@@ -20,12 +20,14 @@
  */
 
 /*
- * TODO: fix the size of the status bar.
+ * FIXME: go back to normal completion when deleting text from no completion.
+ * TODO: setting value completion.
+ * TODO: do not expand the completion view.
+ * TODO: set the size of the status bar according to the size of the font.
  * TODO: supports shortcuts like <C-a> and <C-w> in the command entry.
  * TODO: smart home (with Ctrl-A) in the command text entry.
  * TODO: support non-"always" in special commands.
  * TODO: different event for activate event of special commands.
- * TODO: Disable focusing next element when hitting tab in the command entry.
  * TODO: Show the current shortcut in the status bar.
  * TODO: Try to return an Application directly instead of an Rc<Application>.
  * TODO: support shortcuts with number like "50G".
@@ -47,14 +49,13 @@ extern crate libc;
 extern crate log;
 extern crate mg_settings;
 
-mod completion;
-mod entry_completion;
-mod gobject;
-mod key_converter;
-mod style_context;
 #[macro_use]
 mod widget;
+mod completion;
+mod gobject;
+mod key_converter;
 mod status_bar;
+mod style_context;
 
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
@@ -62,13 +63,12 @@ use std::char;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
-use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::result;
 
 use gdk::{EventKey, RGBA, CONTROL_MASK};
-use gdk::enums::key::{Escape, colon};
+use gdk::enums::key::{Escape, Tab, ISO_Left_Tab, colon};
 use gdk_sys::GdkRGBA;
 use gtk::{
     ContainerExt,
@@ -76,6 +76,7 @@ use gtk::{
     Grid,
     Inhibit,
     IsA,
+    ScrolledWindow,
     Settings,
     Widget,
     WidgetExt,
@@ -85,14 +86,14 @@ use gtk::{
     STATE_FLAG_NORMAL,
 };
 use gtk::prelude::WidgetExtManual;
-use mg_settings::{Config, EnumFromStr, EnumMetaData, Parser, Value};
-use mg_settings::Command::{self, Custom, Map, Set, Unmap};
+use mg_settings::{Config, EnumFromStr, EnumMetaData, MetaData, Parser, Value};
+use mg_settings::Command::{self, App, Custom, Map, Set, Unmap};
 use mg_settings::error::{Error, Result, SettingError};
 use mg_settings::error::ErrorType::{MissingArgument, NoCommand, Parse, UnknownCommand};
 use mg_settings::key::Key;
 use mg_settings::settings;
 
-use completion::{Completer, DEFAULT_COMPLETER_IDENT, NO_COMPLETER_IDENT};
+use completion::{CommandCompleter, CompletionView, SettingCompleter, DEFAULT_COMPLETER_IDENT, NO_COMPLETER_IDENT};
 use key_converter::gdk_key_to_key;
 use gobject::ObjectExtManual;
 use self::ActivationType::{Current, Final};
@@ -166,38 +167,14 @@ const RED: &'static GdkRGBA = &GdkRGBA { red: 1.0, green: 0.0, blue: 0.0, alpha:
 const TRANSPARENT: &'static GdkRGBA = &GdkRGBA { red: 0.0, green: 0.0, blue: 0.0, alpha: 0.0 };
 const WHITE: &'static GdkRGBA = &GdkRGBA { red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0 };
 
+const COMPLETE_NEXT_COMMAND: &'static str = "complete-next";
+const COMPLETE_PREVIOUS_COMMAND: &'static str = "complete-previous";
 const INFO_MESSAGE_DURATION: u32 = 5000;
 
 #[derive(PartialEq)]
 enum ActivationType {
     Current,
     Final,
-}
-
-/// A command completer.
-struct CommandCompleter<T> {
-    _phantom: PhantomData<T>,
-}
-
-impl<T> CommandCompleter<T> {
-    fn new() -> CommandCompleter<T> {
-        CommandCompleter {
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<T: EnumMetaData> Completer for CommandCompleter<T> {
-    fn data(&self) -> Vec<(String, String)> {
-        T::get_metadata().iter()
-            .filter(|&(_, metadata)| !metadata.completion_hidden)
-            .map(|(command_name, metadata)| (command_name.clone(), metadata.help_text.clone()))
-            .collect()
-    }
-
-    fn text_column(&self) -> i32 {
-        0
-    }
 }
 
 #[doc(hidden)]
@@ -207,7 +184,7 @@ pub struct NoSettings;
 #[derive(Clone)]
 pub enum NoSettingsVariant { }
 
-impl ::mg_settings::settings::Settings for NoSettings {
+impl settings::Settings for NoSettings {
     type Variant = NoSettingsVariant;
 
     fn to_variant(name: &str, _value: Value) -> result::Result<Self::Variant, SettingError> {
@@ -215,6 +192,12 @@ impl ::mg_settings::settings::Settings for NoSettings {
     }
 
     fn set_value(&mut self, _value: Self::Variant) {
+    }
+}
+
+impl EnumMetaData for NoSettings {
+    fn get_metadata() -> HashMap<String, MetaData> {
+        HashMap::new()
     }
 }
 
@@ -249,7 +232,11 @@ impl<U: settings::Settings + 'static> ApplicationBuilder<U> {
     }
 
     /// Create a new application with configuration and include path.
-    pub fn build<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static>(self) -> Rc<Application<S, T, U>> {
+    pub fn build<S, T>(self) -> Rc<Application<S, T, U>>
+        where S: SpecialCommand + 'static,
+              T: EnumFromStr + EnumMetaData + 'static,
+              U: EnumMetaData,
+    {
         Application::new(self)
     }
 
@@ -279,6 +266,8 @@ impl<U: settings::Settings + 'static> ApplicationBuilder<U> {
 pub struct Application<S, T, U: settings::Settings> {
     answer: RefCell<Option<String>>,
     command_callback: RefCell<Option<Box<Fn(T)>>>,
+    completion_scrolled_window: ScrolledWindow,
+    completion_view: Rc<CompletionView>,
     choices: RefCell<Vec<char>>,
     close_callback: RefCell<Option<Box<Fn()>>>,
     current_command_mode: Cell<char>,
@@ -295,16 +284,21 @@ pub struct Application<S, T, U: settings::Settings> {
     settings_parser: RefCell<Parser<T>>,
     setting_change_callback: RefCell<Option<Box<Fn(U::Variant)>>>,
     special_command_callback: RefCell<Option<Box<Fn(S)>>>,
-    status_bar: StatusBar,
+    status_bar: Rc<StatusBar>,
     vbox: Grid,
     variables: RefCell<HashMap<String, Box<Fn() -> String>>>,
     window: Window,
 }
 
-impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static, U: settings::Settings + 'static> Application<S, T, U> {
+impl<S, T, U> Application<S, T, U>
+    where S: SpecialCommand + 'static,
+          T: EnumFromStr + EnumMetaData + 'static,
+          U: settings::Settings + EnumMetaData + 'static,
+{
     fn new(builder: ApplicationBuilder<U>) -> Rc<Self> {
         let modes = builder.modes.unwrap_or_default();
         let config = Config {
+            application_commands: vec![COMPLETE_NEXT_COMMAND.to_string(), COMPLETE_PREVIOUS_COMMAND.to_string()],
             mapping_modes: modes.keys().cloned().collect(),
         };
 
@@ -313,10 +307,18 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static, U: se
         let grid = Grid::new();
         window.add(&grid);
 
-        let status_bar = StatusBar::new(Box::new(CommandCompleter::<T>::new()));
-        grid.attach(&status_bar, 0, 1, 1, 1);
+        let completion_view = CompletionView::new();
+        let scrolled_window = ScrolledWindow::new(None, None);
+        scrolled_window.add(&*completion_view);
+        scrolled_window.set_vexpand(true);
+        grid.attach(&scrolled_window, 0, 1, 1, 1);
+
+        let status_bar = StatusBar::new(completion_view.clone(), Box::new(CommandCompleter::<T>::new()));
+        status_bar.add_completer("set", SettingCompleter::<U>::new());
+        grid.attach(&*status_bar, 0, 2, 1, 1);
         window.show_all();
         status_bar.hide();
+        scrolled_window.hide();
 
         let foreground_color = Application::<S, T, U>::get_foreground_color(&window);
 
@@ -331,6 +333,8 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static, U: se
         let app = Rc::new(Application {
             answer: RefCell::new(None),
             command_callback: RefCell::new(None),
+            completion_scrolled_window: scrolled_window,
+            completion_view: completion_view,
             choices: RefCell::new(vec![]),
             close_callback: RefCell::new(None),
             current_command_mode: Cell::new(':'),
@@ -378,14 +382,13 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static, U: se
                         *instance.answer.borrow_mut() = input.clone();
                         callback(input);
                     }
-                    instance.return_to_normal_mode();
                     *instance.input_callback.borrow_mut() = None;
                     (*instance.choices.borrow_mut()).clear();
                 }
                 else {
-                    instance.set_mode("normal");
                     instance.handle_command(input);
                 }
+                instance.return_to_normal_mode();
             });
         }
 
@@ -435,6 +438,15 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static, U: se
     pub fn add_variable<F: Fn() -> String + 'static>(&self, variable_name: &str, function: F) {
         let mut variables = self.variables.borrow_mut();
         variables.insert(variable_name.to_string(), Box::new(function));
+    }
+
+    /// Handle an application command.
+    fn app_command(&self, command: &str) {
+        match command {
+            COMPLETE_NEXT_COMMAND => self.status_bar.complete_next(),
+            COMPLETE_PREVIOUS_COMMAND => self.status_bar.complete_previous(),
+            _ => unreachable!(),
+        }
     }
 
     /// Ask a question to the user and block until the user provides it (or cancel).
@@ -489,6 +501,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static, U: se
         match command {
             Ok(command) => {
                 match command {
+                    App(command) => self.app_command(&command),
                     Custom(command) => callback(command),
                     Set(name, value) => {
                         match U::to_variant(&name, value) {
@@ -524,12 +537,20 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static, U: se
         }
     }
 
+    /// Clear the current shortcut buffer.
+    fn clear_shortcut(&self) {
+        let mut shortcut = self.current_shortcut.borrow_mut();
+        shortcut.clear();
+    }
+
     /// Handle the key press event for the command mode.
     #[allow(non_upper_case_globals)]
     fn command_key_press(&self, key: &EventKey) -> Inhibit {
         match key.get_keyval() {
             Escape => {
                 self.return_to_normal_mode();
+                self.reset();
+                self.clear_shortcut();
                 Inhibit(false)
             },
             _ => self.handle_shortcut(key),
@@ -581,6 +602,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static, U: se
     pub fn error(&self, error: &str) {
         error!("{}", error);
         self.message.set_text(error);
+        self.status_bar.hide_entry();
         self.status_bar.override_background_color(STATE_FLAG_NORMAL, RED);
         self.status_bar.override_color(STATE_FLAG_NORMAL, WHITE);
     }
@@ -609,16 +631,19 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static, U: se
             else {
                 self.handle_special_command(Final, &command);
             }
-            self.status_bar.hide_entry();
+            if self.get_mode() != "command" {
+                self.status_bar.hide_entry();
+            }
         }
     }
 
     /// Handle a possible input of a shortcut.
     fn handle_shortcut(&self, key: &EventKey) -> Inhibit {
+        let keyval = key.get_keyval();
         let mode = self.get_mode();
-        if !self.status_bar.entry_shown() {
-            let control_pressed = key.get_state() & CONTROL_MASK == CONTROL_MASK;
-            if let Some(key) = gdk_key_to_key(key.get_keyval(), control_pressed) {
+        let control_pressed = key.get_state() & CONTROL_MASK == CONTROL_MASK;
+        if !self.status_bar.entry_shown() || control_pressed || keyval == Tab || keyval == ISO_Left_Tab {
+            if let Some(key) = gdk_key_to_key(keyval, control_pressed) {
                 self.add_to_shortcut(key);
                 let action = {
                     let shortcut = self.current_shortcut.borrow();
@@ -627,7 +652,10 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static, U: se
                         .and_then(|mappings| mappings.get(&*shortcut).cloned())
                 };
                 if let Some(action) = action {
-                    self.reset();
+                    if mode != "command" {
+                        self.reset();
+                    }
+                    self.clear_shortcut();
                     match self.action_to_command(&action) {
                         Complete(command) => self.handle_command(Some(command)),
                         Incomplete(command) => {
@@ -637,11 +665,14 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static, U: se
                     }
                 }
                 else if self.no_possible_shortcut() {
-                    self.reset();
+                    if mode != "command" {
+                        self.reset();
+                    }
+                    self.clear_shortcut();
                 }
             }
         }
-        if mode == "normal" {
+        if mode == "normal" || (mode == "command" && (keyval == Tab || keyval == ISO_Left_Tab)) {
             Inhibit(true)
         }
         else {
@@ -713,6 +744,8 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static, U: se
         match key.get_keyval() {
             Escape => {
                 self.return_to_normal_mode();
+                self.reset();
+                self.clear_shortcut();
                 if let Some(ref callback) = *self.input_callback.borrow() {
                     callback(None);
                 }
@@ -774,11 +807,16 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static, U: se
                 self.set_current_identifier(':');
                 self.set_mode("command");
                 self.reset();
+                self.clear_shortcut();
+                self.completion_view.unselect();
+                self.completion_view.scroll_to_first();
+                self.completion_scrolled_window.show();
                 self.status_bar.show_entry();
                 Inhibit(true)
             },
             Escape => {
                 self.reset();
+                self.clear_shortcut();
                 self.handle_shortcut(key)
             },
             keyval => {
@@ -788,6 +826,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static, U: se
                     self.set_current_identifier(character);
                     self.set_mode("command");
                     self.reset();
+                    self.clear_shortcut();
                     self.status_bar.show_entry();
                     Inhibit(true)
                 }
@@ -819,6 +858,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static, U: se
         let commands = self.settings_parser.borrow_mut().parse(buf_reader)?;
         for command in commands {
             match command {
+                App(command) => self.app_command(&command),
                 Custom(command) => {
                     if let Some(ref callback) = *self.command_callback.borrow() {
                         callback(command);
@@ -863,8 +903,7 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static, U: se
         self.status_bar.hide();
         self.message.set_text("");
         self.show_mode();
-        let mut shortcut = self.current_shortcut.borrow_mut();
-        shortcut.clear();
+        self.clear_shortcut();
     }
 
     /// Reset the background and foreground colors of the status bar.
@@ -875,9 +914,10 @@ impl<S: SpecialCommand + 'static, T: EnumFromStr + EnumMetaData + 'static, U: se
 
     /// Go back to the normal mode from command or input mode.
     fn return_to_normal_mode(&self) {
+        self.status_bar.hide_entry();
+        self.completion_scrolled_window.hide();
         self.set_mode("normal");
         self.set_current_identifier(':');
-        self.reset();
     }
 
     /// Get the settings.

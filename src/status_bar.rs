@@ -19,13 +19,16 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-use std::cell::Cell;
+use std::cell::{RefCell, Cell};
+use std::ops::Deref;
+use std::rc::Rc;
 
 use gtk::{
     BoxExt,
     ContainerExt,
     CssProvider,
     EditableExt,
+    EditableSignals,
     Entry,
     EntryExt,
     Label,
@@ -34,7 +37,7 @@ use gtk::{
 };
 use gtk::Orientation::Horizontal;
 
-use completion::{Completer, Completion};
+use completion::{Completer, Completion, CompletionView, DEFAULT_COMPLETER_IDENT, NO_COMPLETER_IDENT};
 
 pub type StatusBarWidget = HBox;
 pub type HBox = ::gtk::Box;
@@ -42,15 +45,18 @@ pub type HBox = ::gtk::Box;
 /// The window status bar.
 pub struct StatusBar {
     completion: Completion,
+    completion_original_input: RefCell<String>,
+    completion_view: Rc<CompletionView>,
     entry: Entry,
     entry_shown: Cell<bool>,
     identifier_label: Label,
+    inserting_completion: Cell<bool>,
     hbox: HBox,
 }
 
 impl StatusBar {
     /// Create a new status bar.
-    pub fn new(default_completer: Box<Completer>) -> Self {
+    pub fn new(completion_view: Rc<CompletionView>, default_completer: Box<Completer>) -> Rc<Self> {
         let hbox = HBox::new(Horizontal, 0);
         hbox.set_size_request(1, 20);
 
@@ -58,19 +64,52 @@ impl StatusBar {
         hbox.add(&identifier_label);
 
         let entry = Entry::new();
-        let completion = Completion::new(default_completer);
-        entry.set_completion(Some(completion.get_entry_completion()));
+        let completion = Completion::new(default_completer, completion_view.clone());
 
         StatusBar::adjust_entry(&entry);
         hbox.add(&entry);
 
-        StatusBar {
+        let status_bar = Rc::new(StatusBar {
             completion: completion,
+            completion_original_input: RefCell::new(String::new()),
+            completion_view: completion_view,
             entry: entry,
             entry_shown: Cell::new(false),
             identifier_label: identifier_label,
+            inserting_completion: Cell::new(false),
             hbox: hbox,
+        });
+
+        {
+            let status_bar2 = status_bar.clone();
+            status_bar.completion_view.connect_selection_changed(move |selection| {
+                if let Some(completion) = status_bar2.completion.complete_result(selection) {
+                    status_bar2.set_input(&completion);
+                }
+            });
         }
+
+        {
+            let status_bar2 = status_bar.clone();
+            status_bar.completion_view.connect_unselect(move || {
+                let text = (*status_bar2.completion_original_input.borrow()).clone();
+                status_bar2.set_input(&text);
+            });
+        }
+
+        {
+            let status_bar2 = status_bar.clone();
+            status_bar.entry.connect_changed(move |_| {
+                status_bar2.update_completions();
+            });
+        }
+
+        status_bar
+    }
+
+    /// Add a command completer.
+    pub fn add_completer<C: Completer + 'static>(&self, command_name: &str, completer: C) {
+        self.completion.add_completer(command_name, completer);
     }
 
     /// Add an item.
@@ -88,15 +127,22 @@ impl StatusBar {
     fn adjust_entry(entry: &Entry) {
         entry.set_name("mg-input-command");
         let style_context = entry.get_style_context().unwrap();
-        let style = "#mg-input-command {
-            box-shadow: none;
-            padding: 0;
-        }";
+        let style = include_str!("../style/command-input.css");
         let provider = CssProvider::new();
         provider.load_from_data(style).unwrap();
         style_context.add_provider(&provider, STYLE_PROVIDER_PRIORITY_APPLICATION);
         entry.set_has_frame(false);
         entry.set_hexpand(true);
+    }
+
+    /// Select the next completion entry if it is visible.
+    pub fn complete_next(&self) {
+        self.completion_view.select_next();
+    }
+
+    /// Select the previous completion entry if it is visible.
+    pub fn complete_previous(&self) {
+        self.completion_view.select_previous();
     }
 
     /// Connect the active entry event.
@@ -121,9 +167,25 @@ impl StatusBar {
 
     /// Hide the entry.
     pub fn hide_entry(&self) {
+        self.entry.set_text("");
         self.entry_shown.set(false);
         self.entry.hide();
         self.identifier_label.hide();
+    }
+
+    /// Select the completer based on the currently typed command.
+    pub fn select_completer(&self) {
+        if let Some(text) = self.entry.get_text() {
+            let text = text.trim_left();
+            let current_completer = self.completion.current_completer();
+            if let Some(space_index) = text.find(' ') {
+                let command = &text[..space_index];
+                self.set_completer(command);
+            }
+            else if current_completer != NO_COMPLETER_IDENT {
+                self.set_completer(DEFAULT_COMPLETER_IDENT);
+            }
+        }
     }
 
     /// Set the current command completer.
@@ -131,10 +193,12 @@ impl StatusBar {
         self.completion.adjust_model(completer);
     }
 
-    /// Set the text of the input entry.
+    /// Set the text of the input entry and move the cursor at the end.
     pub fn set_input(&self, command: &str) {
+        self.inserting_completion.set(true);
         self.entry.set_text(command);
         self.entry.set_position(command.len() as i32);
+        self.inserting_completion.set(false);
     }
 
     /// Set the identifier label text.
@@ -154,6 +218,29 @@ impl StatusBar {
     /// Show the identifier label.
     pub fn show_identifier(&self) {
         self.identifier_label.show();
+    }
+
+    /// Update the completions.
+    fn update_completions(&self) {
+        if !self.inserting_completion.get() {
+            self.select_completer();
+            let current_completer = self.completion.current_completer();
+            if current_completer != NO_COMPLETER_IDENT {
+                if let Some(text) = self.entry.get_text() {
+                    self.completion_view.filter(&text);
+                    *self.completion_original_input.borrow_mut() = text;
+                }
+            }
+            self.completion_view.unselect();
+        }
+    }
+}
+
+impl Deref for StatusBar {
+    type Target = HBox;
+
+    fn deref(&self) -> &Self::Target {
+        &self.hbox
     }
 }
 

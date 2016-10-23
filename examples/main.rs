@@ -36,7 +36,6 @@ use mg::ApplicationBuilder;
 
 use AppCommand::*;
 use AppSettingsVariant::*;
-use CustomSetting::*;
 use SpecialCommand::*;
 
 #[derive(Debug, Setting)]
@@ -52,14 +51,18 @@ enum AppCommand {
     Follow,
     Insert,
     Normal,
+    #[help(text="Open the url")]
     Open(String),
+    #[help(text="Quit the application")]
     Quit,
+    #[help(text="Open the url in a new window")]
     WinOpen(String),
 }
 
 #[derive(Settings)]
 pub struct AppSettings {
     custom: CustomSetting,
+    #[help(text="The window title")]
     title: String,
     title_len: i64,
     width: i64,
@@ -85,7 +88,7 @@ fn main() {
     let item2 = app.add_statusbar_item();
     item2.set_text("Test");
     item.set_text("Rightmost");
-    if let Err(error) = app.parse_config("main.conf") {
+    if let Err(error) = app.parse_config("examples/main.conf") {
         app.error(&error.to_string());
     }
     app.add_variable("url", || "http://duckduckgo.com/lite".to_string());
