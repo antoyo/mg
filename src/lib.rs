@@ -20,7 +20,6 @@
  */
 
 /*
- * TODO: do not expand the completion view.
  * TODO: set the size of the status bar according to the size of the font.
  * TODO: supports shortcuts like <C-a> and <C-w> in the command entry.
  * TODO: smart home (with Ctrl-A) in the command text entry.
@@ -58,6 +57,7 @@ mod style_context;
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::char;
+use std::cmp::min;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
@@ -75,6 +75,7 @@ use gtk::{
     Inhibit,
     IsA,
     ScrolledWindow,
+    ScrolledWindowExt,
     Settings,
     Widget,
     WidgetExt,
@@ -270,7 +271,7 @@ impl<U: settings::Settings + 'static> ApplicationBuilder<U> {
 pub struct Application<S, T, U: settings::Settings> {
     answer: RefCell<Option<String>>,
     command_callback: RefCell<Option<Box<Fn(T)>>>,
-    completion_scrolled_window: ScrolledWindow,
+    completion_scrolled_window: Rc<ScrolledWindow>,
     completion_view: Rc<CompletionView>,
     choices: RefCell<Vec<char>>,
     close_callback: RefCell<Option<Box<Fn()>>>,
@@ -312,10 +313,17 @@ impl<S, T, U> Application<S, T, U>
         window.add(&grid);
 
         let completion_view = CompletionView::new();
-        let scrolled_window = ScrolledWindow::new(None, None);
+        let scrolled_window = Rc::new(ScrolledWindow::new(None, None));
         scrolled_window.add(&*completion_view);
-        scrolled_window.set_vexpand(true);
-        grid.attach(&scrolled_window, 0, 1, 1, 1);
+        {
+            let scrolled_window = scrolled_window.clone();
+            (&**completion_view).connect_draw(move |tree_view, _| {
+                let (preferred_height, _) = tree_view.get_preferred_height();
+                scrolled_window.set_min_content_height(min(300, preferred_height));
+                Inhibit(false)
+            });
+        }
+        grid.attach(&*scrolled_window, 0, 1, 1, 1);
 
         let mut completers: HashMap<String, Box<Completer>> = HashMap::new();
         completers.insert(DEFAULT_COMPLETER_IDENT.to_string(), Box::new(CommandCompleter::<T>::new()));

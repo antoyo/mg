@@ -20,6 +20,7 @@
  */
 
 use std::cell::RefCell;
+use std::ops::Deref;
 use std::rc::Rc;
 
 use gtk::{
@@ -179,6 +180,14 @@ impl CompletionView {
     pub fn unselect(&self) {
         let selection = self.view.get_selection();
         selection.unselect_all();
+    }
+}
+
+impl Deref for CompletionView {
+    type Target = TreeView;
+
+    fn deref(&self) -> &Self::Target {
+        &self.view
     }
 }
 
