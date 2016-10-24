@@ -20,6 +20,7 @@
  */
 
 use std::cell::{RefCell, Cell};
+use std::collections::HashMap;
 use std::ops::Deref;
 use std::rc::Rc;
 
@@ -56,7 +57,7 @@ pub struct StatusBar {
 
 impl StatusBar {
     /// Create a new status bar.
-    pub fn new(completion_view: Rc<CompletionView>, default_completer: Box<Completer>) -> Rc<Self> {
+    pub fn new(completion_view: Rc<CompletionView>, completers: HashMap<String, Box<Completer>>) -> Rc<Self> {
         let hbox = HBox::new(Horizontal, 0);
         hbox.set_size_request(1, 20);
 
@@ -64,7 +65,7 @@ impl StatusBar {
         hbox.add(&identifier_label);
 
         let entry = Entry::new();
-        let completion = Completion::new(default_completer, completion_view.clone());
+        let completion = Completion::new(completers, completion_view.clone());
 
         StatusBar::adjust_entry(&entry);
         hbox.add(&entry);
@@ -105,11 +106,6 @@ impl StatusBar {
         }
 
         status_bar
-    }
-
-    /// Add a command completer.
-    pub fn add_completer<C: Completer + 'static>(&self, command_name: &str, completer: C) {
-        self.completion.add_completer(command_name, completer);
     }
 
     /// Add an item.
@@ -155,6 +151,13 @@ impl StatusBar {
         self.entry_shown.get()
     }
 
+    /// Filter the completion view.
+    fn filter(&self) {
+        if let (Some(text), Some(completer)) = (self.entry.get_text(), self.completion.current_completer()) {
+            self.completion_view.filter(&text, completer);
+        }
+    }
+
     /// Get the text of the command entry.
     pub fn get_command(&self) -> Option<String> {
         self.entry.get_text()
@@ -190,6 +193,7 @@ impl StatusBar {
     /// Set the current command completer.
     pub fn set_completer(&self, completer: &str) {
         self.completion.adjust_model(completer);
+        self.filter();
     }
 
     /// Set the text of the input entry and move the cursor at the end.
@@ -223,10 +227,10 @@ impl StatusBar {
     fn update_completions(&self) {
         if !self.inserting_completion.get() {
             self.select_completer();
-            let current_completer = self.completion.current_completer();
+            let current_completer = self.completion.current_completer_ident();
             if current_completer != NO_COMPLETER_IDENT {
                 if let Some(text) = self.entry.get_text() {
-                    self.completion_view.filter(&text);
+                    self.filter();
                     *self.completion_original_input.borrow_mut() = text;
                 }
             }

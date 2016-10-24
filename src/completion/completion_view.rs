@@ -22,7 +22,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use glib::{Cast, ToValue};
 use gtk::{
     CellRendererText,
     IsA,
@@ -30,14 +29,14 @@ use gtk::{
     TreeIter,
     TreeModel,
     TreeModelExt,
-    TreeModelFilter,
     TreeSelection,
     TreeView,
     TreeViewColumn,
+    Type,
     WidgetExt,
 };
 
-use completion::VISIBLE_COLUMN;
+use super::Completer;
 
 /// A widget to show completions for the command entry.
 pub struct CompletionView {
@@ -84,8 +83,9 @@ impl CompletionView {
     }
 
     /// Filter the rows from the input.
-    pub fn filter(&self, input: &str) {
-        let input = input.trim_left();
+    pub fn filter(&self, input: &str, completer: &Completer) {
+        let model = ListStore::new(&[Type::String, Type::String]);
+
         let key =
             if let Some(index) = input.find(' ') {
                 input[index + 1 ..].trim_left()
@@ -93,24 +93,11 @@ impl CompletionView {
             else {
                 input
             };
-        let model_filter = self.view.get_model().unwrap();
-        let model_filter: TreeModelFilter = model_filter.downcast().unwrap();
-        let model: ListStore = model_filter.get_model().unwrap().downcast().unwrap();
-        let iter = model.get_iter_first();
-        if let Some(iter) = iter {
-            let key = key.to_lowercase();
-            loop {
-                let column1: Option<String> = model.get_value(&iter, 0).get();
-                let column2: Option<String> = model.get_value(&iter, 1).get();
-                let column1 = column1.unwrap_or_default().to_lowercase();
-                let column2 = column2.unwrap_or_default().to_lowercase();
-                let visible = column1.contains(&key) || column2.contains(&key);
-                model.set_value(&iter, VISIBLE_COLUMN, &visible.to_value());
-                if !model.iter_next(&iter) {
-                    break;
-                }
-            }
+        let key = key.to_lowercase();
+        for &(ref col1, ref col2) in &completer.completions(&key) {
+            model.insert_with_values(None, &[0, 1], &[&col1, &col2]);
         }
+        self.view.set_model(Some(&model));
     }
 
     /// Scroll to the selected row.

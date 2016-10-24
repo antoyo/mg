@@ -92,7 +92,7 @@ use mg_settings::error::ErrorType::{MissingArgument, NoCommand, Parse, UnknownCo
 use mg_settings::key::Key;
 use mg_settings::settings;
 
-use completion::{CommandCompleter, CompletionView, SettingCompleter, DEFAULT_COMPLETER_IDENT, NO_COMPLETER_IDENT};
+use completion::{CommandCompleter, Completer, CompletionView, SettingCompleter, DEFAULT_COMPLETER_IDENT, NO_COMPLETER_IDENT};
 use key_converter::gdk_key_to_key;
 use gobject::ObjectExtManual;
 use self::ActivationType::{Current, Final};
@@ -312,8 +312,10 @@ impl<S, T, U> Application<S, T, U>
         scrolled_window.set_vexpand(true);
         grid.attach(&scrolled_window, 0, 1, 1, 1);
 
-        let status_bar = StatusBar::new(completion_view.clone(), Box::new(CommandCompleter::<T>::new()));
-        status_bar.add_completer("set", SettingCompleter::<U>::new());
+        let mut completers: HashMap<String, Box<Completer>> = HashMap::new();
+        completers.insert(DEFAULT_COMPLETER_IDENT.to_string(), Box::new(CommandCompleter::<T>::new()));
+        completers.insert("set".to_string(), Box::new(SettingCompleter::<U>::new()));
+        let status_bar = StatusBar::new(completion_view.clone(), completers);
         grid.attach(&*status_bar, 0, 2, 1, 1);
         window.show_all();
         status_bar.hide();

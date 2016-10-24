@@ -27,23 +27,12 @@ use completion::Completer;
 
 /// A command completer.
 pub struct CommandCompleter<T> {
+    metadata: Vec<(String, String)>,
     _phantom: PhantomData<T>,
 }
 
-impl<T> CommandCompleter<T> {
+impl<T: EnumMetaData> CommandCompleter<T> {
     pub fn new() -> CommandCompleter<T> {
-        CommandCompleter {
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<T: EnumMetaData> Completer for CommandCompleter<T> {
-    fn complete_result(&self, input: &str) -> String {
-        input.to_string()
-    }
-
-    fn data(&self) -> Vec<(String, String)> {
         let mut data: Vec<_> =
             T::get_metadata().iter()
                 .filter(|&(_, metadata)| !metadata.completion_hidden)
@@ -53,7 +42,25 @@ impl<T: EnumMetaData> Completer for CommandCompleter<T> {
         data.push(("set".to_string(), "Change the value of a setting".to_string()));
         data.push(("unmap".to_string(), "Delete a key binding".to_string()));
         data.sort();
-        data
+        CommandCompleter {
+            metadata: data,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<T> Completer for CommandCompleter<T> {
+    fn complete_result(&self, input: &str) -> String {
+        input.to_string()
+    }
+
+    fn completions(&self, input: &str) -> Vec<(String, String)> {
+        self.metadata.iter()
+            .filter(|&&(ref command, ref help)|
+                    command.to_lowercase().contains(&input) ||
+                    help.to_lowercase().contains(&input))
+            .cloned()
+            .collect()
     }
 
     fn text_column(&self) -> i32 {
@@ -63,30 +70,37 @@ impl<T: EnumMetaData> Completer for CommandCompleter<T> {
 
 /// A setting completer.
 pub struct SettingCompleter<T> {
+    metadata: Vec<(String, String)>,
     _phantom: PhantomData<T>,
 }
 
-impl<T> SettingCompleter<T> {
+impl<T: EnumMetaData> SettingCompleter<T> {
     pub fn new() -> Self {
-        SettingCompleter {
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<T: EnumMetaData> Completer for SettingCompleter<T> {
-    fn complete_result(&self, input: &str) -> String {
-        format!("set {}", input)
-    }
-
-    fn data(&self) -> Vec<(String, String)> {
         let mut data: Vec<_> =
             T::get_metadata().iter()
                 .filter(|&(_, metadata)| !metadata.completion_hidden)
                 .map(|(setting_name, metadata)| (setting_name.clone(), metadata.help_text.clone()))
                 .collect();
         data.sort();
-        data
+        SettingCompleter {
+            metadata: data,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<T> Completer for SettingCompleter<T> {
+    fn complete_result(&self, input: &str) -> String {
+        format!("set {} =", input)
+    }
+
+    fn completions(&self, input: &str) -> Vec<(String, String)> {
+        self.metadata.iter()
+            .filter(|&&(ref setting, ref help)|
+                    setting.to_lowercase().contains(&input) ||
+                    help.to_lowercase().contains(&input))
+            .cloned()
+            .collect()
     }
 
     fn text_column(&self) -> i32 {
