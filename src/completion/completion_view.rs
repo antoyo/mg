@@ -20,6 +20,7 @@
  */
 
 use std::cell::RefCell;
+use std::cmp::max;
 use std::ops::Deref;
 use std::rc::Rc;
 
@@ -156,7 +157,7 @@ impl CompletionView {
                     self.show_original_input();
                 }
             }
-            else if let Some(iter) = model.iter_nth_child(None, model.iter_n_children(None) - 1) {
+            else if let Some(iter) = model.iter_nth_child(None, max(0, model.iter_n_children(None) - 1)) {
                 self.scroll(&model, &iter);
                 selection.select_iter(&iter);
             }
