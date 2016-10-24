@@ -20,7 +20,6 @@
  */
 
 /*
- * TODO: setting value completion.
  * TODO: do not expand the completion view.
  * TODO: set the size of the status bar according to the size of the font.
  * TODO: supports shortcuts like <C-a> and <C-w> in the command entry.
@@ -85,7 +84,7 @@ use gtk::{
     STATE_FLAG_NORMAL,
 };
 use gtk::prelude::WidgetExtManual;
-use mg_settings::{Config, EnumFromStr, EnumMetaData, MetaData, Parser, Value};
+use mg_settings::{Config, EnumFromStr, EnumMetaData, MetaData, Parser, SettingCompletion, Value};
 use mg_settings::Command::{self, App, Custom, Map, Set, Unmap};
 use mg_settings::error::{Error, Result, SettingError};
 use mg_settings::error::ErrorType::{MissingArgument, NoCommand, Parse, UnknownCommand};
@@ -200,6 +199,12 @@ impl EnumMetaData for NoSettings {
     }
 }
 
+impl SettingCompletion for NoSettings {
+    fn get_value_completions() -> HashMap<String, Vec<String>> {
+        HashMap::new()
+    }
+}
+
 /// A command from a map command.
 #[derive(Debug)]
 enum ShortcutCommand {
@@ -234,7 +239,7 @@ impl<U: settings::Settings + 'static> ApplicationBuilder<U> {
     pub fn build<S, T>(self) -> Rc<Application<S, T, U>>
         where S: SpecialCommand + 'static,
               T: EnumFromStr + EnumMetaData + 'static,
-              U: EnumMetaData,
+              U: EnumMetaData + SettingCompletion,
     {
         Application::new(self)
     }
@@ -292,7 +297,7 @@ pub struct Application<S, T, U: settings::Settings> {
 impl<S, T, U> Application<S, T, U>
     where S: SpecialCommand + 'static,
           T: EnumFromStr + EnumMetaData + 'static,
-          U: settings::Settings + EnumMetaData + 'static,
+          U: settings::Settings + EnumMetaData + SettingCompletion + 'static,
 {
     fn new(builder: ApplicationBuilder<U>) -> Rc<Self> {
         let modes = builder.modes.unwrap_or_default();

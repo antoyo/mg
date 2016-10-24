@@ -61,6 +61,7 @@ enum AppCommand {
 
 #[derive(Settings)]
 pub struct AppSettings {
+    boolean: bool,
     custom: CustomSetting,
     #[help(text="The window title")]
     title: String,
@@ -110,7 +111,7 @@ fn main() {
                 Custom(setting) => label.set_text(&format!("custom setting is: {:?}", setting)),
                 Title(title) => mg_app.set_window_title(&title),
                 TitleLen(len) => mg_app.set_window_title(&format!("New title len: {}", len)),
-                Width(_) => (),
+                Boolean(_) | Width(_) => (),
             }
         });
     }

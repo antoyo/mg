@@ -19,9 +19,11 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::marker::PhantomData;
 
-use mg_settings::EnumMetaData;
+use mg_settings::{EnumMetaData, SettingCompletion};
 
 use completion::Completer;
 
@@ -50,8 +52,8 @@ impl<T: EnumMetaData> CommandCompleter<T> {
 }
 
 impl<T> Completer for CommandCompleter<T> {
-    fn complete_result(&self, input: &str) -> String {
-        input.to_string()
+    fn complete_result(&self, value: &str) -> String {
+        value.to_string()
     }
 
     fn completions(&self, input: &str) -> Vec<(String, String)> {
@@ -70,11 +72,13 @@ impl<T> Completer for CommandCompleter<T> {
 
 /// A setting completer.
 pub struct SettingCompleter<T> {
-    metadata: Vec<(String, String)>,
+    selected_name: RefCell<Option<String>>,
+    setting_names: Vec<(String, String)>,
+    setting_values: HashMap<String, Vec<String>>,
     _phantom: PhantomData<T>,
 }
 
-impl<T: EnumMetaData> SettingCompleter<T> {
+impl<T: EnumMetaData + SettingCompletion> SettingCompleter<T> {
     pub fn new() -> Self {
         let mut data: Vec<_> =
             T::get_metadata().iter()
@@ -83,24 +87,50 @@ impl<T: EnumMetaData> SettingCompleter<T> {
                 .collect();
         data.sort();
         SettingCompleter {
-            metadata: data,
+            selected_name: RefCell::new(None),
+            setting_names: data,
+            setting_values: T::get_value_completions(),
             _phantom: PhantomData,
         }
     }
 }
 
 impl<T> Completer for SettingCompleter<T> {
-    fn complete_result(&self, input: &str) -> String {
-        format!("set {} =", input)
+    fn complete_result(&self, value: &str) -> String {
+        if let Some(ref name) = *self.selected_name.borrow() {
+            format!("set {} = {}", name, value)
+        }
+        else {
+            format!("set {} =", value)
+        }
     }
 
     fn completions(&self, input: &str) -> Vec<(String, String)> {
-        self.metadata.iter()
-            .filter(|&&(ref setting, ref help)|
-                    setting.to_lowercase().contains(&input) ||
-                    help.to_lowercase().contains(&input))
-            .cloned()
-            .collect()
+        if input.contains("= ") {
+            let mut iter = input.split_whitespace();
+            if let Some(name) = iter.next() {
+                if let Some(values) = self.setting_values.get(name) {
+                    iter.next(); // Skip the equal token.
+                    let input_value = iter.next().unwrap_or_default();
+                    *self.selected_name.borrow_mut() = Some(name.to_string());
+                    return values.iter()
+                        .filter(|value| value.contains(input_value))
+                        .map(|value| (value.clone(), String::new()))
+                        .collect();
+                }
+            }
+            vec![]
+        }
+        else {
+            let input = input.trim();
+            *self.selected_name.borrow_mut() = None;
+            self.setting_names.iter()
+                .filter(|&&(ref setting, ref help)|
+                        setting.to_lowercase().contains(input) ||
+                        help.to_lowercase().contains(input))
+                .cloned()
+                .collect()
+        }
     }
 
     fn text_column(&self) -> i32 {
