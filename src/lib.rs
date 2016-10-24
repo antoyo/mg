@@ -84,6 +84,7 @@ use gtk::{
     WindowType,
     STATE_FLAG_NORMAL,
 };
+use gtk::PolicyType::{Automatic, Never};
 use gtk::prelude::WidgetExtManual;
 use mg_settings::{Config, EnumFromStr, EnumMetaData, MetaData, Parser, SettingCompletion, Value};
 use mg_settings::Command::{self, App, Custom, Map, Set, Unmap};
@@ -168,6 +169,7 @@ const WHITE: &'static GdkRGBA = &GdkRGBA { red: 1.0, green: 1.0, blue: 1.0, alph
 
 const COMPLETE_NEXT_COMMAND: &'static str = "complete-next";
 const COMPLETE_PREVIOUS_COMMAND: &'static str = "complete-previous";
+const COMPLETION_VIEW_MAX_HEIGHT: i32 = 300;
 const INFO_MESSAGE_DURATION: u32 = 5000;
 
 #[derive(PartialEq)]
@@ -319,7 +321,15 @@ impl<S, T, U> Application<S, T, U>
             let scrolled_window = scrolled_window.clone();
             (&**completion_view).connect_draw(move |tree_view, _| {
                 let (preferred_height, _) = tree_view.get_preferred_height();
-                scrolled_window.set_min_content_height(min(300, preferred_height));
+                let policy =
+                    if preferred_height < COMPLETION_VIEW_MAX_HEIGHT {
+                        Never
+                    }
+                    else {
+                        Automatic
+                    };
+                scrolled_window.set_policy(policy, policy);
+                scrolled_window.set_min_content_height(min(COMPLETION_VIEW_MAX_HEIGHT, preferred_height));
                 Inhibit(false)
             });
         }
