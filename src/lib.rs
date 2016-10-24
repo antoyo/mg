@@ -38,6 +38,7 @@
 extern crate gdk;
 extern crate gdk_sys;
 extern crate glib;
+extern crate glib_sys;
 extern crate gobject_sys;
 extern crate gtk;
 extern crate gtk_sys;
@@ -51,6 +52,7 @@ mod widget;
 mod completion;
 mod gobject;
 mod key_converter;
+mod scrolled_window;
 mod status_bar;
 mod style_context;
 

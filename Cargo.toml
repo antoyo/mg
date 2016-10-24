@@ -34,6 +34,10 @@ version = "0.3.1"
 git = "https://github.com/gtk-rs/glib"
 version = "0.1.0"
 
+[dependencies.glib-sys]
+git = "https://github.com/gtk-rs/sys"
+version = "0.3.1"
+
 [dependencies.gobject-sys]
 git = "https://github.com/gtk-rs/sys"
 version = "0.3.1"

@@ -20,14 +20,14 @@
  */
 
 use std::cell::RefCell;
-use std::cmp::{max, min};
+use std::cmp::max;
 use std::ops::Deref;
 use std::rc::Rc;
 
+use glib::Object;
 use gtk::{
     CellRendererText,
     ContainerExt,
-    Inhibit,
     IsA,
     ListStore,
     ScrolledWindow,
@@ -43,6 +43,7 @@ use gtk::{
 };
 use gtk::PolicyType::{Automatic, Never};
 
+use scrolled_window::ScrolledWindowExtManual;
 use super::Completer;
 
 const COMPLETION_VIEW_MAX_HEIGHT: i32 = 300;
@@ -51,7 +52,7 @@ const COMPLETION_VIEW_MAX_HEIGHT: i32 = 300;
 pub struct CompletionView {
     unselect_callback: RefCell<Option<Box<Fn()>>>,
     tree_view: TreeView,
-    view: Rc<ScrolledWindow>,
+    view: ScrolledWindow,
 }
 
 impl CompletionView {
@@ -75,31 +76,30 @@ impl CompletionView {
         tree_view.set_enable_search(false);
         tree_view.set_headers_visible(false);
         tree_view.set_hexpand(true);
+        tree_view.set_can_focus(false);
 
-        let scrolled_window = Rc::new(ScrolledWindow::new(None, None));
+        let scrolled_window = ScrolledWindow::new(None, None);
         scrolled_window.add(&tree_view);
-        {
-            let scrolled_window = scrolled_window.clone();
-            tree_view.connect_draw(move |tree_view, _| {
-                let (preferred_height, _) = tree_view.get_preferred_height();
-                let policy =
-                    if preferred_height < COMPLETION_VIEW_MAX_HEIGHT {
-                        Never
-                    }
-                    else {
-                        Automatic
-                    };
-                scrolled_window.set_policy(policy, policy);
-                scrolled_window.set_min_content_height(min(COMPLETION_VIEW_MAX_HEIGHT, preferred_height));
-                Inhibit(false)
-            });
-        }
+        scrolled_window.set_max_content_height(COMPLETION_VIEW_MAX_HEIGHT);
+        scrolled_window.set_propagate_natural_height(true);
 
         Rc::new(CompletionView {
             unselect_callback: RefCell::new(None),
             tree_view: tree_view,
             view: scrolled_window,
         })
+    }
+
+    /// Adjust the policy of the scrolled window to avoid having extra space around the tree view.
+    fn adjust_policy<M: IsA<Object> + IsA<TreeModel>>(&self, model: &M) {
+        let policy =
+            if model.iter_n_children(None) < 2 {
+                Never
+            }
+            else {
+                Automatic
+            };
+        self.view.set_policy(Never, policy);
     }
 
     /// Add a callback to the selection changed event.
@@ -128,6 +128,7 @@ impl CompletionView {
             model.insert_with_values(None, &[0, 1], &[&col1, &col2]);
         }
         self.tree_view.set_model(Some(&model));
+        self.adjust_policy(&model);
     }
 
     /// Scroll to the selected row.
