@@ -20,14 +20,18 @@
  */
 
 use std::cell::RefCell;
-use std::cmp::max;
+use std::cmp::{max, min};
 use std::ops::Deref;
 use std::rc::Rc;
 
 use gtk::{
     CellRendererText,
+    ContainerExt,
+    Inhibit,
     IsA,
     ListStore,
+    ScrolledWindow,
+    ScrolledWindowExt,
     TreeIter,
     TreeModel,
     TreeModelExt,
@@ -37,13 +41,17 @@ use gtk::{
     Type,
     WidgetExt,
 };
+use gtk::PolicyType::{Automatic, Never};
 
 use super::Completer;
+
+const COMPLETION_VIEW_MAX_HEIGHT: i32 = 300;
 
 /// A widget to show completions for the command entry.
 pub struct CompletionView {
     unselect_callback: RefCell<Option<Box<Fn()>>>,
-    view: TreeView,
+    tree_view: TreeView,
+    view: Rc<ScrolledWindow>,
 }
 
 impl CompletionView {
@@ -68,15 +76,35 @@ impl CompletionView {
         tree_view.set_headers_visible(false);
         tree_view.set_hexpand(true);
 
+        let scrolled_window = Rc::new(ScrolledWindow::new(None, None));
+        scrolled_window.add(&tree_view);
+        {
+            let scrolled_window = scrolled_window.clone();
+            tree_view.connect_draw(move |tree_view, _| {
+                let (preferred_height, _) = tree_view.get_preferred_height();
+                let policy =
+                    if preferred_height < COMPLETION_VIEW_MAX_HEIGHT {
+                        Never
+                    }
+                    else {
+                        Automatic
+                    };
+                scrolled_window.set_policy(policy, policy);
+                scrolled_window.set_min_content_height(min(COMPLETION_VIEW_MAX_HEIGHT, preferred_height));
+                Inhibit(false)
+            });
+        }
+
         Rc::new(CompletionView {
             unselect_callback: RefCell::new(None),
-            view: tree_view,
+            tree_view: tree_view,
+            view: scrolled_window,
         })
     }
 
     /// Add a callback to the selection changed event.
     pub fn connect_selection_changed<F: Fn(&TreeSelection) + 'static>(&self, callback: F) {
-        self.view.get_selection().connect_changed(callback);
+        self.tree_view.get_selection().connect_changed(callback);
     }
 
     /// Add a callback to the unselect event.
@@ -99,22 +127,22 @@ impl CompletionView {
         for &(ref col1, ref col2) in &completer.completions(&key) {
             model.insert_with_values(None, &[0, 1], &[&col1, &col2]);
         }
-        self.view.set_model(Some(&model));
+        self.tree_view.set_model(Some(&model));
     }
 
     /// Scroll to the selected row.
     fn scroll(&self, model: &TreeModel, iter: &TreeIter) {
         if let Some(path) = model.get_path(iter) {
-            self.view.scroll_to_cell(Some(&path), None, false, 0.0, 0.0);
+            self.tree_view.scroll_to_cell(Some(&path), None, false, 0.0, 0.0);
         }
     }
 
     /// Scroll to the first row.
     pub fn scroll_to_first(&self) {
-        if let Some(model) = self.view.get_model() {
+        if let Some(model) = self.tree_view.get_model() {
             if let Some(iter) = model.get_iter_first() {
                 if let Some(path) = model.get_path(&iter) {
-                    self.view.scroll_to_cell(Some(&path), None, false, 0.0, 0.0);
+                    self.tree_view.scroll_to_cell(Some(&path), None, false, 0.0, 0.0);
                 }
             }
         }
@@ -123,8 +151,8 @@ impl CompletionView {
     /// Select the next item.
     /// This loops with the value that started the completion.
     pub fn select_next(&self) {
-        if let Some(model) = self.view.get_model() {
-            let selection = self.view.get_selection();
+        if let Some(model) = self.tree_view.get_model() {
+            let selection = self.tree_view.get_selection();
             if let Some((model, selected_iter)) = selection.get_selected() {
                 if model.iter_next(&selected_iter) {
                     selection.select_iter(&selected_iter);
@@ -145,8 +173,8 @@ impl CompletionView {
     /// Select the previous item.
     /// This loops with the value that started the completion.
     pub fn select_previous(&self) {
-        if let Some(model) = self.view.get_model() {
-            let selection = self.view.get_selection();
+        if let Some(model) = self.tree_view.get_model() {
+            let selection = self.tree_view.get_selection();
             if let Some((model, selected_iter)) = selection.get_selected() {
                 if model.iter_previous(&selected_iter) {
                     selection.select_iter(&selected_iter);
@@ -166,7 +194,7 @@ impl CompletionView {
 
     /// Set the model.
     pub fn set_model<T: IsA<TreeModel>>(&self, model: Option<&T>) {
-        self.view.set_model(model);
+        self.tree_view.set_model(model);
     }
 
     /// Emit the event to show the original input.
@@ -179,17 +207,15 @@ impl CompletionView {
 
     /// Unselect the item.
     pub fn unselect(&self) {
-        let selection = self.view.get_selection();
+        let selection = self.tree_view.get_selection();
         selection.unselect_all();
     }
 }
 
 impl Deref for CompletionView {
-    type Target = TreeView;
+    type Target = ScrolledWindow;
 
     fn deref(&self) -> &Self::Target {
         &self.view
     }
 }
-
-is_widget!(CompletionView, view);

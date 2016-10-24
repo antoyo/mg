@@ -57,7 +57,6 @@ mod style_context;
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::char;
-use std::cmp::min;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
@@ -74,8 +73,6 @@ use gtk::{
     Grid,
     Inhibit,
     IsA,
-    ScrolledWindow,
-    ScrolledWindowExt,
     Settings,
     Widget,
     WidgetExt,
@@ -84,7 +81,6 @@ use gtk::{
     WindowType,
     STATE_FLAG_NORMAL,
 };
-use gtk::PolicyType::{Automatic, Never};
 use gtk::prelude::WidgetExtManual;
 use mg_settings::{Config, EnumFromStr, EnumMetaData, MetaData, Parser, SettingCompletion, Value};
 use mg_settings::Command::{self, App, Custom, Map, Set, Unmap};
@@ -169,7 +165,6 @@ const WHITE: &'static GdkRGBA = &GdkRGBA { red: 1.0, green: 1.0, blue: 1.0, alph
 
 const COMPLETE_NEXT_COMMAND: &'static str = "complete-next";
 const COMPLETE_PREVIOUS_COMMAND: &'static str = "complete-previous";
-const COMPLETION_VIEW_MAX_HEIGHT: i32 = 300;
 const INFO_MESSAGE_DURATION: u32 = 5000;
 
 #[derive(PartialEq)]
@@ -273,7 +268,6 @@ impl<U: settings::Settings + 'static> ApplicationBuilder<U> {
 pub struct Application<S, T, U: settings::Settings> {
     answer: RefCell<Option<String>>,
     command_callback: RefCell<Option<Box<Fn(T)>>>,
-    completion_scrolled_window: Rc<ScrolledWindow>,
     completion_view: Rc<CompletionView>,
     choices: RefCell<Vec<char>>,
     close_callback: RefCell<Option<Box<Fn()>>>,
@@ -315,25 +309,7 @@ impl<S, T, U> Application<S, T, U>
         window.add(&grid);
 
         let completion_view = CompletionView::new();
-        let scrolled_window = Rc::new(ScrolledWindow::new(None, None));
-        scrolled_window.add(&*completion_view);
-        {
-            let scrolled_window = scrolled_window.clone();
-            (&**completion_view).connect_draw(move |tree_view, _| {
-                let (preferred_height, _) = tree_view.get_preferred_height();
-                let policy =
-                    if preferred_height < COMPLETION_VIEW_MAX_HEIGHT {
-                        Never
-                    }
-                    else {
-                        Automatic
-                    };
-                scrolled_window.set_policy(policy, policy);
-                scrolled_window.set_min_content_height(min(COMPLETION_VIEW_MAX_HEIGHT, preferred_height));
-                Inhibit(false)
-            });
-        }
-        grid.attach(&*scrolled_window, 0, 1, 1, 1);
+        grid.attach(&**completion_view, 0, 1, 1, 1);
 
         let mut completers: HashMap<String, Box<Completer>> = HashMap::new();
         completers.insert(DEFAULT_COMPLETER_IDENT.to_string(), Box::new(CommandCompleter::<T>::new()));
@@ -342,7 +318,7 @@ impl<S, T, U> Application<S, T, U>
         grid.attach(&*status_bar, 0, 2, 1, 1);
         window.show_all();
         status_bar.hide();
-        scrolled_window.hide();
+        completion_view.hide();
 
         let foreground_color = Application::<S, T, U>::get_foreground_color(&window);
 
@@ -357,7 +333,6 @@ impl<S, T, U> Application<S, T, U>
         let app = Rc::new(Application {
             answer: RefCell::new(None),
             command_callback: RefCell::new(None),
-            completion_scrolled_window: scrolled_window,
             completion_view: completion_view,
             choices: RefCell::new(vec![]),
             close_callback: RefCell::new(None),
@@ -405,6 +380,7 @@ impl<S, T, U> Application<S, T, U>
                     if let Some(ref callback) = *instance.input_callback.borrow() {
                         *instance.answer.borrow_mut() = input.clone();
                         callback(input);
+                        instance.reset();
                     }
                     *instance.input_callback.borrow_mut() = None;
                     (*instance.choices.borrow_mut()).clear();
@@ -486,6 +462,7 @@ impl<S, T, U> Application<S, T, U>
         self.status_bar.override_background_color(STATE_FLAG_NORMAL, BLUE);
         self.status_bar.override_color(STATE_FLAG_NORMAL, WHITE);
         gtk::main();
+        self.reset();
         self.answer.borrow().clone()
     }
 
@@ -508,6 +485,7 @@ impl<S, T, U> Application<S, T, U>
         self.status_bar.override_background_color(STATE_FLAG_NORMAL, BLUE);
         self.status_bar.override_color(STATE_FLAG_NORMAL, WHITE);
         gtk::main();
+        self.reset();
         self.return_to_normal_mode();
         (*self.choices.borrow_mut()).clear();
         (*self.answer.borrow())
@@ -787,6 +765,7 @@ impl<S, T, U> Application<S, T, U>
                             callback(Some(character.to_string()));
                             self.return_to_normal_mode();
                             (*self.choices.borrow_mut()).clear();
+                            self.reset();
                         }
                         *self.input_callback.borrow_mut() = None;
                         return Inhibit(true);
@@ -834,7 +813,7 @@ impl<S, T, U> Application<S, T, U>
                 self.clear_shortcut();
                 self.completion_view.unselect();
                 self.completion_view.scroll_to_first();
-                self.completion_scrolled_window.show();
+                self.completion_view.show();
                 self.status_bar.show_entry();
                 Inhibit(true)
             },
@@ -939,7 +918,7 @@ impl<S, T, U> Application<S, T, U>
     /// Go back to the normal mode from command or input mode.
     fn return_to_normal_mode(&self) {
         self.status_bar.hide_entry();
-        self.completion_scrolled_window.hide();
+        self.completion_view.hide();
         self.set_mode("normal");
         self.set_current_identifier(':');
     }
