@@ -24,6 +24,7 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use std::rc::Rc;
 
+use gdk_sys::GdkRGBA;
 use gtk::{
     BoxExt,
     ContainerExt,
@@ -34,11 +35,18 @@ use gtk::{
     EntryExt,
     Label,
     WidgetExt,
+    STATE_FLAG_NORMAL,
     STYLE_PROVIDER_PRIORITY_APPLICATION,
 };
+use gtk::prelude::WidgetExtManual;
 use gtk::Orientation::Horizontal;
 
 use completion::{Completer, Completion, CompletionView, DEFAULT_COMPLETER_IDENT, NO_COMPLETER_IDENT};
+
+const BLUE: &'static GdkRGBA = &GdkRGBA { red: 0.0, green: 0.0, blue: 1.0, alpha: 1.0 };
+const ORANGE: &'static GdkRGBA = &GdkRGBA { red: 0.9, green: 0.55, blue: 0.0, alpha: 1.0 };
+const RED: &'static GdkRGBA = &GdkRGBA { red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0 };
+const WHITE: &'static GdkRGBA = &GdkRGBA { red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0 };
 
 pub type StatusBarWidget = HBox;
 pub type HBox = ::gtk::Box;
@@ -129,6 +137,24 @@ impl StatusBar {
         style_context.add_provider(&provider, STYLE_PROVIDER_PRIORITY_APPLICATION);
         entry.set_has_frame(false);
         entry.set_hexpand(true);
+    }
+
+    /// Color the status bar in blue.
+    pub fn color_blue(&self) {
+        self.override_background_color(STATE_FLAG_NORMAL, BLUE);
+        self.white_foreground();
+    }
+
+    /// Color the status bar in orange.
+    pub fn color_orange(&self) {
+        self.override_background_color(STATE_FLAG_NORMAL, ORANGE);
+        self.white_foreground();
+    }
+
+    /// Color the status bar in red.
+    pub fn color_red(&self) {
+        self.override_background_color(STATE_FLAG_NORMAL, RED);
+        self.white_foreground();
     }
 
     /// Select the next completion entry if it is visible.
@@ -236,6 +262,11 @@ impl StatusBar {
             }
             self.completion_view.unselect();
         }
+    }
+
+    /// Set the foreground (text) color to white.
+    pub fn white_foreground(&self) {
+        self.override_color(STATE_FLAG_NORMAL, WHITE);
     }
 }
 

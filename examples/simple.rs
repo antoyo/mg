@@ -35,6 +35,7 @@ use std::rc::Rc;
 use gtk::{ContainerExt, Entry, Label, WidgetExt};
 use gtk::Orientation::Vertical;
 use mg::{Application, SimpleApplicationBuilder};
+use mg::message::MessageWindow;
 
 use AppCommand::*;
 

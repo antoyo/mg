@@ -20,6 +20,7 @@
  */
 
 /*
+ * TODO: allow autocompletion for input.
  * TODO: set the size of the status bar according to the size of the font.
  * TODO: supports shortcuts like <C-a> and <C-w> in the command entry.
  * TODO: smart home (with Ctrl-A) in the command text entry.
@@ -50,8 +51,10 @@ extern crate mg_settings;
 #[macro_use]
 mod widget;
 mod completion;
+pub mod dialog;
 mod gobject;
 mod key_converter;
+pub mod message;
 mod scrolled_window;
 mod status_bar;
 mod style_context;
@@ -71,7 +74,6 @@ use gdk::enums::key::{Escape, Tab, ISO_Left_Tab, colon};
 use gdk_sys::GdkRGBA;
 use gtk::{
     ContainerExt,
-    Continue,
     Grid,
     Inhibit,
     IsA,
@@ -91,9 +93,17 @@ use mg_settings::error::ErrorType::{MissingArgument, NoCommand, Parse, UnknownCo
 use mg_settings::key::Key;
 use mg_settings::settings;
 
-use completion::{CommandCompleter, Completer, CompletionView, SettingCompleter, DEFAULT_COMPLETER_IDENT, NO_COMPLETER_IDENT};
-use key_converter::gdk_key_to_key;
+use completion::{
+    CommandCompleter,
+    Completer,
+    CompletionView,
+    SettingCompleter,
+    DEFAULT_COMPLETER_IDENT,
+    NO_COMPLETER_IDENT,
+};
 use gobject::ObjectExtManual;
+use key_converter::gdk_key_to_key;
+use message::MessageWindow;
 use self::ActivationType::{Current, Final};
 use self::ShortcutCommand::{Complete, Incomplete};
 use status_bar::StatusBar;
@@ -159,15 +169,10 @@ pub trait SpecialCommand
 
 type Modes = HashMap<String, String>;
 
-const BLUE: &'static GdkRGBA = &GdkRGBA { red: 0.0, green: 0.0, blue: 1.0, alpha: 1.0 };
-const ORANGE: &'static GdkRGBA = &GdkRGBA { red: 0.9, green: 0.55, blue: 0.0, alpha: 1.0 };
-const RED: &'static GdkRGBA = &GdkRGBA { red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0 };
 const TRANSPARENT: &'static GdkRGBA = &GdkRGBA { red: 0.0, green: 0.0, blue: 0.0, alpha: 0.0 };
-const WHITE: &'static GdkRGBA = &GdkRGBA { red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0 };
 
 const COMPLETE_NEXT_COMMAND: &'static str = "complete-next";
 const COMPLETE_PREVIOUS_COMMAND: &'static str = "complete-previous";
-const INFO_MESSAGE_DURATION: u32 = 5000;
 
 #[derive(PartialEq)]
 enum ActivationType {
@@ -451,55 +456,6 @@ impl<S, T, U> Application<S, T, U>
         }
     }
 
-    /// Ask a question to the user and block until the user provides it (or cancel).
-    pub fn blocking_input(&self, message: &str, default_answer: &str) -> Option<String> {
-        self.status_bar.set_identifier(&format!("{} ", message));
-        self.status_bar.show_entry();
-        self.status_bar.set_input(default_answer);
-        *self.answer.borrow_mut() = None;
-        *self.input_callback.borrow_mut() = Some(Box::new(|_| {
-            gtk::main_quit();
-        }));
-        self.set_mode("blocking-input");
-        self.status_bar.override_background_color(STATE_FLAG_NORMAL, BLUE);
-        self.status_bar.override_color(STATE_FLAG_NORMAL, WHITE);
-        gtk::main();
-        self.reset();
-        self.answer.borrow().clone()
-    }
-
-    /// Ask a multiple-choice question to the user and block until the user provides it (or cancel).
-    pub fn blocking_question(&self, message: &str, choices: &[char]) -> Option<char> {
-        {
-            let app_choices = &mut *self.choices.borrow_mut();
-            app_choices.clear();
-            app_choices.extend_from_slice(choices);
-        }
-        let choices: Vec<_> = choices.iter().map(|c| c.to_string()).collect();
-        let choices = choices.join("/");
-        self.status_bar.set_identifier(&format!("{} ({}) ", message, choices));
-        self.status_bar.show_identifier();
-        *self.answer.borrow_mut() = None;
-        *self.input_callback.borrow_mut() = Some(Box::new(|_| {
-            gtk::main_quit();
-        }));
-        self.set_mode("blocking-input");
-        self.status_bar.override_background_color(STATE_FLAG_NORMAL, BLUE);
-        self.status_bar.override_color(STATE_FLAG_NORMAL, WHITE);
-        gtk::main();
-        self.reset();
-        self.return_to_normal_mode();
-        (*self.choices.borrow_mut()).clear();
-        (*self.answer.borrow())
-            .as_ref()
-            .and_then(|answer| answer.chars().next())
-    }
-
-    /// Ask a yes-no question to the user and block until the user provides it (or cancel).
-    pub fn blocking_yes_no_question(&self, message: &str) -> bool {
-        self.blocking_question(message, &['y', 'n']) == Some('y')
-    }
-
     /// Call the callback with the command or show an error if the command cannot be parsed.
     fn call_command(&self, callback: &Box<Fn(T)>, command: Result<Command<T>>) {
         match command {
@@ -602,15 +558,6 @@ impl<S, T, U> Application<S, T, U>
         *self.special_command_callback.borrow_mut() = Some(Box::new(callback));
     }
 
-    /// Show an error to the user.
-    pub fn error(&self, error: &str) {
-        error!("{}", error);
-        self.message.set_text(error);
-        self.status_bar.hide_entry();
-        self.status_bar.override_background_color(STATE_FLAG_NORMAL, RED);
-        self.status_bar.override_color(STATE_FLAG_NORMAL, WHITE);
-    }
-
     /// Get the color of the text.
     fn get_foreground_color(window: &Window) -> RGBA {
         let style_context = window.get_style_context().unwrap();
@@ -697,32 +644,6 @@ impl<S, T, U> Application<S, T, U>
         }
     }
 
-    /// Show an information message to the user for 5 seconds.
-    pub fn info(app: &Rc<Self>, message: &str) {
-        info!("{}", message);
-        app.message.set_text(message);
-        app.reset_colors();
-        let app = app.clone();
-        let message = Some(message.to_string());
-        gtk::timeout_add(INFO_MESSAGE_DURATION, move || {
-            if app.message.get_text() == message {
-                app.message.set_text("");
-            }
-            Continue(false)
-        });
-    }
-
-    /// Ask a question to the user.
-    pub fn input<F: Fn(Option<String>) + 'static>(&self, message: &str, default_answer: &str, callback: F) {
-        self.set_mode("input");
-        self.status_bar.set_identifier(&format!("{} ", message));
-        self.status_bar.show_entry();
-        self.status_bar.set_input(default_answer);
-        *self.input_callback.borrow_mut() = Some(Box::new(callback));
-        self.status_bar.override_background_color(STATE_FLAG_NORMAL, BLUE);
-        self.status_bar.override_color(STATE_FLAG_NORMAL, WHITE);
-    }
-
     /// Input the specified command.
     fn input_command(&self, command: &str) {
         self.set_mode("command");
@@ -794,13 +715,6 @@ impl<S, T, U> Application<S, T, U>
             "command" => self.command_key_release(key),
             _ => Inhibit(false),
         }
-    }
-
-    /// Show a message to the user.
-    pub fn message(&self, message: &str) {
-        self.message.set_text(message);
-        self.status_bar.override_background_color(STATE_FLAG_NORMAL, BLUE);
-        self.status_bar.override_color(STATE_FLAG_NORMAL, WHITE);
     }
 
     /// Handle the key press event for the normal mode.
@@ -879,27 +793,6 @@ impl<S, T, U> Application<S, T, U>
             }
         }
         Ok(())
-    }
-
-    /// Ask a multiple-choice question to the user.
-    pub fn question<F: Fn(Option<char>) + 'static>(&self, message: &str, choices: &[char], callback: F) {
-        {
-            let app_choices = &mut *self.choices.borrow_mut();
-            app_choices.clear();
-            app_choices.extend_from_slice(choices);
-        }
-        let choices: Vec<_> = choices.iter().map(|c| c.to_string()).collect();
-        let choices = choices.join("/");
-        self.status_bar.set_identifier(&format!("{} ({}) ", message, choices));
-        self.status_bar.show_identifier();
-        *self.input_callback.borrow_mut() = Some(Box::new(move |answer| {
-            let character = answer.as_ref()
-                .and_then(|answer| answer.chars().next());
-            callback(character);
-        }));
-        self.set_mode("input");
-        self.status_bar.override_background_color(STATE_FLAG_NORMAL, BLUE);
-        self.status_bar.override_color(STATE_FLAG_NORMAL, WHITE);
     }
 
     /// Handle the escape event.
@@ -983,23 +876,6 @@ impl<S, T, U> Application<S, T, U>
         let settings = Settings::get_default().unwrap();
         settings.set_data("gtk-application-prefer-dark-theme", 1);
         *self.foreground_color.borrow_mut() = Application::<S, T, U>::get_foreground_color(&self.window);
-    }
-
-    /// Show a warning message to the user for 5 seconds.
-    pub fn warning(app: &Rc<Self>, message: &str) {
-        warn!("{}", message);
-        app.message.set_text(message);
-        let app = app.clone();
-        let message = Some(message.to_string());
-        app.status_bar.override_background_color(STATE_FLAG_NORMAL, ORANGE);
-        app.status_bar.override_color(STATE_FLAG_NORMAL, WHITE);
-        gtk::timeout_add(INFO_MESSAGE_DURATION, move || {
-            if app.message.get_text() == message {
-                app.message.set_text("");
-                app.reset_colors();
-            }
-            Continue(false)
-        });
     }
 
     /// Get the application window.
