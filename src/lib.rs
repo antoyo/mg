@@ -20,7 +20,6 @@
  */
 
 /*
- * TODO: allow autocompletion for input.
  * TODO: set the size of the status bar according to the size of the font.
  * TODO: supports shortcuts like <C-a> and <C-w> in the command entry.
  * TODO: smart home (with Ctrl-A) in the command text entry.
@@ -50,7 +49,7 @@ extern crate mg_settings;
 
 #[macro_use]
 mod widget;
-mod completion;
+pub mod completion;
 pub mod dialog;
 mod gobject;
 mod key_converter;
@@ -171,8 +170,14 @@ type Modes = HashMap<String, String>;
 
 const TRANSPARENT: &'static GdkRGBA = &GdkRGBA { red: 0.0, green: 0.0, blue: 0.0, alpha: 0.0 };
 
+#[doc(hidden)]
+pub const BLOCKING_INPUT_MODE: &'static str = "blocking-input";
+const COMMAND_MODE: &'static str = "command";
 const COMPLETE_NEXT_COMMAND: &'static str = "complete-next";
 const COMPLETE_PREVIOUS_COMMAND: &'static str = "complete-previous";
+#[doc(hidden)]
+pub const INPUT_MODE: &'static str = "input";
+const NORMAL_MODE: &'static str = "normal";
 
 #[derive(PartialEq)]
 enum ActivationType {
@@ -224,6 +229,7 @@ pub type SimpleApplicationBuilder = ApplicationBuilder<NoSettings>;
 
 /// Application builder.
 pub struct ApplicationBuilder<U: settings::Settings> {
+    completers: HashMap<String, Box<Completer>>,
     modes: Option<Modes>,
     include_path: Option<PathBuf>,
     settings: Option<U>,
@@ -234,6 +240,7 @@ impl<U: settings::Settings + 'static> ApplicationBuilder<U> {
     #[allow(new_without_default_derive)]
     pub fn new() -> Self {
         ApplicationBuilder {
+            completers: HashMap::new(),
             modes: None,
             include_path: None,
             settings: None,
@@ -249,6 +256,12 @@ impl<U: settings::Settings + 'static> ApplicationBuilder<U> {
         Application::new(self)
     }
 
+    /// Add a input completer.
+    pub fn completer<C: Completer + 'static>(mut self, name: &str, completer: C) -> Self {
+        self.completers.insert(name.to_string(), Box::new(completer));
+        self
+    }
+
     /// Set the include path of the configuration files.
     pub fn include_path<P: AsRef<Path>>(mut self, include_path: P) -> Self {
         self.include_path = Some(include_path.as_ref().to_path_buf());
@@ -257,8 +270,8 @@ impl<U: settings::Settings + 'static> ApplicationBuilder<U> {
 
     /// Set the configuration of the application.
     pub fn modes(mut self, mut modes: Modes) -> Self {
-        assert!(modes.insert("n".to_string(), "normal".to_string()).is_none(), "Duplicate mode prefix n.");
-        assert!(modes.insert("c".to_string(), "command".to_string()).is_none(), "Duplicate mode prefix c.");
+        assert!(modes.insert("n".to_string(), NORMAL_MODE.to_string()).is_none(), "Duplicate mode prefix n.");
+        assert!(modes.insert("c".to_string(), COMMAND_MODE.to_string()).is_none(), "Duplicate mode prefix c.");
         self.modes = Some(modes);
         self
     }
@@ -279,7 +292,7 @@ pub struct Application<S, T, U: settings::Settings> {
     choices: RefCell<Vec<char>>,
     close_callback: RefCell<Option<Box<Fn()>>>,
     current_command_mode: Cell<char>,
-    current_mode: RefCell<String>,
+    current_mode: Rc<RefCell<String>>,
     current_shortcut: RefCell<Vec<Key>>,
     foreground_color: RefCell<RGBA>,
     input_callback: RefCell<Option<Box<Fn(Option<String>)>>>,
@@ -310,6 +323,8 @@ impl<S, T, U> Application<S, T, U>
             mapping_modes: modes.keys().cloned().collect(),
         };
 
+        let current_mode = Rc::new(RefCell::new(NORMAL_MODE.to_string()));
+
         let window = Window::new(WindowType::Toplevel);
 
         let grid = Grid::new();
@@ -321,7 +336,10 @@ impl<S, T, U> Application<S, T, U>
         let mut completers: HashMap<String, Box<Completer>> = HashMap::new();
         completers.insert(DEFAULT_COMPLETER_IDENT.to_string(), Box::new(CommandCompleter::<T>::new()));
         completers.insert("set".to_string(), Box::new(SettingCompleter::<U>::new()));
-        let status_bar = StatusBar::new(completion_view.clone(), completers);
+        for (identifier, completer) in builder.completers {
+            completers.insert(identifier, completer);
+        }
+        let status_bar = StatusBar::new(completion_view.clone(), completers, current_mode.clone());
         grid.attach(&*status_bar, 0, 2, 1, 1);
         window.show_all();
         status_bar.hide();
@@ -344,7 +362,7 @@ impl<S, T, U> Application<S, T, U>
             choices: RefCell::new(vec![]),
             close_callback: RefCell::new(None),
             current_command_mode: Cell::new(':'),
-            current_mode: RefCell::new("normal".to_string()),
+            current_mode: current_mode,
             current_shortcut: RefCell::new(vec![]),
             foreground_color: RefCell::new(foreground_color),
             input_callback: RefCell::new(None),
@@ -383,7 +401,7 @@ impl<S, T, U> Application<S, T, U>
             let instance = app.clone();
             app.status_bar.connect_activate(move |input| {
                 let mode = instance.get_mode();
-                if mode == "input" || mode == "blocking-input" {
+                if mode == INPUT_MODE || mode == BLOCKING_INPUT_MODE {
                     if let Some(ref callback) = *instance.input_callback.borrow() {
                         *instance.answer.borrow_mut() = input.clone();
                         callback(input);
@@ -582,9 +600,6 @@ impl<S, T, U> Application<S, T, U>
             else {
                 self.handle_special_command(Final, &command);
             }
-            if self.get_mode() != "command" {
-                self.status_bar.hide_entry();
-            }
         }
     }
 
@@ -599,11 +614,16 @@ impl<S, T, U> Application<S, T, U>
                 let action = {
                     let shortcut = self.current_shortcut.borrow();
                     let mappings = self.mappings.borrow();
-                    mappings.get(&*self.current_mode.borrow())
+                    let mut current_mode = mode.clone();
+                    // The input modes have the same mappings as the command mode.
+                    if current_mode == INPUT_MODE || current_mode == BLOCKING_INPUT_MODE {
+                        current_mode = COMMAND_MODE.to_string();
+                    }
+                    mappings.get(&current_mode)
                         .and_then(|mappings| mappings.get(&*shortcut).cloned())
                 };
                 if let Some(action) = action {
-                    if mode != "command" {
+                    if !self.status_bar.entry_shown() {
                         self.reset();
                     }
                     self.clear_shortcut();
@@ -616,14 +636,14 @@ impl<S, T, U> Application<S, T, U>
                     }
                 }
                 else if self.no_possible_shortcut() {
-                    if mode != "command" {
+                    if !self.status_bar.entry_shown() {
                         self.reset();
                     }
                     self.clear_shortcut();
                 }
             }
         }
-        if mode == "normal" || (mode == "command" && (keyval == Tab || keyval == ISO_Left_Tab)) {
+        if mode == NORMAL_MODE || (mode == COMMAND_MODE && (keyval == Tab || keyval == ISO_Left_Tab)) {
             Inhibit(true)
         }
         else {
@@ -646,7 +666,7 @@ impl<S, T, U> Application<S, T, U>
 
     /// Input the specified command.
     fn input_command(&self, command: &str) {
-        self.set_mode("command");
+        self.set_mode(COMMAND_MODE);
         self.status_bar.show_entry();
         let variables = self.variables.borrow();
         let mut command = command.to_string();
@@ -680,7 +700,7 @@ impl<S, T, U> Application<S, T, U>
             keyval => {
                 if let Some(character) = char::from_u32(keyval) {
                     if (*self.choices.borrow()).contains(&character) {
-                        if self.get_mode() == "blocking-input" {
+                        if self.get_mode() == BLOCKING_INPUT_MODE {
                             *self.answer.borrow_mut() = Some(character.to_string());
                             gtk::main_quit();
                         }
@@ -694,7 +714,7 @@ impl<S, T, U> Application<S, T, U>
                         return Inhibit(true);
                     }
                 }
-                Inhibit(false)
+                self.handle_shortcut(key)
             },
         }
     }
@@ -702,9 +722,9 @@ impl<S, T, U> Application<S, T, U>
     /// Handle the key press event.
     fn key_press(&self, key: &EventKey) -> Inhibit {
         match self.get_mode().as_ref() {
-            "normal" => self.normal_key_press(key),
-            "command" => self.command_key_press(key),
-            "blocking-input" | "input" => self.input_key_press(key),
+            NORMAL_MODE => self.normal_key_press(key),
+            COMMAND_MODE => self.command_key_press(key),
+            BLOCKING_INPUT_MODE | INPUT_MODE => self.input_key_press(key),
             _ => self.handle_shortcut(key)
         }
     }
@@ -712,7 +732,7 @@ impl<S, T, U> Application<S, T, U>
     /// Handle the key release event.
     fn key_release(&self, key: &EventKey) -> Inhibit {
         match self.get_mode().as_ref() {
-            "command" => self.command_key_release(key),
+            COMMAND_MODE => self.command_key_release(key),
             _ => Inhibit(false),
         }
     }
@@ -724,12 +744,10 @@ impl<S, T, U> Application<S, T, U>
             colon => {
                 self.status_bar.set_completer(DEFAULT_COMPLETER_IDENT);
                 self.set_current_identifier(':');
-                self.set_mode("command");
+                self.set_mode(COMMAND_MODE);
                 self.reset();
                 self.clear_shortcut();
-                self.completion_view.unselect();
-                self.completion_view.scroll_to_first();
-                self.completion_view.show();
+                self.show_completion_view();
                 self.status_bar.show_entry();
                 Inhibit(true)
             },
@@ -743,7 +761,7 @@ impl<S, T, U> Application<S, T, U>
                 if S::is_identifier(character) {
                     self.status_bar.set_completer(NO_COMPLETER_IDENT);
                     self.set_current_identifier(character);
-                    self.set_mode("command");
+                    self.set_mode(COMMAND_MODE);
                     self.reset();
                     self.clear_shortcut();
                     self.status_bar.show_entry();
@@ -814,7 +832,7 @@ impl<S, T, U> Application<S, T, U>
     fn return_to_normal_mode(&self) {
         self.status_bar.hide_entry();
         self.completion_view.hide();
-        self.set_mode("normal");
+        self.set_mode(NORMAL_MODE);
         self.set_current_identifier(':');
     }
 
@@ -860,10 +878,17 @@ impl<S, T, U> Application<S, T, U>
         self.window.set_title(title);
     }
 
+    /// Show the completion view.
+    fn show_completion_view(&self) {
+        self.completion_view.unselect();
+        self.completion_view.scroll_to_first();
+        self.completion_view.show();
+    }
+
     /// Show the current mode if it is not the normal mode.
     fn show_mode(&self) {
         let mode = self.get_mode();
-        if mode != "normal" && mode != "command" && mode != "input" && mode != "blocking-input" {
+        if mode != NORMAL_MODE && mode != COMMAND_MODE && mode != INPUT_MODE && mode != BLOCKING_INPUT_MODE {
             self.mode_label.set_text(&mode);
         }
         else {

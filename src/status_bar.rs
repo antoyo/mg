@@ -42,6 +42,7 @@ use gtk::prelude::WidgetExtManual;
 use gtk::Orientation::Horizontal;
 
 use completion::{Completer, Completion, CompletionView, DEFAULT_COMPLETER_IDENT, NO_COMPLETER_IDENT};
+use super::COMMAND_MODE;
 
 const BLUE: &'static GdkRGBA = &GdkRGBA { red: 0.0, green: 0.0, blue: 1.0, alpha: 1.0 };
 const ORANGE: &'static GdkRGBA = &GdkRGBA { red: 0.9, green: 0.55, blue: 0.0, alpha: 1.0 };
@@ -56,6 +57,7 @@ pub struct StatusBar {
     completion: Completion,
     completion_original_input: RefCell<String>,
     completion_view: Rc<CompletionView>,
+    current_mode: Rc<RefCell<String>>,
     entry: Entry,
     entry_shown: Cell<bool>,
     identifier_label: Label,
@@ -65,7 +67,7 @@ pub struct StatusBar {
 
 impl StatusBar {
     /// Create a new status bar.
-    pub fn new(completion_view: Rc<CompletionView>, completers: HashMap<String, Box<Completer>>) -> Rc<Self> {
+    pub fn new(completion_view: Rc<CompletionView>, completers: HashMap<String, Box<Completer>>, current_mode: Rc<RefCell<String>>) -> Rc<Self> {
         let hbox = HBox::new(Horizontal, 0);
         hbox.set_size_request(1, 20);
 
@@ -82,6 +84,7 @@ impl StatusBar {
             completion: completion,
             completion_original_input: RefCell::new(String::new()),
             completion_view: completion_view,
+            current_mode: current_mode,
             entry: entry,
             entry_shown: Cell::new(false),
             identifier_label: identifier_label,
@@ -235,6 +238,11 @@ impl StatusBar {
         self.identifier_label.set_text(identifier);
     }
 
+    /// Set the original input.
+    pub fn set_original_input(&self, input: &str) {
+        *self.completion_original_input.borrow_mut() = input.to_string();
+    }
+
     /// Show the entry.
     pub fn show_entry(&self) {
         self.entry_shown.set(true);
@@ -251,8 +259,18 @@ impl StatusBar {
 
     /// Update the completions.
     fn update_completions(&self) {
+        let in_command_mode = (*self.current_mode.borrow()) == COMMAND_MODE;
         if !self.inserting_completion.get() {
-            self.select_completer();
+            if in_command_mode {
+                // In command mode, the completer can change when the user type.
+                // For instance, after typing "set ", the completer switch to the settings
+                // completer.
+                self.select_completer();
+            }
+            else {
+                // Do not select another completer when in input mode.
+                self.filter();
+            }
             let current_completer = self.completion.current_completer_ident();
             if current_completer != NO_COMPLETER_IDENT {
                 if let Some(text) = self.entry.get_text() {

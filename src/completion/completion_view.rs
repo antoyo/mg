@@ -43,6 +43,7 @@ use gtk::{
 };
 use gtk::PolicyType::{Automatic, Never};
 
+use completion::CompletionResult;
 use scrolled_window::ScrolledWindowExtManual;
 use super::Completer;
 
@@ -64,12 +65,14 @@ impl CompletionView {
         let cell1 = CellRendererText::new();
         column1.pack_start(&cell1, true);
         column1.add_attribute(&cell1, "text", 0);
+        column1.add_attribute(&cell1, "foreground", 2);
         tree_view.append_column(&column1);
 
         let column2 = TreeViewColumn::new();
         let cell2 = CellRendererText::new();
         column2.pack_start(&cell2, true);
         column2.add_attribute(&cell2, "text", 1);
+        column2.add_attribute(&cell2, "foreground", 2);
         tree_view.append_column(&column2);
 
         tree_view.get_selection().unselect_all();
@@ -114,7 +117,7 @@ impl CompletionView {
 
     /// Filter the rows from the input.
     pub fn filter(&self, input: &str, completer: &Completer) {
-        let model = ListStore::new(&[Type::String, Type::String]);
+        let model = ListStore::new(&[Type::String, Type::String, Type::String]);
 
         let key =
             if let Some(index) = input.find(' ') {
@@ -123,9 +126,8 @@ impl CompletionView {
             else {
                 input
             };
-        let key = key.to_lowercase();
-        for &(ref col1, ref col2) in &completer.completions(&key) {
-            model.insert_with_values(None, &[0, 1], &[&col1, &col2]);
+        for &CompletionResult { ref col1, ref col2, ref foreground } in &completer.completions(key) {
+            model.insert_with_values(None, &[0, 1, 2], &[col1, col2, foreground]);
         }
         self.tree_view.set_model(Some(&model));
         self.adjust_policy(&model);

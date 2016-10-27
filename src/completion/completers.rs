@@ -25,7 +25,7 @@ use std::marker::PhantomData;
 
 use mg_settings::{EnumMetaData, SettingCompletion};
 
-use completion::Completer;
+use completion::{Completer, CompletionResult};
 
 /// A command completer.
 pub struct CommandCompleter<T> {
@@ -34,6 +34,7 @@ pub struct CommandCompleter<T> {
 }
 
 impl<T: EnumMetaData> CommandCompleter<T> {
+    /// Create a new command completer.
     pub fn new() -> CommandCompleter<T> {
         let mut data: Vec<_> =
             T::get_metadata().iter()
@@ -56,17 +57,13 @@ impl<T> Completer for CommandCompleter<T> {
         value.to_string()
     }
 
-    fn completions(&self, input: &str) -> Vec<(String, String)> {
+    fn completions(&self, input: &str) -> Vec<CompletionResult> {
         self.metadata.iter()
             .filter(|&&(ref command, ref help)|
                     command.to_lowercase().contains(&input) ||
                     help.to_lowercase().contains(&input))
-            .cloned()
+            .map(|&(ref col1, ref col2)| CompletionResult::new(col1, col2))
             .collect()
-    }
-
-    fn text_column(&self) -> i32 {
-        0
     }
 }
 
@@ -79,6 +76,7 @@ pub struct SettingCompleter<T> {
 }
 
 impl<T: EnumMetaData + SettingCompletion> SettingCompleter<T> {
+    /// Create a new setting completer.
     pub fn new() -> Self {
         let mut data: Vec<_> =
             T::get_metadata().iter()
@@ -105,7 +103,7 @@ impl<T> Completer for SettingCompleter<T> {
         }
     }
 
-    fn completions(&self, input: &str) -> Vec<(String, String)> {
+    fn completions(&self, input: &str) -> Vec<CompletionResult> {
         if input.contains("= ") {
             let mut iter = input.split_whitespace();
             if let Some(name) = iter.next() {
@@ -115,7 +113,7 @@ impl<T> Completer for SettingCompleter<T> {
                     *self.selected_name.borrow_mut() = Some(name.to_string());
                     return values.iter()
                         .filter(|value| value.contains(input_value))
-                        .map(|value| (value.clone(), String::new()))
+                        .map(|value| CompletionResult::new(value, ""))
                         .collect();
                 }
             }
@@ -128,12 +126,8 @@ impl<T> Completer for SettingCompleter<T> {
                 .filter(|&&(ref setting, ref help)|
                         setting.to_lowercase().contains(input) ||
                         help.to_lowercase().contains(input))
-                .cloned()
+                .map(|&(ref col1, ref col2)| CompletionResult::new(col1, col2))
                 .collect()
         }
-    }
-
-    fn text_column(&self) -> i32 {
-        0
     }
 }

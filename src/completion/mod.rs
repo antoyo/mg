@@ -19,6 +19,8 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+//! Trait and widget for input completion.
+
 mod completers;
 mod completion_view;
 
@@ -35,16 +37,28 @@ use gtk::{
 pub use self::completers::{CommandCompleter, SettingCompleter};
 pub use self::completion_view::CompletionView;
 
+/// The identifier of the default completer.
 pub const DEFAULT_COMPLETER_IDENT: &'static str = "__mg_default";
+
+/// The identifier of the null completer.
 pub const NO_COMPLETER_IDENT: &'static str = "__mg_no_completer";
 
+/// The trait completer is an interface to be satisfied by input completers.
 pub trait Completer {
+    /// From the selected text entry, return the text that should be written in the text input.
     fn complete_result(&self, input: &str) -> String;
-    fn completions(&self, input: &str) -> Vec<(String, String)>;
-    fn text_column(&self) -> i32;
+
+    /// From the user input, return the completion results.
+    /// The results are on two columns, hence the 2-tuple.
+    fn completions(&self, input: &str) -> Vec<CompletionResult>;
+
+    /// Set the column to use as the result of a selected text entry.
+    fn text_column(&self) -> i32 {
+        0
+    }
 }
 
-/// Entry completion.
+/// Completion to use with a text Entry.
 pub struct Completion {
     completer_ident: RefCell<String>,
     completers: HashMap<String, Box<Completer>>,
@@ -52,6 +66,7 @@ pub struct Completion {
 }
 
 impl Completion {
+    /// Create a new completion widget.
     pub fn new(completers: HashMap<String, Box<Completer>>, view: Rc<CompletionView>) -> Self {
         Completion {
             completer_ident: RefCell::new(String::new()),
@@ -98,5 +113,35 @@ impl Completion {
     /// Get the current completer ident.
     pub fn current_completer_ident(&self) -> String {
         self.completer_ident.borrow().clone()
+    }
+}
+
+/// A result to show in the completion view.
+pub struct CompletionResult {
+    /// The left column.
+    pub col1: String,
+    /// The right column.
+    pub col2: String,
+    /// The foreground color of the text.
+    pub foreground: String,
+}
+
+impl CompletionResult {
+    /// Create a new completion result.
+    pub fn new(col1: &str, col2: &str) -> Self {
+        CompletionResult {
+            col1: col1.to_string(),
+            col2: col2.to_string(),
+            foreground: "white".to_string(),
+        }
+    }
+
+    /// Add a cell property.
+    pub fn new_with_foreground(col1: &str, col2: &str, foreground: &str) -> Self {
+        CompletionResult {
+            col1: col1.to_string(),
+            col2: col2.to_string(),
+            foreground: foreground.to_string(),
+        }
     }
 }

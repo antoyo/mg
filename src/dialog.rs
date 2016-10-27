@@ -25,20 +25,22 @@ use gtk;
 use mg_settings::{EnumFromStr, EnumMetaData, SettingCompletion};
 use mg_settings::settings;
 
-use super::{Application, SpecialCommand};
+use super::{Application, SpecialCommand, BLOCKING_INPUT_MODE, INPUT_MODE};
 
 /// Builder to create a new dialog.
 pub struct DialogBuilder {
     /// Whether the dialog should block the calling function.
-    pub blocking: bool,
+    blocking: bool,
     /// The callback function to call for an asynchronous input dialog.
-    pub callback: Option<Box<Fn(Option<&str>) + 'static>>,
+    callback: Option<Box<Fn(Option<&str>) + 'static>>,
     /// The available choices to the question.
-    pub choices: Vec<char>,
+    choices: Vec<char>,
+    /// The text completer identifier for the input.
+    completer: Option<String>,
     /// The default answer to the question.
-    pub default_answer: String,
+    default_answer: String,
     /// The message/question to show to the user.
-    pub message: String,
+    message: String,
 }
 
 impl DialogBuilder {
@@ -49,6 +51,7 @@ impl DialogBuilder {
             blocking: false,
             callback: None,
             choices: vec![],
+            completer: None,
             default_answer: String::new(),
             message: String::new(),
         }
@@ -69,6 +72,12 @@ impl DialogBuilder {
     /// Set the choices available for the input.
     pub fn choices(mut self, choices: &[char]) -> Self {
         self.choices = choices.iter().cloned().collect();
+        self
+    }
+
+    /// Set the text completer for the input.
+    pub fn completer(mut self, completer: &str) -> Self {
+        self.completer = Some(completer.to_string());
         self
     }
 
@@ -169,6 +178,13 @@ impl<S, T, U> DialogWindow for Application<S, T, U>
             self.status_bar.show_entry();
             self.status_bar.set_input(&dialog_builder.default_answer);
         }
+
+        if let Some(completer) = dialog_builder.completer {
+            self.status_bar.set_completer(&completer);
+            self.status_bar.set_original_input(&dialog_builder.default_answer);
+            self.show_completion_view();
+        }
+
         *self.answer.borrow_mut() = None;
         if dialog_builder.blocking {
             *self.input_callback.borrow_mut() = Some(Box::new(|_| {
@@ -176,7 +192,7 @@ impl<S, T, U> DialogWindow for Application<S, T, U>
             }));
         }
         if dialog_builder.blocking {
-            self.set_mode("blocking-input");
+            self.set_mode(BLOCKING_INPUT_MODE);
         }
         else {
             if let Some(callback) = dialog_builder.callback {
@@ -184,7 +200,7 @@ impl<S, T, U> DialogWindow for Application<S, T, U>
                     callback(answer.as_ref().map(String::as_ref));
                 }));
             }
-            self.set_mode("input");
+            self.set_mode(INPUT_MODE);
 
         }
         self.status_bar.color_blue();
