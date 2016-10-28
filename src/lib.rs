@@ -303,6 +303,7 @@ pub struct Application<S, T, U: settings::Settings> {
     settings_parser: RefCell<Parser<T>>,
     setting_change_callback: RefCell<Option<Box<Fn(U::Variant)>>>,
     shortcuts: RefCell<HashMap<Key, String>>,
+    shortcut_pressed: Cell<bool>,
     special_command_callback: RefCell<Option<Box<Fn(S)>>>,
     status_bar: Rc<StatusBar>,
     vbox: Grid,
@@ -374,6 +375,7 @@ impl<S, T, U> Application<S, T, U>
             settings_parser: RefCell::new(parser),
             setting_change_callback: RefCell::new(None),
             shortcuts: RefCell::new(HashMap::new()),
+            shortcut_pressed: Cell::new(false),
             special_command_callback: RefCell::new(None),
             status_bar: status_bar,
             vbox: grid,
@@ -611,6 +613,7 @@ impl<S, T, U> Application<S, T, U>
             let shortcuts = &*self.shortcuts.borrow();
             if shortcuts.contains_key(&key) {
                 self.set_dialog_answer(&shortcuts[&key]);
+                self.shortcut_pressed.set(true);
                 return true;
             }
         }

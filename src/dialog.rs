@@ -187,7 +187,7 @@ impl<S, T, U> DialogWindow for Application<S, T, U>
     }
 
     fn show_dialog(&self, mut dialog_builder: DialogBuilder) -> DialogResult {
-        let has_shortcuts = !dialog_builder.shortcuts.is_empty();
+        self.shortcut_pressed.set(false);
         {
             let shortcuts = &mut *self.shortcuts.borrow_mut();
             shortcuts.clear();
@@ -245,7 +245,7 @@ impl<S, T, U> DialogWindow for Application<S, T, U>
             self.return_to_normal_mode();
             (*self.choices.borrow_mut()).clear();
             let answer = self.answer.borrow().clone();
-            if has_shortcuts {
+            if self.shortcut_pressed.get() {
                 if let Some(answer) = answer {
                     Shortcut(answer)
                 }
