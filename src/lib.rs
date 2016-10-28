@@ -170,13 +170,11 @@ type Modes = HashMap<String, String>;
 
 const TRANSPARENT: &'static GdkRGBA = &GdkRGBA { red: 0.0, green: 0.0, blue: 0.0, alpha: 0.0 };
 
-#[doc(hidden)]
-pub const BLOCKING_INPUT_MODE: &'static str = "blocking-input";
+const BLOCKING_INPUT_MODE: &'static str = "blocking-input";
 const COMMAND_MODE: &'static str = "command";
 const COMPLETE_NEXT_COMMAND: &'static str = "complete-next";
 const COMPLETE_PREVIOUS_COMMAND: &'static str = "complete-previous";
-#[doc(hidden)]
-pub const INPUT_MODE: &'static str = "input";
+const INPUT_MODE: &'static str = "input";
 const NORMAL_MODE: &'static str = "normal";
 
 #[derive(PartialEq)]
@@ -304,6 +302,7 @@ pub struct Application<S, T, U: settings::Settings> {
     settings: RefCell<Option<U>>,
     settings_parser: RefCell<Parser<T>>,
     setting_change_callback: RefCell<Option<Box<Fn(U::Variant)>>>,
+    shortcuts: RefCell<HashMap<Key, String>>,
     special_command_callback: RefCell<Option<Box<Fn(S)>>>,
     status_bar: Rc<StatusBar>,
     vbox: Grid,
@@ -374,6 +373,7 @@ impl<S, T, U> Application<S, T, U>
             settings: RefCell::new(builder.settings),
             settings_parser: RefCell::new(parser),
             setting_change_callback: RefCell::new(None),
+            shortcuts: RefCell::new(HashMap::new()),
             special_command_callback: RefCell::new(None),
             status_bar: status_bar,
             vbox: grid,
@@ -603,6 +603,20 @@ impl<S, T, U> Application<S, T, U>
         }
     }
 
+    /// Handle a shortcut in input mode.
+    fn handle_input_shortcut(&self, key: &EventKey) -> bool {
+        let keyval = key.get_keyval();
+        let control_pressed = key.get_state() & CONTROL_MASK == CONTROL_MASK;
+        if let Some(key) = gdk_key_to_key(keyval, control_pressed) {
+            let shortcuts = &*self.shortcuts.borrow();
+            if shortcuts.contains_key(&key) {
+                self.set_dialog_answer(&shortcuts[&key]);
+                return true;
+            }
+        }
+        false
+    }
+
     /// Handle a possible input of a shortcut.
     fn handle_shortcut(&self, key: &EventKey) -> Inhibit {
         let keyval = key.get_keyval();
@@ -698,19 +712,12 @@ impl<S, T, U> Application<S, T, U>
                 Inhibit(false)
             },
             keyval => {
-                if let Some(character) = char::from_u32(keyval) {
+                if self.handle_input_shortcut(key) {
+                    return Inhibit(true);
+                }
+                else if let Some(character) = char::from_u32(keyval) {
                     if (*self.choices.borrow()).contains(&character) {
-                        if self.get_mode() == BLOCKING_INPUT_MODE {
-                            *self.answer.borrow_mut() = Some(character.to_string());
-                            gtk::main_quit();
-                        }
-                        else if let Some(ref callback) = *self.input_callback.borrow() {
-                            callback(Some(character.to_string()));
-                            self.return_to_normal_mode();
-                            (*self.choices.borrow_mut()).clear();
-                            self.reset();
-                        }
-                        *self.input_callback.borrow_mut() = None;
+                        self.set_dialog_answer(&character.to_string());
                         return Inhibit(true);
                     }
                 }
@@ -854,6 +861,21 @@ impl<S, T, U> Application<S, T, U>
     fn set_current_identifier(&self, identifier: char) {
         self.current_command_mode.set(identifier);
         self.status_bar.set_identifier(&identifier.to_string());
+    }
+
+    /// Set the answer to return to the caller of the dialog.
+    fn set_dialog_answer(&self, answer: &str) {
+        if self.get_mode() == BLOCKING_INPUT_MODE {
+            *self.answer.borrow_mut() = Some(answer.to_string());
+            gtk::main_quit();
+        }
+        else if let Some(ref callback) = *self.input_callback.borrow() {
+            callback(Some(answer.to_string()));
+            self.return_to_normal_mode();
+            (*self.choices.borrow_mut()).clear();
+            self.reset();
+        }
+        *self.input_callback.borrow_mut() = None;
     }
 
     /// Set the current mode.

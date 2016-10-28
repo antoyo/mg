@@ -21,10 +21,14 @@
 
 //! Non-modal input dialogs.
 
+use std::collections::HashMap;
+
 use gtk;
 use mg_settings::{EnumFromStr, EnumMetaData, SettingCompletion};
+use mg_settings::key::Key;
 use mg_settings::settings;
 
+use self::DialogResult::{Answer, Shortcut};
 use super::{Application, SpecialCommand, BLOCKING_INPUT_MODE, INPUT_MODE};
 
 /// Builder to create a new dialog.
@@ -41,6 +45,8 @@ pub struct DialogBuilder {
     default_answer: String,
     /// The message/question to show to the user.
     message: String,
+    /// The available shortcuts.
+    shortcuts: HashMap<Key, String>,
 }
 
 impl DialogBuilder {
@@ -54,6 +60,7 @@ impl DialogBuilder {
             completer: None,
             default_answer: String::new(),
             message: String::new(),
+            shortcuts: HashMap::new(),
         }
     }
 
@@ -92,6 +99,22 @@ impl DialogBuilder {
         self.message = message.to_string();
         self
     }
+
+    /// Add a shortcut.
+    pub fn shortcut(mut self, shortcut: Key, value: &str) -> Self {
+        self.shortcuts.insert(shortcut, value.to_string());
+        self
+    }
+}
+
+/// Struct representing a dialog result.
+/// A dialog result is either what the user typed in the input (Answer) or the string associated
+/// with the shortcut.
+pub enum DialogResult {
+    /// A string typed by the user or None if the user closed the dialog (with Escape).
+    Answer(Option<String>),
+    /// A shortcut pressd by the user.
+    Shortcut(String),
 }
 
 /// Trait to provide function for show dialogs.
@@ -112,7 +135,10 @@ pub trait DialogWindow {
     fn question<F: Fn(Option<&str>) + 'static>(&self, message: &str, choices: &[char], callback: F);
 
     /// Show a dialog created with a `DialogBuilder`.
-    fn show_dialog(&self, mut dialog_builder: DialogBuilder) -> Option<String>;
+    fn show_dialog(&self, mut dialog_builder: DialogBuilder) -> DialogResult;
+
+    /// Show a dialog created with a `DialogBuilder` which does not contain shortcut.
+    fn show_dialog_without_shortcuts(&self, mut dialog_builder: DialogBuilder) -> Option<String>;
 }
 
 impl<S, T, U> DialogWindow for Application<S, T, U>
@@ -125,7 +151,7 @@ impl<S, T, U> DialogWindow for Application<S, T, U>
             .blocking(true)
             .default_answer(default_answer)
             .message(message);
-        self.show_dialog(builder)
+        self.show_dialog_without_shortcuts(builder)
     }
 
     fn blocking_question(&self, message: &str, choices: &[char]) -> Option<String> {
@@ -133,7 +159,7 @@ impl<S, T, U> DialogWindow for Application<S, T, U>
             .blocking(true)
             .message(message)
             .choices(choices);
-        self.show_dialog(builder)
+        self.show_dialog_without_shortcuts(builder)
     }
 
     fn blocking_yes_no_question(&self, message: &str) -> bool {
@@ -141,7 +167,7 @@ impl<S, T, U> DialogWindow for Application<S, T, U>
             .blocking(true)
             .message(message)
             .choices(&['y', 'n']);
-        self.show_dialog(builder) == Some("y".to_string())
+        self.show_dialog_without_shortcuts(builder) == Some("y".to_string())
     }
 
     fn input<F: Fn(Option<&str>) + 'static>(&self, message: &str, default_answer: &str, callback: F) {
@@ -160,7 +186,16 @@ impl<S, T, U> DialogWindow for Application<S, T, U>
         self.show_dialog(builder);
     }
 
-    fn show_dialog(&self, mut dialog_builder: DialogBuilder) -> Option<String> {
+    fn show_dialog(&self, mut dialog_builder: DialogBuilder) -> DialogResult {
+        let has_shortcuts = !dialog_builder.shortcuts.is_empty();
+        {
+            let shortcuts = &mut *self.shortcuts.borrow_mut();
+            shortcuts.clear();
+            for (key, value) in dialog_builder.shortcuts {
+                shortcuts.insert(key, value);
+            }
+        }
+
         let choices = dialog_builder.choices.clone();
         if !choices.is_empty() {
             {
@@ -209,10 +244,28 @@ impl<S, T, U> DialogWindow for Application<S, T, U>
             self.reset();
             self.return_to_normal_mode();
             (*self.choices.borrow_mut()).clear();
-            self.answer.borrow().clone()
+            let answer = self.answer.borrow().clone();
+            if has_shortcuts {
+                if let Some(answer) = answer {
+                    Shortcut(answer)
+                }
+                else {
+                    Answer(None)
+                }
+            }
+            else {
+                Answer(self.answer.borrow().clone())
+            }
         }
         else {
-            None
+            Answer(None)
+        }
+    }
+
+    fn show_dialog_without_shortcuts(&self, dialog_builder: DialogBuilder) -> Option<String> {
+        match self.show_dialog(dialog_builder) {
+            Answer(answer) => answer,
+            Shortcut(_) => panic!("cannot return a shortcut in show_dialog_without_shortcuts()"),
         }
     }
 }
