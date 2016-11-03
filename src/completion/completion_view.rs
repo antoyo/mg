@@ -63,6 +63,7 @@ impl CompletionView {
 
         let column1 = TreeViewColumn::new();
         let cell1 = CellRendererText::new();
+        column1.set_expand(true);
         column1.pack_start(&cell1, true);
         column1.add_attribute(&cell1, "text", 0);
         column1.add_attribute(&cell1, "foreground", 2);
@@ -70,6 +71,7 @@ impl CompletionView {
 
         let column2 = TreeViewColumn::new();
         let cell2 = CellRendererText::new();
+        column2.set_expand(true);
         column2.pack_start(&cell2, true);
         column2.add_attribute(&cell2, "text", 1);
         column2.add_attribute(&cell2, "foreground", 2);
