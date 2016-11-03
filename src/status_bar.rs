@@ -182,6 +182,9 @@ impl StatusBar {
 
     /// Filter the completion view.
     fn filter(&self) {
+        // Disable the scrollbars so that commands without completion does not
+        // show the completion view.
+        self.completion_view.disable_scrollbars();
         if let (Some(text), Some(completer)) = (self.entry.get_text(), self.completion.current_completer()) {
             self.completion_view.filter(&text, completer);
         }
@@ -258,7 +261,7 @@ impl StatusBar {
     }
 
     /// Update the completions.
-    fn update_completions(&self) {
+    pub fn update_completions(&self) {
         let in_command_mode = (*self.current_mode.borrow()) == COMMAND_MODE;
         if !self.inserting_completion.get() {
             if in_command_mode {

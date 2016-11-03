@@ -117,6 +117,11 @@ impl CompletionView {
         *self.unselect_callback.borrow_mut() = Some(Box::new(callback));
     }
 
+    /// Adjust the policy of the scrolled window to avoid having extra space around the tree view.
+    pub fn disable_scrollbars(&self) {
+        self.view.set_policy(Never, Never);
+    }
+
     /// Filter the rows from the input.
     pub fn filter(&self, input: &str, completer: &Completer) {
         let model = ListStore::new(&[Type::String, Type::String, Type::String]);

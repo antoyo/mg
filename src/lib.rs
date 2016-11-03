@@ -648,6 +648,8 @@ impl<S, T, U> Application<S, T, U>
                         Complete(command) => self.handle_command(Some(command)),
                         Incomplete(command) => {
                             self.input_command(&command);
+                            self.show_completion_view();
+                            self.status_bar.update_completions();
                             return Inhibit(true);
                         },
                     }
