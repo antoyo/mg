@@ -53,10 +53,6 @@ impl<T: EnumMetaData> CommandCompleter<T> {
 }
 
 impl<T> Completer for CommandCompleter<T> {
-    fn complete_result(&self, value: &str) -> String {
-        value.to_string()
-    }
-
     fn completions(&self, input: &str) -> Vec<CompletionResult> {
         self.metadata.iter()
             .filter(|&&(ref command, ref help)|
