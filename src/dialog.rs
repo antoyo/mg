@@ -135,10 +135,10 @@ pub trait DialogWindow {
     fn question<F: Fn(Option<&str>) + 'static>(&self, message: &str, choices: &[char], callback: F);
 
     /// Show a dialog created with a `DialogBuilder`.
-    fn show_dialog(&self, mut dialog_builder: DialogBuilder) -> DialogResult;
+    fn show_dialog(&self, dialog_builder: DialogBuilder) -> DialogResult;
 
     /// Show a dialog created with a `DialogBuilder` which does not contain shortcut.
-    fn show_dialog_without_shortcuts(&self, mut dialog_builder: DialogBuilder) -> Option<String>;
+    fn show_dialog_without_shortcuts(&self, dialog_builder: DialogBuilder) -> Option<String>;
 }
 
 impl<S, T, U> DialogWindow for Application<S, T, U>

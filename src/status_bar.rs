@@ -40,8 +40,10 @@ use gtk::{
 };
 use gtk::prelude::WidgetExtManual;
 use gtk::Orientation::Horizontal;
+use pango_sys::PangoEllipsizeMode;
 
 use completion::{Completer, Completion, CompletionView, DEFAULT_COMPLETER_IDENT, NO_COMPLETER_IDENT};
+use gtk_widgets::LabelExtManual;
 use super::COMMAND_MODE;
 
 const BLUE: &'static GdkRGBA = &GdkRGBA { red: 0.0, green: 0.0, blue: 1.0, alpha: 1.0 };
@@ -311,8 +313,10 @@ impl StatusBarItem {
     /// Create a new status bar item.
     #[allow(new_without_default)]
     pub fn new() -> Self {
+        let label = Label::new(None);
+        label.set_ellipsize(PangoEllipsizeMode::End);
         StatusBarItem {
-            label: Label::new(None),
+            label: label,
             left: false,
         }
     }

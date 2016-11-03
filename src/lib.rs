@@ -46,12 +46,14 @@ extern crate libc;
 #[macro_use]
 extern crate log;
 extern crate mg_settings;
+extern crate pango_sys;
 
 #[macro_use]
 mod widget;
 pub mod completion;
 pub mod dialog;
 mod gobject;
+mod gtk_widgets;
 mod key_converter;
 pub mod message;
 mod scrolled_window;

@@ -50,5 +50,9 @@ version = "0.1.0"
 git = "https://github.com/gtk-rs/sys"
 version = "0.3.1"
 
+[dependencies.pango-sys]
+git = "https://github.com/gtk-rs/sys"
+version = "0.3.1"
+
 [package.metadata.release]
 upload-doc = true
