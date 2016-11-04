@@ -1,26 +1,20 @@
 [package]
-name = "mg"
-version = "0.0.5-pre"
 authors = ["Antoni Boucher <bouanto@zoho.com>"]
 description = "Minimal UI library based on GTK+."
-license = "MIT"
-repository = "https://github.com/antoyo/mg"
 documentation = "https://antoyo.github.io/mg/mg/"
+license = "MIT"
+name = "mg"
+repository = "https://github.com/antoyo/mg"
+version = "0.0.5-pre"
 
-[features]
-nightly = []
+[metadata]
+
+[metadata.release]
+upload-doc = true
 
 [dependencies]
 libc = "^0.2"
 log = "^0.3"
-
-[dependencies.mg-settings]
-git = "https://github.com/antoyo/mg-settings"
-version = "^0.0.5-pre"
-
-[dev-dependencies.mg-settings-macros]
-git = "https://github.com/antoyo/mg-settings"
-version = "^0.0.1"
 
 [dependencies.gdk]
 git = "https://github.com/gtk-rs/gdk"
@@ -50,9 +44,20 @@ version = "0.1.0"
 git = "https://github.com/gtk-rs/sys"
 version = "0.3.1"
 
+[dependencies.mg-settings]
+git = "https://github.com/antoyo/mg-settings"
+version = "^0.0.5-pre"
+
 [dependencies.pango-sys]
 git = "https://github.com/gtk-rs/sys"
 version = "0.3.1"
 
-[package.metadata.release]
-upload-doc = true
+[dev-dependencies]
+libxdo = "^0.4.1"
+
+[dev-dependencies.mg-settings-macros]
+git = "https://github.com/antoyo/mg-settings"
+version = "^0.0.1"
+
+[features]
+nightly = []
