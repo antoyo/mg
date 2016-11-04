@@ -228,14 +228,14 @@ enum ShortcutCommand {
 pub type SimpleApplicationBuilder = ApplicationBuilder<NoSettings>;
 
 /// Application builder.
-pub struct ApplicationBuilder<U: settings::Settings> {
+pub struct ApplicationBuilder<Sett: settings::Settings> {
     completers: HashMap<String, Box<Completer>>,
     modes: Option<Modes>,
     include_path: Option<PathBuf>,
-    settings: Option<U>,
+    settings: Option<Sett>,
 }
 
-impl<U: settings::Settings + 'static> ApplicationBuilder<U> {
+impl<Sett: settings::Settings + 'static> ApplicationBuilder<Sett> {
     /// Create a new application builder.
     #[allow(new_without_default_derive)]
     pub fn new() -> Self {
@@ -248,10 +248,10 @@ impl<U: settings::Settings + 'static> ApplicationBuilder<U> {
     }
 
     /// Create a new application with configuration and include path.
-    pub fn build<S, T>(self) -> Rc<Application<S, T, U>>
-        where S: SpecialCommand + 'static,
-              T: EnumFromStr + EnumMetaData + 'static,
-              U: EnumMetaData + SettingCompletion,
+    pub fn build<Spec, Comm>(self) -> Rc<Application<Spec, Comm, Sett>>
+        where Spec: SpecialCommand + 'static,
+              Comm: EnumFromStr + EnumMetaData + 'static,
+              Sett: EnumMetaData + SettingCompletion,
     {
         Application::new(self)
     }
@@ -277,7 +277,7 @@ impl<U: settings::Settings + 'static> ApplicationBuilder<U> {
     }
 
     /// Set the default settings of the application.
-    pub fn settings(mut self, settings: U) -> Self {
+    pub fn settings(mut self, settings: Sett) -> Self {
         self.settings = Some(settings);
         self
     }
@@ -285,9 +285,9 @@ impl<U: settings::Settings + 'static> ApplicationBuilder<U> {
 
 /// Create a new MG application window.
 /// This window contains a status bar where the user can type a command and a central widget.
-pub struct Application<S, T, U: settings::Settings> {
+pub struct Application<Spec, Comm, Sett: settings::Settings> {
     answer: RefCell<Option<String>>,
-    command_callback: RefCell<Option<Box<Fn(T)>>>,
+    command_callback: RefCell<Option<Box<Fn(Comm)>>>,
     completion_view: Rc<CompletionView>,
     choices: RefCell<Vec<char>>,
     close_callback: RefCell<Option<Box<Fn()>>>,
@@ -301,24 +301,24 @@ pub struct Application<S, T, U: settings::Settings> {
     message: StatusBarItem,
     mode_changed_callback: RefCell<Option<Box<Fn(&str)>>>,
     mode_label: StatusBarItem,
-    settings: RefCell<Option<U>>,
-    settings_parser: RefCell<Parser<T>>,
-    setting_change_callback: RefCell<Option<Box<Fn(U::Variant)>>>,
+    settings: RefCell<Option<Sett>>,
+    settings_parser: RefCell<Parser<Comm>>,
+    setting_change_callback: RefCell<Option<Box<Fn(Sett::Variant)>>>,
     shortcuts: RefCell<HashMap<Key, String>>,
     shortcut_pressed: Cell<bool>,
-    special_command_callback: RefCell<Option<Box<Fn(S)>>>,
+    special_command_callback: RefCell<Option<Box<Fn(Spec)>>>,
     status_bar: Rc<StatusBar>,
     vbox: Grid,
     variables: RefCell<HashMap<String, Box<Fn() -> String>>>,
     window: Window,
 }
 
-impl<S, T, U> Application<S, T, U>
-    where S: SpecialCommand + 'static,
-          T: EnumFromStr + EnumMetaData + 'static,
-          U: settings::Settings + EnumMetaData + SettingCompletion + 'static,
+impl<Spec, Comm, Sett> Application<Spec, Comm, Sett>
+    where Spec: SpecialCommand + 'static,
+          Comm: EnumFromStr + EnumMetaData + 'static,
+          Sett: settings::Settings + EnumMetaData + SettingCompletion + 'static,
 {
-    fn new(builder: ApplicationBuilder<U>) -> Rc<Self> {
+    fn new(builder: ApplicationBuilder<Sett>) -> Rc<Self> {
         let modes = builder.modes.unwrap_or_default();
         let config = Config {
             application_commands: vec![COMPLETE_NEXT_COMMAND.to_string(), COMPLETE_PREVIOUS_COMMAND.to_string()],
@@ -336,8 +336,8 @@ impl<S, T, U> Application<S, T, U>
         grid.attach(&**completion_view, 0, 1, 1, 1);
 
         let mut completers: HashMap<String, Box<Completer>> = HashMap::new();
-        completers.insert(DEFAULT_COMPLETER_IDENT.to_string(), Box::new(CommandCompleter::<T>::new()));
-        completers.insert("set".to_string(), Box::new(SettingCompleter::<U>::new()));
+        completers.insert(DEFAULT_COMPLETER_IDENT.to_string(), Box::new(CommandCompleter::<Comm>::new()));
+        completers.insert("set".to_string(), Box::new(SettingCompleter::<Sett>::new()));
         for (identifier, completer) in builder.completers {
             completers.insert(identifier, completer);
         }
@@ -347,7 +347,7 @@ impl<S, T, U> Application<S, T, U>
         status_bar.hide();
         completion_view.hide();
 
-        let foreground_color = Application::<S, T, U>::get_foreground_color(&window);
+        let foreground_color = Application::<Spec, Comm, Sett>::get_foreground_color(&window);
 
         let mode_label = StatusBarItem::new().left();
         let message = StatusBarItem::new().left();
@@ -479,14 +479,14 @@ impl<S, T, U> Application<S, T, U>
     }
 
     /// Call the callback with the command or show an error if the command cannot be parsed.
-    fn call_command(&self, callback: &Box<Fn(T)>, command: Result<Command<T>>) {
+    fn call_command(&self, callback: &Box<Fn(Comm)>, command: Result<Command<Comm>>) {
         match command {
             Ok(command) => {
                 match command {
                     App(command) => self.app_command(&command),
                     Custom(command) => callback(command),
                     Set(name, value) => {
-                        match U::to_variant(&name, value) {
+                        match Sett::to_variant(&name, value) {
                             Ok(setting) => self.set_setting(setting),
                             Err(error) => {
                                 let message = format!("Error setting value: {}", error);
@@ -513,7 +513,7 @@ impl<S, T, U> Application<S, T, U>
     }
 
     /// Call the setting changed callback.
-    fn call_setting_callback(&self, setting: U::Variant) {
+    fn call_setting_callback(&self, setting: Sett::Variant) {
         if let Some(ref callback) = *self.setting_change_callback.borrow() {
             callback(setting);
         }
@@ -542,7 +542,7 @@ impl<S, T, U> Application<S, T, U>
     /// Handle the key release event for the command mode.
     fn command_key_release(&self, _key: &EventKey) -> Inhibit {
         let identifier = self.current_command_mode.get();
-        if identifier != ':' && S::is_always(identifier) {
+        if identifier != ':' && Spec::is_always(identifier) {
             if let Some(command) = self.status_bar.get_command() {
                 self.handle_special_command(Current, &command);
             }
@@ -556,7 +556,7 @@ impl<S, T, U> Application<S, T, U>
     }
 
     /// Add a callback to the command event.
-    pub fn connect_command<F: Fn(T) + 'static>(&self, callback: F) {
+    pub fn connect_command<F: Fn(Comm) + 'static>(&self, callback: F) {
         *self.command_callback.borrow_mut() = Some(Box::new(callback));
     }
 
@@ -571,12 +571,12 @@ impl<S, T, U> Application<S, T, U>
     }
 
     /// Add a callback to setting changed event.
-    pub fn connect_setting_changed<F: Fn(U::Variant) + 'static>(&self, callback: F) {
+    pub fn connect_setting_changed<F: Fn(Sett::Variant) + 'static>(&self, callback: F) {
         *self.setting_change_callback.borrow_mut() = Some(Box::new(callback));
     }
 
     /// Add a callback to the special command event.
-    pub fn connect_special_command<F: Fn(S) + 'static>(&self, callback: F) {
+    pub fn connect_special_command<F: Fn(Spec) + 'static>(&self, callback: F) {
         *self.special_command_callback.borrow_mut() = Some(Box::new(callback));
     }
 
@@ -676,7 +676,7 @@ impl<S, T, U> Application<S, T, U>
     fn handle_special_command(&self, activation_type: ActivationType, command: &str) {
         if let Some(ref callback) = *self.special_command_callback.borrow() {
             let identifier = self.current_command_mode.get();
-            if let Ok(special_command) = S::identifier_to_command(identifier, command) {
+            if let Ok(special_command) = Spec::identifier_to_command(identifier, command) {
                 callback(special_command);
                 if activation_type == Final {
                     self.set_current_identifier(':');
@@ -772,7 +772,7 @@ impl<S, T, U> Application<S, T, U>
             },
             keyval => {
                 let character = keyval as u8 as char;
-                if S::is_identifier(character) {
+                if Spec::is_identifier(character) {
                     self.status_bar.set_completer(NO_COMPLETER_IDENT);
                     self.set_current_identifier(character);
                     self.set_mode(COMMAND_MODE);
@@ -820,7 +820,7 @@ impl<S, T, U> Application<S, T, U>
                     let mappings = mappings.entry(self.modes[&mode].clone()).or_insert_with(HashMap::new);
                     mappings.insert(keys, action);
                 },
-                Set(name, value) => self.set_setting(U::to_variant(&name, value)?),
+                Set(name, value) => self.set_setting(Sett::to_variant(&name, value)?),
                 Unmap { .. } => panic!("not yet implemented"), // TODO
             }
         }
@@ -851,13 +851,13 @@ impl<S, T, U> Application<S, T, U>
     }
 
     /// Get the settings.
-    pub fn settings(&self) -> &U {
+    pub fn settings(&self) -> &Sett {
         let settings = unsafe { &*self.settings.as_ptr() };
         settings.as_ref().unwrap()
     }
 
     /// Set a setting value.
-    pub fn set_setting(&self, setting: U::Variant) {
+    pub fn set_setting(&self, setting: Sett::Variant) {
         if let Some(ref mut settings) = *self.settings.borrow_mut() {
             settings.set_value(setting.clone());
             self.call_setting_callback(setting);
@@ -929,7 +929,7 @@ impl<S, T, U> Application<S, T, U>
     pub fn use_dark_theme(&self) {
         let settings = Settings::get_default().unwrap();
         settings.set_data("gtk-application-prefer-dark-theme", 1);
-        *self.foreground_color.borrow_mut() = Application::<S, T, U>::get_foreground_color(&self.window);
+        *self.foreground_color.borrow_mut() = Application::<Spec, Comm, Sett>::get_foreground_color(&self.window);
     }
 
     /// Get the application window.
