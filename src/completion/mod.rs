@@ -35,7 +35,7 @@ use gtk::{
 };
 
 use self::Column::Expand;
-pub use self::completers::{CommandCompleter, SettingCompleter};
+pub use self::completers::{CommandCompleter, NoCompleter, SettingCompleter};
 pub use self::completion_view::CompletionView;
 
 /// The identifier of the default completer.
@@ -89,7 +89,8 @@ pub struct Completion {
 
 impl Completion {
     /// Create a new completion widget.
-    pub fn new(completers: HashMap<String, Box<Completer>>, view: Rc<CompletionView>) -> Self {
+    pub fn new(mut completers: HashMap<String, Box<Completer>>, view: Rc<CompletionView>) -> Self {
+        completers.insert(NO_COMPLETER_IDENT.to_string(), Box::new(NoCompleter::new()));
         Completion {
             completer_ident: RefCell::new(String::new()),
             completers: completers,

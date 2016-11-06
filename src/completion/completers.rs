@@ -63,6 +63,28 @@ impl<T> Completer for CommandCompleter<T> {
     }
 }
 
+/// A nop completer.
+pub struct NoCompleter {
+}
+
+impl NoCompleter {
+    /// Create a new nop completer.
+    pub fn new() -> Self {
+        NoCompleter {
+        }
+    }
+}
+
+impl Completer for NoCompleter {
+    fn complete_result(&self, _value: &str) -> String {
+        String::new()
+    }
+
+    fn completions(&self, _input: &str) -> Vec<CompletionResult> {
+        vec![]
+    }
+}
+
 /// A setting completer.
 pub struct SettingCompleter<T> {
     selected_name: RefCell<Option<String>>,
