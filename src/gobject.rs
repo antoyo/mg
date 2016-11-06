@@ -24,13 +24,21 @@ use std::ffi::CString;
 use glib::{IsA, Object, ObjectExt};
 use gobject_sys::{GObject, g_object_set};
 use libc::c_void;
+use pango_sys::PangoEllipsizeMode;
 
 pub trait ObjectExtManual {
     fn set_data(&self, key: &str, data: i32);
+    fn set_ellipsize_data(&self, key: &str, data: PangoEllipsizeMode);
 }
 
 impl<O: ObjectExt + IsA<Object>> ObjectExtManual for O {
     fn set_data(&self, key: &str, data: i32) {
+        let object: *mut GObject = self.to_glib_full();
+        let key = CString::new(key).unwrap();
+        unsafe { g_object_set(object as *mut _, key.as_ptr(), data, 0 as *mut c_void) };
+    }
+
+    fn set_ellipsize_data(&self, key: &str, data: PangoEllipsizeMode) {
         let object: *mut GObject = self.to_glib_full();
         let key = CString::new(key).unwrap();
         unsafe { g_object_set(object as *mut _, key.as_ptr(), data, 0 as *mut c_void) };

@@ -24,7 +24,7 @@ use std::cmp::max;
 use std::ops::Deref;
 use std::rc::Rc;
 
-use glib::Object;
+use glib::{Object, ToValue};
 use gtk::{
     CellRendererText,
     ContainerExt,
@@ -42,8 +42,11 @@ use gtk::{
     WidgetExt,
 };
 use gtk::PolicyType::{Automatic, Never};
+use pango_sys::PangoEllipsizeMode;
 
 use completion::CompletionResult;
+use completion::Column::{self, Expand};
+use gobject::ObjectExtManual;
 use scrolled_window::ScrolledWindowExtManual;
 use super::Completer;
 
@@ -61,22 +64,6 @@ impl CompletionView {
     pub fn new() -> Rc<Self> {
         let tree_view = TreeView::new();
 
-        let column1 = TreeViewColumn::new();
-        let cell1 = CellRendererText::new();
-        column1.set_expand(true);
-        column1.pack_start(&cell1, true);
-        column1.add_attribute(&cell1, "markup", 0);
-        column1.add_attribute(&cell1, "foreground", 2);
-        tree_view.append_column(&column1);
-
-        let column2 = TreeViewColumn::new();
-        let cell2 = CellRendererText::new();
-        column2.set_expand(true);
-        column2.pack_start(&cell2, true);
-        column2.add_attribute(&cell2, "markup", 1);
-        column2.add_attribute(&cell2, "foreground", 2);
-        tree_view.append_column(&column2);
-
         tree_view.get_selection().unselect_all();
         tree_view.set_enable_search(false);
         tree_view.set_headers_visible(false);
@@ -88,11 +75,53 @@ impl CompletionView {
         scrolled_window.set_max_content_height(COMPLETION_VIEW_MAX_HEIGHT);
         scrolled_window.set_propagate_natural_height(true);
 
-        Rc::new(CompletionView {
+        let view = Rc::new(CompletionView {
             unselect_callback: RefCell::new(None),
             tree_view: tree_view,
             view: scrolled_window,
-        })
+        });
+
+        view.add_columns(2);
+
+        view
+    }
+
+    /// Add a column to the tree view.
+    fn add_column(&self, index: i32, foreground_index: i32, column: Column) {
+        let view_column = TreeViewColumn::new();
+        let cell = CellRendererText::new();
+        if column == Expand {
+            cell.set_ellipsize_data("ellipsize", PangoEllipsizeMode::End);
+            view_column.set_expand(true);
+        }
+        view_column.pack_start(&cell, true);
+        view_column.add_attribute(&cell, "text", index);
+        view_column.add_attribute(&cell, "foreground", foreground_index);
+        self.tree_view.append_column(&view_column);
+    }
+
+    /// Add the specified number of columns.
+    fn add_columns(&self, column_count: i32) {
+        self.remove_columns();
+        for i in 0 .. column_count {
+            self.add_column(i, column_count + i, Expand);
+        }
+    }
+
+    /// Add the specified number of columns.
+    fn add_columns_from_completer(&self, completer: &Completer) {
+        self.remove_columns();
+        let columns = completer.columns();
+        let column_count = columns.len() as i32;
+        for (i, column) in columns.iter().enumerate() {
+            let i = i as i32;
+            self.add_column(i, column_count + i, *column);
+        }
+    }
+
+    /// Adjust the columns from the completer.
+    pub fn adjust_columns(&self, completer: &Completer) {
+        self.add_columns_from_completer(completer);
     }
 
     /// Adjust the policy of the scrolled window to avoid having extra space around the tree view.
@@ -124,7 +153,9 @@ impl CompletionView {
 
     /// Filter the rows from the input.
     pub fn filter(&self, input: &str, completer: &Completer) {
-        let model = ListStore::new(&[Type::String, Type::String, Type::String]);
+        // Multiply by 2 because each column has a foreground column.
+        let columns = vec![Type::String; completer.column_count() * 2];
+        let model = ListStore::new(&columns);
 
         let key =
             if let Some(index) = input.find(' ') {
@@ -133,11 +164,25 @@ impl CompletionView {
             else {
                 input
             };
-        for &CompletionResult { ref col1, ref col2, ref foreground } in &completer.completions(key) {
-            model.insert_with_values(None, &[0, 1, 2], &[col1, col2, foreground]);
+        for &CompletionResult { ref columns } in &completer.completions(key) {
+            let row = model.insert(-1);
+            let start_column = columns.len();
+            for (index, cell) in columns.iter().enumerate() {
+                model.set_value(&row, index as u32, &cell.value.to_value());
+                if let Some(ref foreground) = cell.foreground {
+                    model.set_value(&row, (index + start_column) as u32, &foreground.to_value());
+                }
+            }
         }
         self.tree_view.set_model(Some(&model));
         self.adjust_policy(&model);
+    }
+
+    /// Remove all the columns.
+    fn remove_columns(&self) {
+        for column in &self.tree_view.get_columns() {
+            self.tree_view.remove_column(column);
+        }
     }
 
     /// Scroll to the selected row.

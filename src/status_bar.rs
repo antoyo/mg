@@ -226,7 +226,8 @@ impl StatusBar {
 
     /// Set the current command completer.
     pub fn set_completer(&self, completer: &str) {
-        self.completion.adjust_model(completer);
+        let completer = self.completion.adjust_model(completer);
+        self.completion_view.adjust_columns(completer);
         self.filter();
     }
 

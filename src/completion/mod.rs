@@ -34,6 +34,7 @@ use gtk::{
     TreeSelection,
 };
 
+use self::Column::Expand;
 pub use self::completers::{CommandCompleter, SettingCompleter};
 pub use self::completion_view::CompletionView;
 
@@ -43,8 +44,27 @@ pub const DEFAULT_COMPLETER_IDENT: &'static str = "__mg_default";
 /// The identifier of the null completer.
 pub const NO_COMPLETER_IDENT: &'static str = "__mg_no_completer";
 
+/// The type of a column.
+#[derive(Clone, Copy, PartialEq)]
+pub enum Column {
+    /// Specifies that the column does not expand, but won't be ellipsized.
+    AllVisible,
+    /// Specifies that the column will expand, but can be truncated (ellipsized).
+    Expand,
+}
+
 /// The trait completer is an interface to be satisfied by input completers.
 pub trait Completer {
+    /// The number of columns of the completer.
+    fn columns(&self) -> Vec<Column> {
+        vec![Expand, Expand]
+    }
+
+    /// The number of column.
+    fn column_count(&self) -> usize {
+        self.columns().len()
+    }
+
     /// From the selected text entry, return the text that should be written in the text input.
     fn complete_result(&self, input: &str) -> String {
         input.to_string()
@@ -78,7 +98,7 @@ impl Completion {
     }
 
     /// Adjust the model by using the specified completer.
-    pub fn adjust_model(&self, completer_ident: &str) {
+    pub fn adjust_model(&self, completer_ident: &str) -> &Completer {
         if completer_ident != *self.completer_ident.borrow() {
             *self.completer_ident.borrow_mut() = completer_ident.to_string();
             if completer_ident == NO_COMPLETER_IDENT || !self.completers.contains_key(completer_ident) {
@@ -86,6 +106,7 @@ impl Completion {
                 self.view.set_model::<ListStore>(None);
             }
         }
+        &*self.completers[&*self.completer_ident.borrow()]
     }
 
     /// Complete the result for the selection using the current completer.
@@ -118,32 +139,74 @@ impl Completion {
     }
 }
 
+/// A completion cell is the value with attributes of one data in a row.
+#[derive(Clone)]
+pub struct CompletionCell {
+    /// The foreground color of the cell or None if using the default color.
+    pub foreground: Option<String>,
+    /// The text value to show on the cell.
+    pub value: String,
+}
+
+impl CompletionCell {
+    /// Create a new cell.
+    pub fn new(value: &str) -> Self {
+        CompletionCell {
+            foreground: None,
+            value: value.to_string(),
+        }
+    }
+
+    /// Set the foreground color of the cell.
+    pub fn foreground(mut self, foreground: &str) -> Self {
+        self.foreground = Some(foreground.to_string());
+        self
+    }
+}
+
+/// Trait to specify that a type can be converted to a `CompletionCell`.
+pub trait ToCell {
+    /// Convert a value to a `CompletionCell`.
+    fn to_cell(&self) -> CompletionCell;
+}
+
+impl ToCell for CompletionCell {
+    fn to_cell(&self) -> CompletionCell {
+        self.clone()
+    }
+}
+
+impl ToCell for str {
+    fn to_cell(&self) -> CompletionCell {
+        CompletionCell::new(self)
+    }
+}
+
+impl ToCell for String {
+    fn to_cell(&self) -> CompletionCell {
+        CompletionCell::new(&self)
+    }
+}
+
 /// A result to show in the completion view.
 pub struct CompletionResult {
-    /// The left column.
-    pub col1: String,
-    /// The right column.
-    pub col2: String,
-    /// The foreground color of the text.
-    pub foreground: String,
+    /// The columns data.
+    pub columns: Vec<CompletionCell>,
 }
 
 impl CompletionResult {
     /// Create a new completion result.
-    pub fn new(col1: &str, col2: &str) -> Self {
+    pub fn new(cols: &[&str]) -> Self {
+        let cols: Vec<_> = cols.iter().map(|col| CompletionCell::new(col)).collect();
         CompletionResult {
-            col1: col1.to_string(),
-            col2: col2.to_string(),
-            foreground: "white".to_string(),
+            columns: cols,
         }
     }
 
-    /// Add a cell property.
-    pub fn new_with_foreground(col1: &str, col2: &str, foreground: &str) -> Self {
+    /// Create a new completion result with foregrounds.
+    pub fn from_cells(cols: &[&ToCell]) -> Self {
         CompletionResult {
-            col1: col1.to_string(),
-            col2: col2.to_string(),
-            foreground: foreground.to_string(),
+            columns: cols.iter().map(|value| value.to_cell()).collect(),
         }
     }
 }
