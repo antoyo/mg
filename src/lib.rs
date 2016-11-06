@@ -663,7 +663,10 @@ impl<Spec, Comm, Sett> Application<Spec, Comm, Sett>
                 }
             }
         }
-        if mode == NORMAL_MODE || (mode == COMMAND_MODE && (keyval == Tab || keyval == ISO_Left_Tab)) {
+        if mode == NORMAL_MODE ||
+            (mode == COMMAND_MODE && (keyval == Tab || keyval == ISO_Left_Tab)) ||
+            key.get_keyval() == Escape
+        {
             Inhibit(true)
         }
         else {
