@@ -31,34 +31,21 @@ use super::{Application, SpecialCommand};
 
 const INFO_MESSAGE_DURATION: u32 = 5000;
 
-/// Trait to provide functions to show info, warning and error message.
-pub trait MessageWindow {
-    /// Show an error to the user.
-    fn error(&self, error: &str);
-
-    /// Show an information message to the user for 5 seconds.
-    fn info(app: &Rc<Self>, message: &str);
-
-    /// Show a message to the user.
-    fn message(&self, message: &str);
-
-    /// Show a warning message to the user for 5 seconds.
-    fn warning(app: &Rc<Self>, message: &str);
-}
-
-impl<S, T, U> MessageWindow for Application<S, T, U>
+impl<S, T, U> Application<S, T, U>
     where S: SpecialCommand + 'static,
           T: EnumFromStr + EnumMetaData + 'static,
           U: settings::Settings + EnumMetaData + SettingCompletion + 'static,
 {
-    fn error(&self, error: &str) {
+    /// Show an error to the user.
+    pub fn error(&self, error: &str) {
         error!("{}", error);
         self.message.set_text(error);
         self.status_bar.hide_entry();
         self.status_bar.color_red();
     }
 
-    fn info(app: &Rc<Self>, message: &str) {
+    /// Show an information message to the user for 5 seconds.
+    pub fn info(app: &Rc<Self>, message: &str) {
         info!("{}", message);
         app.message.set_text(message);
         app.reset_colors();
@@ -72,12 +59,14 @@ impl<S, T, U> MessageWindow for Application<S, T, U>
         });
     }
 
-    fn message(&self, message: &str) {
+    /// Show a message to the user.
+    pub fn message(&self, message: &str) {
         self.message.set_text(message);
         self.status_bar.color_blue();
     }
 
-    fn warning(app: &Rc<Self>, message: &str) {
+    /// Show a warning message to the user for 5 seconds.
+    pub fn warning(app: &Rc<Self>, message: &str) {
         warn!("{}", message);
         app.message.set_text(message);
         let app = app.clone();

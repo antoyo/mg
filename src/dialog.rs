@@ -117,36 +117,13 @@ pub enum DialogResult {
     Shortcut(String),
 }
 
-/// Trait to provide function for show dialogs.
-pub trait DialogWindow {
-    /// Ask a question to the user and block until the user provides it (or cancel).
-    fn blocking_input(&self, message: &str, default_answer: &str) -> Option<String>;
-
-    /// Ask a multiple-choice question to the user and block until the user provides it (or cancel).
-    fn blocking_question(&self, message: &str, choices: &[char]) -> Option<String>;
-
-    /// Show a blocking yes/no question.
-    fn blocking_yes_no_question(&self, message: &str) -> bool;
-
-    /// Ask a question to the user.
-    fn input<F: Fn(Option<&str>) + 'static>(&self, message: &str, default_answer: &str, callback: F);
-
-    /// Ask a multiple-choice question to the user.
-    fn question<F: Fn(Option<&str>) + 'static>(&self, message: &str, choices: &[char], callback: F);
-
-    /// Show a dialog created with a `DialogBuilder`.
-    fn show_dialog(&self, dialog_builder: DialogBuilder) -> DialogResult;
-
-    /// Show a dialog created with a `DialogBuilder` which does not contain shortcut.
-    fn show_dialog_without_shortcuts(&self, dialog_builder: DialogBuilder) -> Option<String>;
-}
-
-impl<S, T, U> DialogWindow for Application<S, T, U>
+impl<S, T, U> Application<S, T, U>
     where S: SpecialCommand + 'static,
           T: EnumFromStr + EnumMetaData + 'static,
           U: settings::Settings + EnumMetaData + SettingCompletion + 'static,
 {
-    fn blocking_input(&self, message: &str, default_answer: &str) -> Option<String> {
+    /// Ask a question to the user and block until the user provides it (or cancel).
+    pub fn blocking_input(&self, message: &str, default_answer: &str) -> Option<String> {
         let builder = DialogBuilder::new()
             .blocking(true)
             .default_answer(default_answer)
@@ -154,7 +131,8 @@ impl<S, T, U> DialogWindow for Application<S, T, U>
         self.show_dialog_without_shortcuts(builder)
     }
 
-    fn blocking_question(&self, message: &str, choices: &[char]) -> Option<String> {
+    /// Ask a multiple-choice question to the user and block until the user provides it (or cancel).
+    pub fn blocking_question(&self, message: &str, choices: &[char]) -> Option<String> {
         let builder = DialogBuilder::new()
             .blocking(true)
             .message(message)
@@ -162,7 +140,8 @@ impl<S, T, U> DialogWindow for Application<S, T, U>
         self.show_dialog_without_shortcuts(builder)
     }
 
-    fn blocking_yes_no_question(&self, message: &str) -> bool {
+    /// Show a blocking yes/no question.
+    pub fn blocking_yes_no_question(&self, message: &str) -> bool {
         let builder = DialogBuilder::new()
             .blocking(true)
             .message(message)
@@ -170,7 +149,8 @@ impl<S, T, U> DialogWindow for Application<S, T, U>
         self.show_dialog_without_shortcuts(builder) == Some("y".to_string())
     }
 
-    fn input<F: Fn(Option<&str>) + 'static>(&self, message: &str, default_answer: &str, callback: F) {
+    /// Ask a question to the user.
+    pub fn input<F: Fn(Option<&str>) + 'static>(&self, message: &str, default_answer: &str, callback: F) {
         let builder = DialogBuilder::new()
             .callback(callback)
             .default_answer(default_answer)
@@ -178,7 +158,8 @@ impl<S, T, U> DialogWindow for Application<S, T, U>
         self.show_dialog(builder);
     }
 
-    fn question<F: Fn(Option<&str>) + 'static>(&self, message: &str, choices: &[char], callback: F) {
+    /// Ask a multiple-choice question to the user.
+    pub fn question<F: Fn(Option<&str>) + 'static>(&self, message: &str, choices: &[char], callback: F) {
         let builder = DialogBuilder::new()
             .callback(callback)
             .message(message)
@@ -186,7 +167,8 @@ impl<S, T, U> DialogWindow for Application<S, T, U>
         self.show_dialog(builder);
     }
 
-    fn show_dialog(&self, mut dialog_builder: DialogBuilder) -> DialogResult {
+    /// Show a dialog created with a `DialogBuilder`.
+    pub fn show_dialog(&self, mut dialog_builder: DialogBuilder) -> DialogResult {
         self.shortcut_pressed.set(false);
         {
             let shortcuts = &mut *self.shortcuts.borrow_mut();
@@ -262,7 +244,8 @@ impl<S, T, U> DialogWindow for Application<S, T, U>
         }
     }
 
-    fn show_dialog_without_shortcuts(&self, dialog_builder: DialogBuilder) -> Option<String> {
+    /// Show a dialog created with a `DialogBuilder` which does not contain shortcut.
+    pub fn show_dialog_without_shortcuts(&self, dialog_builder: DialogBuilder) -> Option<String> {
         match self.show_dialog(dialog_builder) {
             Answer(answer) => answer,
             Shortcut(_) => panic!("cannot return a shortcut in show_dialog_without_shortcuts()"),

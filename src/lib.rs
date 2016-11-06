@@ -20,7 +20,6 @@
  */
 
 /*
- * TODO: remove the traits to only use impl.
  * TODO: set the size of the status bar according to the size of the font.
  * TODO: supports shortcuts like <C-a> and <C-w> in the command entry.
  * TODO: smart home (with Ctrl-A) in the command text entry.
@@ -105,7 +104,6 @@ use completion::{
 };
 use gobject::ObjectExtManual;
 use key_converter::gdk_key_to_key;
-use message::MessageWindow;
 use self::ActivationType::{Current, Final};
 use self::ShortcutCommand::{Complete, Incomplete};
 use status_bar::StatusBar;
