@@ -117,10 +117,10 @@ pub enum DialogResult {
     Shortcut(String),
 }
 
-impl<S, T, U> Application<S, T, U>
-    where S: SpecialCommand + 'static,
-          T: EnumFromStr + EnumMetaData + 'static,
-          U: settings::Settings + EnumMetaData + SettingCompletion + 'static,
+impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
+    where Spec: SpecialCommand + 'static,
+          Comm: EnumFromStr + EnumMetaData + 'static,
+          Sett: settings::Settings + EnumMetaData + SettingCompletion + 'static,
 {
     /// Ask a question to the user and block until the user provides it (or cancel).
     pub fn blocking_input(&self, message: &str, default_answer: &str) -> Option<String> {

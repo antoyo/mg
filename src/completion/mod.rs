@@ -185,7 +185,7 @@ impl ToCell for str {
 
 impl ToCell for String {
     fn to_cell(&self) -> CompletionCell {
-        CompletionCell::new(&self)
+        CompletionCell::new(self)
     }
 }
 

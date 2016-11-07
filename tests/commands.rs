@@ -36,28 +36,10 @@ use std::thread;
 
 use gtk::Label;
 use libxdo::XDo;
-use mg::{Application, ApplicationBuilder, SpecialCommand};
+use mg::{Application, ApplicationBuilder};
 
 use self::AppCommand::*;
 use utils::XDoExt;
-
-// TODO: remove when special commands are merge with commands.
-struct NoSpecialCommands {
-}
-
-impl SpecialCommand for NoSpecialCommands {
-    fn identifier_to_command(_identifier: char, _input: &str) -> Result<Self, String> {
-        Err(String::new())
-    }
-
-    fn is_always(_identifier: char) -> bool {
-        false
-    }
-
-    fn is_identifier(_character: char) -> bool {
-        false
-    }
-}
 
 #[derive(Commands)]
 enum AppCommand {
@@ -75,7 +57,7 @@ pub struct AppSettings {
 fn test_basic_command() {
     gtk::init().unwrap();
 
-    let app: Rc<Application<NoSpecialCommands, AppCommand, AppSettings>> = ApplicationBuilder::new()
+    let app: Rc<Application<AppCommand, AppSettings>> = ApplicationBuilder::new()
         .settings(AppSettings::new())
         .build();
 

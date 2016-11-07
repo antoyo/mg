@@ -31,10 +31,10 @@ use super::{Application, SpecialCommand};
 
 const INFO_MESSAGE_DURATION: u32 = 5000;
 
-impl<S, T, U> Application<S, T, U>
-    where S: SpecialCommand + 'static,
-          T: EnumFromStr + EnumMetaData + 'static,
-          U: settings::Settings + EnumMetaData + SettingCompletion + 'static,
+impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
+    where Spec: SpecialCommand + 'static,
+          Comm: EnumFromStr + EnumMetaData + 'static,
+          Sett: settings::Settings + EnumMetaData + SettingCompletion + 'static,
 {
     /// Show an error to the user.
     pub fn error(&self, error: &str) {

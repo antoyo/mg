@@ -35,7 +35,6 @@ use std::rc::Rc;
 use gtk::{ContainerExt, Entry, Label, WidgetExt};
 use gtk::Orientation::Vertical;
 use mg::{Application, SimpleApplicationBuilder};
-use mg::message::MessageWindow;
 
 use AppCommand::*;
 
@@ -50,7 +49,7 @@ enum AppCommand {
 fn main() {
     gtk::init().unwrap();
 
-    let app = SimpleApplicationBuilder::new()
+    let app: Rc<Application<AppCommand>> = SimpleApplicationBuilder::new()
         .modes(hash! {
             "i" => "insert",
         })
@@ -80,7 +79,6 @@ fn main() {
         let label = label.clone();
         app.connect_command(move |command| {
             match command {
-                Follow => (),
                 Insert => mg_app.set_mode("insert"),
                 Normal => mg_app.set_mode("normal"),
                 Open(url) => label.set_text(&format!("Opening URL {}", url)),

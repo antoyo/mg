@@ -33,7 +33,6 @@ use std::rc::Rc;
 use gtk::{ContainerExt, Entry, Label, WidgetExt};
 use gtk::Orientation::Vertical;
 use mg::ApplicationBuilder;
-use mg::message::MessageWindow;
 
 use AppCommand::*;
 use AppSettingsVariant::*;

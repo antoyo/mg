@@ -167,6 +167,25 @@ pub trait SpecialCommand
     fn is_identifier(character: char) -> bool;
 }
 
+// TODO: remove when special commands are merge with commands.
+#[doc(hidden)]
+pub struct NoSpecialCommands {
+}
+
+impl SpecialCommand for NoSpecialCommands {
+    fn identifier_to_command(_identifier: char, _input: &str) -> result::Result<Self, String> {
+        Err(String::new())
+    }
+
+    fn is_always(_identifier: char) -> bool {
+        false
+    }
+
+    fn is_identifier(_character: char) -> bool {
+        false
+    }
+}
+
 type Modes = HashMap<String, String>;
 
 const TRANSPARENT: &'static GdkRGBA = &GdkRGBA { red: 0.0, green: 0.0, blue: 0.0, alpha: 0.0 };
@@ -247,7 +266,7 @@ impl<Sett: settings::Settings + 'static> ApplicationBuilder<Sett> {
     }
 
     /// Create a new application with configuration and include path.
-    pub fn build<Spec, Comm>(self) -> Rc<Application<Spec, Comm, Sett>>
+    pub fn build<Spec, Comm>(self) -> Rc<Application<Comm, Sett, Spec>>
         where Spec: SpecialCommand + 'static,
               Comm: EnumFromStr + EnumMetaData + 'static,
               Sett: EnumMetaData + SettingCompletion,
@@ -284,7 +303,7 @@ impl<Sett: settings::Settings + 'static> ApplicationBuilder<Sett> {
 
 /// Create a new MG application window.
 /// This window contains a status bar where the user can type a command and a central widget.
-pub struct Application<Spec, Comm, Sett: settings::Settings> {
+pub struct Application<Comm, Sett: settings::Settings = NoSettings, Spec = NoSpecialCommands> {
     answer: RefCell<Option<String>>,
     command_callback: RefCell<Option<Box<Fn(Comm)>>>,
     completion_view: Rc<CompletionView>,
@@ -312,7 +331,7 @@ pub struct Application<Spec, Comm, Sett: settings::Settings> {
     window: Window,
 }
 
-impl<Spec, Comm, Sett> Application<Spec, Comm, Sett>
+impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     where Spec: SpecialCommand + 'static,
           Comm: EnumFromStr + EnumMetaData + 'static,
           Sett: settings::Settings + EnumMetaData + SettingCompletion + 'static,
@@ -346,7 +365,7 @@ impl<Spec, Comm, Sett> Application<Spec, Comm, Sett>
         status_bar.hide();
         completion_view.hide();
 
-        let foreground_color = Application::<Spec, Comm, Sett>::get_foreground_color(&window);
+        let foreground_color = Application::<Comm, Sett, Spec>::get_foreground_color(&window);
 
         let mode_label = StatusBarItem::new().left();
         let message = StatusBarItem::new().left();
@@ -931,7 +950,7 @@ impl<Spec, Comm, Sett> Application<Spec, Comm, Sett>
     pub fn use_dark_theme(&self) {
         let settings = Settings::get_default().unwrap();
         settings.set_data("gtk-application-prefer-dark-theme", 1);
-        *self.foreground_color.borrow_mut() = Application::<Spec, Comm, Sett>::get_foreground_color(&self.window);
+        *self.foreground_color.borrow_mut() = Application::<Comm, Sett, Spec>::get_foreground_color(&self.window);
     }
 
     /// Get the application window.
