@@ -26,6 +26,7 @@ use std::rc::Rc;
 
 use glib::{Object, ToValue};
 use gtk::{
+    Align,
     CellRendererText,
     ContainerExt,
     IsA,
@@ -67,10 +68,10 @@ impl CompletionView {
         tree_view.get_selection().unselect_all();
         tree_view.set_enable_search(false);
         tree_view.set_headers_visible(false);
-        tree_view.set_hexpand(true);
         tree_view.set_can_focus(false);
 
         let scrolled_window = ScrolledWindow::new(None, None);
+        scrolled_window.set_valign(Align::End);
         scrolled_window.add(&tree_view);
         scrolled_window.set_max_content_height(COMPLETION_VIEW_MAX_HEIGHT);
         scrolled_window.set_propagate_natural_height(true);

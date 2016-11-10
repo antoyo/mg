@@ -25,6 +25,7 @@
  * TODO: smart home (with Ctrl-A) in the command text entry.
  * TODO: support non-"always" in special commands.
  * TODO: different event for activate event of special commands.
+ * TODO: use the gtk::Statusbar widget?
  * TODO: Show the current shortcut in the status bar.
  * TODO: Try to return an Application directly instead of an Rc<Application>.
  * TODO: support shortcuts with number like "50G".
@@ -78,6 +79,7 @@ use gtk::{
     Grid,
     Inhibit,
     IsA,
+    Overlay,
     Settings,
     Widget,
     WidgetExt,
@@ -326,7 +328,7 @@ pub struct Application<Comm, Sett: settings::Settings = NoSettings, Spec = NoSpe
     shortcut_pressed: Cell<bool>,
     special_command_callback: RefCell<Option<Box<Fn(Spec)>>>,
     status_bar: Rc<StatusBar>,
-    vbox: Grid,
+    view: Overlay,
     variables: RefCell<HashMap<String, Box<Fn() -> String>>>,
     window: Window,
 }
@@ -350,8 +352,11 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
         let grid = Grid::new();
         window.add(&grid);
 
+        let view = Overlay::new();
+        grid.attach(&view, 0, 0, 1, 1);
+
         let completion_view = CompletionView::new();
-        grid.attach(&**completion_view, 0, 1, 1, 1);
+        view.add_overlay(&**completion_view);
 
         let mut completers: HashMap<String, Box<Completer>> = HashMap::new();
         completers.insert(DEFAULT_COMPLETER_IDENT.to_string(), Box::new(CommandCompleter::<Comm>::new()));
@@ -398,7 +403,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
             shortcut_pressed: Cell::new(false),
             special_command_callback: RefCell::new(None),
             status_bar: status_bar,
-            vbox: grid,
+            view: view,
             variables: RefCell::new(HashMap::new()),
             window: window,
         });
@@ -920,7 +925,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
         view.set_hexpand(true);
         view.set_vexpand(true);
         view.show_all();
-        self.vbox.attach(view, 0, 0, 1, 1);
+        self.view.add(view);
     }
 
     /// Set the window title.
