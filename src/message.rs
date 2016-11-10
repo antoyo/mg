@@ -36,6 +36,12 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
           Comm: EnumFromStr + EnumMetaData + 'static,
           Sett: settings::Settings + EnumMetaData + SettingCompletion + 'static,
 {
+    /// Show an alert message to the user.
+    pub fn alert(&self, message: &str) {
+        self.message.set_text(message);
+        self.status_bar.color_blue();
+    }
+
     /// Show an error to the user.
     pub fn error(&self, error: &str) {
         error!("{}", error);
@@ -62,7 +68,6 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
     /// Show a message to the user.
     pub fn message(&self, message: &str) {
         self.message.set_text(message);
-        self.status_bar.color_blue();
     }
 
     /// Show a warning message to the user for 5 seconds.
