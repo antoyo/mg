@@ -30,11 +30,9 @@ extern crate mg_settings;
 #[macro_use]
 extern crate mg_settings_macros;
 
-use std::rc::Rc;
-
 use gtk::{ContainerExt, Entry, Label, WidgetExt};
 use gtk::Orientation::Vertical;
-use mg::{Application, SimpleApplicationBuilder};
+use mg::{Application, NoSettings, NoSpecialCommands, SimpleApplicationBuilder};
 
 use AppCommand::*;
 
@@ -46,48 +44,63 @@ enum AppCommand {
     Quit,
 }
 
+struct App {
+    app: Box<mg::Application<AppCommand, NoSettings, NoSpecialCommands>>,
+    label: Label,
+}
+
+impl App {
+    fn new() -> Box<Self> {
+        let mut app: Box<Application<AppCommand>> = SimpleApplicationBuilder::new()
+            .modes(hash! {
+                "i" => "insert",
+            })
+            .build();
+        app.use_dark_theme();
+        let item = app.add_statusbar_item();
+        item.set_text("Item");
+        let item2 = app.add_statusbar_item();
+        item2.set_text("Test");
+        item.set_text("Rightmost");
+        if let Err(error) = app.parse_config("examples/main.conf") {
+            app.error(&error.to_string());
+        }
+        app.add_variable("url", || "http://duckduckgo.com/lite".to_string());
+        app.set_window_title("First Mg Program");
+
+        let vbox = gtk::Box::new(Vertical, 0);
+        let label = Label::new(Some("Mg App"));
+        vbox.add(&label);
+        let entry = Entry::new();
+        vbox.add(&entry);
+        app.set_view(&vbox);
+
+        let mut app = Box::new(App {
+            app: app,
+            label: label,
+        });
+
+        connect!(app.app, connect_command(command), app, Self::handle_command(command));
+
+        entry.grab_focus();
+
+        app
+    }
+
+    fn handle_command(&self, command: AppCommand) {
+        match command {
+            Insert => self.app.set_mode("insert"),
+            Normal => self.app.set_mode("normal"),
+            Open(url) => self.label.set_text(&format!("Opening URL {}", url)),
+            Quit => gtk::main_quit(),
+        }
+    }
+}
+
 fn main() {
     gtk::init().unwrap();
 
-    let app: Rc<Application<AppCommand>> = SimpleApplicationBuilder::new()
-        .modes(hash! {
-            "i" => "insert",
-        })
-        .build();
-    app.use_dark_theme();
-    let item = app.add_statusbar_item();
-    item.set_text("Item");
-    let item2 = app.add_statusbar_item();
-    item2.set_text("Test");
-    item.set_text("Rightmost");
-    if let Err(error) = app.parse_config("main.conf") {
-        app.error(&error.to_string());
-    }
-    app.add_variable("url", || "http://duckduckgo.com/lite".to_string());
-    app.set_window_title("First Mg Program");
-
-    let vbox = gtk::Box::new(Vertical, 0);
-    let label = Label::new(Some("Mg App"));
-    vbox.add(&label);
-    let label = Rc::new(label);
-    let entry = Entry::new();
-    vbox.add(&entry);
-    app.set_view(&vbox);
-
-    {
-        let mg_app = app.clone();
-        let label = label.clone();
-        app.connect_command(move |command| {
-            match command {
-                Insert => mg_app.set_mode("insert"),
-                Normal => mg_app.set_mode("normal"),
-                Open(url) => label.set_text(&format!("Opening URL {}", url)),
-                Quit => gtk::main_quit(),
-            }
-        });
-    }
-
-    entry.grab_focus();
+    let _app = App::new();
 
     gtk::main();
 }

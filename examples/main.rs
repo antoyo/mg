@@ -108,7 +108,6 @@ impl App {
 
         entry.grab_focus();
 
-
         let mut app = Box::new(App {
             app: app,
             label: label,
