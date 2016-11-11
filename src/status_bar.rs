@@ -34,6 +34,7 @@ use gtk::{
     Entry,
     EntryExt,
     Label,
+    TreeSelection,
     WidgetExt,
     STATE_FLAG_NORMAL,
     STYLE_PROVIDER_PRIORITY_APPLICATION,
@@ -57,8 +58,7 @@ pub type HBox = ::gtk::Box;
 /// The window status bar.
 pub struct StatusBar {
     completion: Completion,
-    completion_original_input: RefCell<String>,
-    completion_view: Rc<CompletionView>,
+    completion_original_input: String,
     current_mode: Rc<RefCell<String>>,
     entry: Entry,
     entry_shown: Cell<bool>,
@@ -69,7 +69,7 @@ pub struct StatusBar {
 
 impl StatusBar {
     /// Create a new status bar.
-    pub fn new(completion_view: Rc<CompletionView>, completers: HashMap<String, Box<Completer>>, current_mode: Rc<RefCell<String>>) -> Rc<Self> {
+    pub fn new(completion_view: Box<CompletionView>, completers: HashMap<String, Box<Completer>>, current_mode: Rc<RefCell<String>>) -> Box<Self> {
         let hbox = HBox::new(Horizontal, 0);
         hbox.set_size_request(1, 20);
 
@@ -77,15 +77,14 @@ impl StatusBar {
         hbox.add(&identifier_label);
 
         let entry = Entry::new();
-        let completion = Completion::new(completers, completion_view.clone());
+        let completion = Completion::new(completers, completion_view);
 
         StatusBar::adjust_entry(&entry);
         hbox.add(&entry);
 
-        let status_bar = Rc::new(StatusBar {
+        let mut status_bar = Box::new(StatusBar {
             completion: completion,
-            completion_original_input: RefCell::new(String::new()),
-            completion_view: completion_view,
+            completion_original_input: String::new(),
             current_mode: current_mode,
             entry: entry,
             entry_shown: Cell::new(false),
@@ -94,29 +93,9 @@ impl StatusBar {
             hbox: hbox,
         });
 
-        {
-            let status_bar2 = status_bar.clone();
-            status_bar.completion_view.connect_selection_changed(move |selection| {
-                if let Some(completion) = status_bar2.completion.complete_result(selection) {
-                    status_bar2.set_input(&completion);
-                }
-            });
-        }
-
-        {
-            let status_bar2 = status_bar.clone();
-            status_bar.completion_view.connect_unselect(move || {
-                let text = (*status_bar2.completion_original_input.borrow()).clone();
-                status_bar2.set_input(&text);
-            });
-        }
-
-        {
-            let status_bar2 = status_bar.clone();
-            status_bar.entry.connect_changed(move |_| {
-                status_bar2.update_completions();
-            });
-        }
+        connect!(status_bar.completion.view, connect_selection_changed(selection), status_bar, Self::selection_changed(selection));
+        connect!(status_bar.completion.view, connect_unselect, status_bar, Self::handle_unselect);
+        connect!(status_bar.entry, connect_changed(_), status_bar, Self::update_completions);
 
         status_bar
     }
@@ -164,12 +143,12 @@ impl StatusBar {
 
     /// Select the next completion entry if it is visible.
     pub fn complete_next(&self) {
-        self.completion_view.select_next();
+        self.completion.view.select_next();
     }
 
     /// Select the previous completion entry if it is visible.
     pub fn complete_previous(&self) {
-        self.completion_view.select_previous();
+        self.completion.view.select_previous();
     }
 
     /// Connect the active entry event.
@@ -186,9 +165,9 @@ impl StatusBar {
     fn filter(&self) {
         // Disable the scrollbars so that commands without completion does not
         // show the completion view.
-        self.completion_view.disable_scrollbars();
+        self.completion.view.disable_scrollbars();
         if let (Some(text), Some(completer)) = (self.entry.get_text(), self.completion.current_completer()) {
-            self.completion_view.filter(&text, completer);
+            self.completion.view.filter(&text, completer);
         }
     }
 
@@ -197,9 +176,19 @@ impl StatusBar {
         self.entry.get_text()
     }
 
+    /// Handle the unselect event.
+    fn handle_unselect(&self) {
+        self.set_input(&self.completion_original_input);
+    }
+
     /// Hide all the widgets.
     pub fn hide(&self) {
         self.hide_entry();
+    }
+
+    /// Hide the completion view.
+    pub fn hide_completion(&self) {
+        self.completion.view.hide();
     }
 
     /// Hide the entry.
@@ -211,7 +200,7 @@ impl StatusBar {
     }
 
     /// Select the completer based on the currently typed command.
-    pub fn select_completer(&self) {
+    pub fn select_completer(&mut self) {
         if let Some(text) = self.entry.get_text() {
             let text = text.trim_left();
             if let Some(space_index) = text.find(' ') {
@@ -224,10 +213,16 @@ impl StatusBar {
         }
     }
 
+    /// Handle the selection changed event.
+    fn selection_changed(&self, selection: &TreeSelection) {
+        if let Some(completion) = self.completion.complete_result(selection) {
+            self.set_input(&completion);
+        }
+    }
+
     /// Set the current command completer.
-    pub fn set_completer(&self, completer: &str) {
-        let completer = self.completion.adjust_model(completer);
-        self.completion_view.adjust_columns(completer);
+    pub fn set_completer(&mut self, completer: &str) {
+        self.completion.adjust_model(completer);
         self.filter();
     }
 
@@ -245,8 +240,15 @@ impl StatusBar {
     }
 
     /// Set the original input.
-    pub fn set_original_input(&self, input: &str) {
-        *self.completion_original_input.borrow_mut() = input.to_string();
+    pub fn set_original_input(&mut self, input: &str) {
+        self.completion_original_input = input.to_string();
+    }
+
+    /// Show the completion view.
+    pub fn show_completion(&self) {
+        self.completion.view.unselect();
+        self.completion.view.scroll_to_first();
+        self.completion.view.show();
     }
 
     /// Show the entry.
@@ -264,7 +266,7 @@ impl StatusBar {
     }
 
     /// Update the completions.
-    pub fn update_completions(&self) {
+    pub fn update_completions(&mut self) {
         let in_command_mode = (*self.current_mode.borrow()) == COMMAND_MODE;
         if !self.inserting_completion.get() {
             if in_command_mode {
@@ -281,10 +283,10 @@ impl StatusBar {
             if current_completer != NO_COMPLETER_IDENT {
                 if let Some(text) = self.entry.get_text() {
                     self.filter();
-                    *self.completion_original_input.borrow_mut() = text;
+                    self.completion_original_input = text;
                 }
             }
-            self.completion_view.unselect();
+            self.completion.view.unselect();
         }
     }
 

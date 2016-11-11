@@ -27,7 +27,6 @@
  * TODO: different event for activate event of special commands.
  * TODO: use the gtk::Statusbar widget?
  * TODO: Show the current shortcut in the status bar.
- * TODO: Try to return an Application directly instead of an Rc<Application>.
  * TODO: support shortcuts with number like "50G".
  * TODO: Associate a color with modes.
  */
@@ -49,6 +48,8 @@ extern crate log;
 extern crate mg_settings;
 extern crate pango_sys;
 
+#[macro_use]
+mod signal;
 #[macro_use]
 mod widget;
 pub mod completion;
@@ -268,7 +269,7 @@ impl<Sett: settings::Settings + 'static> ApplicationBuilder<Sett> {
     }
 
     /// Create a new application with configuration and include path.
-    pub fn build<Spec, Comm>(self) -> Rc<Application<Comm, Sett, Spec>>
+    pub fn build<Spec, Comm>(self) -> Box<Application<Comm, Sett, Spec>>
         where Spec: SpecialCommand + 'static,
               Comm: EnumFromStr + EnumMetaData + 'static,
               Sett: EnumMetaData + SettingCompletion,
@@ -306,30 +307,29 @@ impl<Sett: settings::Settings + 'static> ApplicationBuilder<Sett> {
 /// Create a new MG application window.
 /// This window contains a status bar where the user can type a command and a central widget.
 pub struct Application<Comm, Sett: settings::Settings = NoSettings, Spec = NoSpecialCommands> {
-    answer: RefCell<Option<String>>,
-    command_callback: RefCell<Option<Box<Fn(Comm)>>>,
-    completion_view: Rc<CompletionView>,
-    choices: RefCell<Vec<char>>,
-    close_callback: RefCell<Option<Box<Fn()>>>,
+    answer: Option<String>,
+    command_callback: Option<Box<Fn(Comm)>>,
+    choices: Vec<char>,
+    close_callback: Option<Box<Fn()>>,
     current_command_mode: Cell<char>,
     current_mode: Rc<RefCell<String>>,
-    current_shortcut: RefCell<Vec<Key>>,
-    foreground_color: RefCell<RGBA>,
-    input_callback: RefCell<Option<Box<Fn(Option<String>)>>>,
-    mappings: RefCell<HashMap<String, HashMap<Vec<Key>, String>>>,
+    current_shortcut: Vec<Key>,
+    foreground_color: RGBA,
+    input_callback: Option<Box<Fn(Option<String>)>>,
+    mappings: HashMap<String, HashMap<Vec<Key>, String>>,
     modes: Modes,
     message: StatusBarItem,
-    mode_changed_callback: RefCell<Option<Box<Fn(&str)>>>,
+    mode_changed_callback: Option<Box<Fn(&str)>>,
     mode_label: StatusBarItem,
-    settings: RefCell<Option<Sett>>,
-    settings_parser: RefCell<Parser<Comm>>,
-    setting_change_callback: RefCell<Option<Box<Fn(Sett::Variant)>>>,
-    shortcuts: RefCell<HashMap<Key, String>>,
+    settings: Option<Sett>,
+    settings_parser: Parser<Comm>,
+    setting_change_callback: Option<Box<Fn(Sett::Variant)>>,
+    shortcuts: HashMap<Key, String>,
     shortcut_pressed: Cell<bool>,
-    special_command_callback: RefCell<Option<Box<Fn(Spec)>>>,
-    status_bar: Rc<StatusBar>,
+    special_command_callback: Option<Box<Fn(Spec)>>,
+    status_bar: Box<StatusBar>,
     view: Overlay,
-    variables: RefCell<HashMap<String, Box<Fn() -> String>>>,
+    variables: HashMap<String, Box<Fn() -> String>>,
     window: Window,
 }
 
@@ -338,7 +338,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
           Comm: EnumFromStr + EnumMetaData + 'static,
           Sett: settings::Settings + EnumMetaData + SettingCompletion + 'static,
 {
-    fn new(builder: ApplicationBuilder<Sett>) -> Rc<Self> {
+    fn new(builder: ApplicationBuilder<Sett>) -> Box<Self> {
         let modes = builder.modes.unwrap_or_default();
         let config = Config {
             application_commands: vec![COMPLETE_NEXT_COMMAND.to_string(), COMPLETE_PREVIOUS_COMMAND.to_string()],
@@ -364,11 +364,11 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
         for (identifier, completer) in builder.completers {
             completers.insert(identifier, completer);
         }
-        let status_bar = StatusBar::new(completion_view.clone(), completers, current_mode.clone());
+        let status_bar = StatusBar::new(completion_view, completers, current_mode.clone());
         grid.attach(&*status_bar, 0, 2, 1, 1);
         window.show_all();
         status_bar.hide();
-        completion_view.hide();
+        status_bar.hide_completion();
 
         let foreground_color = Application::<Comm, Sett, Spec>::get_foreground_color(&window);
 
@@ -380,79 +380,40 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
             parser.set_include_path(include_path);
         }
 
-        let app = Rc::new(Application {
-            answer: RefCell::new(None),
-            command_callback: RefCell::new(None),
-            completion_view: completion_view,
-            choices: RefCell::new(vec![]),
-            close_callback: RefCell::new(None),
+        let mut app = Box::new(Application {
+            answer: None,
+            command_callback: None,
+            choices: vec![],
+            close_callback: None,
             current_command_mode: Cell::new(':'),
             current_mode: current_mode,
-            current_shortcut: RefCell::new(vec![]),
-            foreground_color: RefCell::new(foreground_color),
-            input_callback: RefCell::new(None),
-            mappings: RefCell::new(HashMap::new()),
+            current_shortcut: vec![],
+            foreground_color: foreground_color,
+            input_callback: None,
+            mappings: HashMap::new(),
             modes: modes,
             message: message,
-            mode_changed_callback: RefCell::new(None),
+            mode_changed_callback: None,
             mode_label: mode_label,
-            settings: RefCell::new(builder.settings),
-            settings_parser: RefCell::new(parser),
-            setting_change_callback: RefCell::new(None),
-            shortcuts: RefCell::new(HashMap::new()),
+            settings: builder.settings,
+            settings_parser: parser,
+            setting_change_callback: None,
+            shortcuts: HashMap::new(),
             shortcut_pressed: Cell::new(false),
-            special_command_callback: RefCell::new(None),
+            special_command_callback: None,
             status_bar: status_bar,
             view: view,
-            variables: RefCell::new(HashMap::new()),
+            variables: HashMap::new(),
             window: window,
         });
 
         app.status_bar.add_item(&app.mode_label);
         app.status_bar.add_item(&app.message);
 
-        {
-            let instance = app.clone();
-            app.window.connect_delete_event(move |_, _| {
-                if let Some(ref callback) = *instance.close_callback.borrow() {
-                    callback();
-                }
-                else {
-                    gtk::main_quit();
-                }
-                Inhibit(true)
-            });
-        }
-
-        {
-            let instance = app.clone();
-            app.status_bar.connect_activate(move |input| {
-                let mode = instance.get_mode();
-                if mode == INPUT_MODE || mode == BLOCKING_INPUT_MODE {
-                    if let Some(ref callback) = *instance.input_callback.borrow() {
-                        *instance.answer.borrow_mut() = input.clone();
-                        callback(input);
-                        instance.reset();
-                    }
-                    *instance.input_callback.borrow_mut() = None;
-                    (*instance.choices.borrow_mut()).clear();
-                }
-                else {
-                    instance.handle_command(input);
-                }
-                instance.return_to_normal_mode();
-            });
-        }
-
-        {
-            let instance = app.clone();
-            app.window.connect_key_press_event(move |_, key| instance.key_press(key));
-        }
-
-        {
-            let instance = app.clone();
-            app.window.connect_key_release_event(move |_, key| instance.key_release(key));
-        }
+        connect!(app.window, connect_delete_event(_, _), app, Self::quit);
+        connect!(app.status_bar, connect_activate(input), app, Self::command_activate(input));
+        connect!(app.window, connect_key_press_event(_, key), app, Self::key_press(key));
+        connect!(app.window, connect_key_release_event(_, key), app, Self::key_release(key));
 
         app
     }
@@ -480,16 +441,14 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     }
 
     /// Add the key to the current shortcut.
-    fn add_to_shortcut(&self, key: Key) {
-        let mut shortcut = self.current_shortcut.borrow_mut();
-        shortcut.push(key);
+    fn add_to_shortcut(&mut self, key: Key) {
+        self.current_shortcut.push(key);
     }
 
     /// Add a variable that can be used in mappings.
     /// The placeholder will be replaced by the value return by the function.
-    pub fn add_variable<F: Fn() -> String + 'static>(&self, variable_name: &str, function: F) {
-        let mut variables = self.variables.borrow_mut();
-        variables.insert(variable_name.to_string(), Box::new(function));
+    pub fn add_variable<F: Fn() -> String + 'static>(&mut self, variable_name: &str, function: F) {
+        self.variables.insert(variable_name.to_string(), Box::new(function));
     }
 
     /// Handle an application command.
@@ -502,12 +461,16 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     }
 
     /// Call the callback with the command or show an error if the command cannot be parsed.
-    fn call_command(&self, callback: &Box<Fn(Comm)>, command: Result<Command<Comm>>) {
+    fn call_command(&mut self, command: Result<Command<Comm>>) {
         match command {
             Ok(command) => {
                 match command {
                     App(command) => self.app_command(&command),
-                    Custom(command) => callback(command),
+                    Custom(command) => {
+                        if let Some(ref callback) = self.command_callback {
+                            callback(command);
+                        }
+                    },
                     Set(name, value) => {
                         match Sett::to_variant(&name, value) {
                             Ok(setting) => self.set_setting(setting),
@@ -537,20 +500,41 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
 
     /// Call the setting changed callback.
     fn call_setting_callback(&self, setting: Sett::Variant) {
-        if let Some(ref callback) = *self.setting_change_callback.borrow() {
+        if let Some(ref callback) = self.setting_change_callback {
             callback(setting);
         }
     }
 
     /// Clear the current shortcut buffer.
-    fn clear_shortcut(&self) {
-        let mut shortcut = self.current_shortcut.borrow_mut();
-        shortcut.clear();
+    fn clear_shortcut(&mut self) {
+        self.current_shortcut.clear();
+    }
+
+    /// Handle the command entry activate event.
+    fn command_activate(&mut self, input: Option<String>) {
+        let mode = self.get_mode();
+        if mode == INPUT_MODE || mode == BLOCKING_INPUT_MODE {
+            let mut should_reset = false;
+            if let Some(ref callback) = self.input_callback {
+                self.answer = input.clone();
+                callback(input);
+                should_reset = true;
+            }
+            if should_reset {
+                self.reset();
+            }
+            self.input_callback = None;
+            self.choices.clear();
+        }
+        else {
+            self.handle_command(input);
+        }
+        self.return_to_normal_mode();
     }
 
     /// Handle the key press event for the command mode.
     #[allow(non_upper_case_globals)]
-    fn command_key_press(&self, key: &EventKey) -> Inhibit {
+    fn command_key_press(&mut self, key: &EventKey) -> Inhibit {
         match key.get_keyval() {
             Escape => {
                 self.return_to_normal_mode();
@@ -574,13 +558,13 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     }
 
     /// Connect the close event to the specified callback.
-    pub fn connect_close<F: Fn() + 'static>(&self, callback: F) {
-        *self.close_callback.borrow_mut() = Some(Box::new(callback));
+    pub fn connect_close<F: Fn() + 'static>(&mut self, callback: F) {
+        self.close_callback = Some(Box::new(callback));
     }
 
     /// Add a callback to the command event.
-    pub fn connect_command<F: Fn(Comm) + 'static>(&self, callback: F) {
-        *self.command_callback.borrow_mut() = Some(Box::new(callback));
+    pub fn connect_command<F: Fn(Comm) + 'static>(&mut self, callback: F) {
+        self.command_callback = Some(Box::new(callback));
     }
 
     /// Add a callback to the window key press event.
@@ -589,18 +573,18 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     }
 
     /// Add a callback to change mode event.
-    pub fn connect_mode_changed<F: Fn(&str) + 'static>(&self, callback: F) {
-        *self.mode_changed_callback.borrow_mut() = Some(Box::new(callback));
+    pub fn connect_mode_changed<F: Fn(&str) + 'static>(&mut self, callback: F) {
+        self.mode_changed_callback = Some(Box::new(callback));
     }
 
     /// Add a callback to setting changed event.
-    pub fn connect_setting_changed<F: Fn(Sett::Variant) + 'static>(&self, callback: F) {
-        *self.setting_change_callback.borrow_mut() = Some(Box::new(callback));
+    pub fn connect_setting_changed<F: Fn(Sett::Variant) + 'static>(&mut self, callback: F) {
+        self.setting_change_callback = Some(Box::new(callback));
     }
 
     /// Add a callback to the special command event.
-    pub fn connect_special_command<F: Fn(Spec) + 'static>(&self, callback: F) {
-        *self.special_command_callback.borrow_mut() = Some(Box::new(callback));
+    pub fn connect_special_command<F: Fn(Spec) + 'static>(&mut self, callback: F) {
+        self.special_command_callback = Some(Box::new(callback));
     }
 
     /// Get the color of the text.
@@ -615,14 +599,12 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     }
 
     /// Handle the command activate event.
-    fn handle_command(&self, command: Option<String>) {
+    fn handle_command(&mut self, command: Option<String>) {
         if let Some(command) = command {
             let identifier = self.current_command_mode.get();
             if identifier == ':' {
-                if let Some(ref callback) = *self.command_callback.borrow() {
-                    let result = self.settings_parser.borrow_mut().parse_line(&command);
-                    self.call_command(callback, result);
-                }
+                let result = self.settings_parser.parse_line(&command);
+                self.call_command(result);
             }
             else {
                 self.handle_special_command(Final, &command);
@@ -631,13 +613,13 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     }
 
     /// Handle a shortcut in input mode.
-    fn handle_input_shortcut(&self, key: &EventKey) -> bool {
+    fn handle_input_shortcut(&mut self, key: &EventKey) -> bool {
         let keyval = key.get_keyval();
         let control_pressed = key.get_state() & CONTROL_MASK == CONTROL_MASK;
         if let Some(key) = gdk_key_to_key(keyval, control_pressed) {
-            let shortcuts = &*self.shortcuts.borrow();
-            if shortcuts.contains_key(&key) {
-                self.set_dialog_answer(&shortcuts[&key]);
+            if self.shortcuts.contains_key(&key) {
+                let answer = &self.shortcuts[&key].clone();
+                self.set_dialog_answer(answer);
                 self.shortcut_pressed.set(true);
                 return true;
             }
@@ -646,7 +628,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     }
 
     /// Handle a possible input of a shortcut.
-    fn handle_shortcut(&self, key: &EventKey) -> Inhibit {
+    fn handle_shortcut(&mut self, key: &EventKey) -> Inhibit {
         let keyval = key.get_keyval();
         let mode = self.get_mode();
         let control_pressed = key.get_state() & CONTROL_MASK == CONTROL_MASK;
@@ -654,15 +636,13 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
             if let Some(key) = gdk_key_to_key(keyval, control_pressed) {
                 self.add_to_shortcut(key);
                 let action = {
-                    let shortcut = self.current_shortcut.borrow();
-                    let mappings = self.mappings.borrow();
                     let mut current_mode = mode.clone();
                     // The input modes have the same mappings as the command mode.
                     if current_mode == INPUT_MODE || current_mode == BLOCKING_INPUT_MODE {
                         current_mode = COMMAND_MODE.to_string();
                     }
-                    mappings.get(&current_mode)
-                        .and_then(|mappings| mappings.get(&*shortcut).cloned())
+                    self.mappings.get(&current_mode)
+                        .and_then(|mappings| mappings.get(&self.current_shortcut).cloned())
                 };
                 if let Some(action) = action {
                     if !self.status_bar.entry_shown() {
@@ -673,7 +653,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
                         Complete(command) => self.handle_command(Some(command)),
                         Incomplete(command) => {
                             self.input_command(&command);
-                            self.show_completion_view();
+                            self.status_bar.show_completion();
                             self.status_bar.update_completions();
                             return Inhibit(true);
                         },
@@ -700,7 +680,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
 
     /// Handle a special command activate or key press event.
     fn handle_special_command(&self, activation_type: ActivationType, command: &str) {
-        if let Some(ref callback) = *self.special_command_callback.borrow() {
+        if let Some(ref callback) = self.special_command_callback {
             let identifier = self.current_command_mode.get();
             if let Ok(special_command) = Spec::identifier_to_command(identifier, command) {
                 callback(special_command);
@@ -715,9 +695,8 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     fn input_command(&self, command: &str) {
         self.set_mode(COMMAND_MODE);
         self.status_bar.show_entry();
-        let variables = self.variables.borrow();
         let mut command = command.to_string();
-        for (variable, function) in variables.iter() {
+        for (variable, function) in &self.variables {
             command = command.replace(&format!("<{}>", variable), &function());
         }
         let text: Cow<str> =
@@ -732,16 +711,16 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
 
     /// Handle the key press event for the input mode.
     #[allow(non_upper_case_globals)]
-    fn input_key_press(&self, key: &EventKey) -> Inhibit {
+    fn input_key_press(&mut self, key: &EventKey) -> Inhibit {
         match key.get_keyval() {
             Escape => {
                 self.return_to_normal_mode();
                 self.reset();
                 self.clear_shortcut();
-                if let Some(ref callback) = *self.input_callback.borrow() {
+                if let Some(ref callback) = self.input_callback {
                     callback(None);
                 }
-                *self.input_callback.borrow_mut() = None;
+                self.input_callback = None;
                 Inhibit(false)
             },
             keyval => {
@@ -749,7 +728,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
                     return Inhibit(true);
                 }
                 else if let Some(character) = char::from_u32(keyval) {
-                    if (*self.choices.borrow()).contains(&character) {
+                    if self.choices.contains(&character) {
                         self.set_dialog_answer(&character.to_string());
                         return Inhibit(true);
                     }
@@ -760,7 +739,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     }
 
     /// Handle the key press event.
-    fn key_press(&self, key: &EventKey) -> Inhibit {
+    fn key_press(&mut self, key: &EventKey) -> Inhibit {
         match self.get_mode().as_ref() {
             NORMAL_MODE => self.normal_key_press(key),
             COMMAND_MODE => self.command_key_press(key),
@@ -779,7 +758,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
 
     /// Handle the key press event for the normal mode.
     #[allow(non_upper_case_globals)]
-    fn normal_key_press(&self, key: &EventKey) -> Inhibit {
+    fn normal_key_press(&mut self, key: &EventKey) -> Inhibit {
         match key.get_keyval() {
             colon => {
                 self.status_bar.set_completer(DEFAULT_COMPLETER_IDENT);
@@ -787,7 +766,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
                 self.set_mode(COMMAND_MODE);
                 self.reset();
                 self.clear_shortcut();
-                self.show_completion_view();
+                self.status_bar.show_completion();
                 self.status_bar.show_entry();
                 Inhibit(true)
             },
@@ -816,11 +795,9 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
 
     /// Check if there are no possible shortcuts.
     fn no_possible_shortcut(&self) -> bool {
-        let current_shortcut = self.current_shortcut.borrow();
-        let mappings = self.mappings.borrow();
-        if let Some(mappings) = mappings.get(&*self.current_mode.borrow()) {
+        if let Some(mappings) = self.mappings.get(&*self.current_mode.borrow()) {
             for key in mappings.keys() {
-                if key.starts_with(&*current_shortcut) {
+                if key.starts_with(&self.current_shortcut) {
                     return false;
                 }
             }
@@ -829,21 +806,20 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     }
 
     /// Parse a configuration file.
-    pub fn parse_config<P: AsRef<Path>>(&self, filename: P) -> Result<()> {
+    pub fn parse_config<P: AsRef<Path>>(&mut self, filename: P) -> Result<()> {
         let file = File::open(filename)?;
         let buf_reader = BufReader::new(file);
-        let commands = self.settings_parser.borrow_mut().parse(buf_reader)?;
+        let commands = self.settings_parser.parse(buf_reader)?;
         for command in commands {
             match command {
                 App(command) => self.app_command(&command),
                 Custom(command) => {
-                    if let Some(ref callback) = *self.command_callback.borrow() {
+                    if let Some(ref callback) = self.command_callback {
                         callback(command);
                     }
                 },
                 Map { action, keys, mode } => {
-                    let mut mappings = self.mappings.borrow_mut();
-                    let mappings = mappings.entry(self.modes[&mode].clone()).or_insert_with(HashMap::new);
+                    let mappings = self.mappings.entry(self.modes[&mode].clone()).or_insert_with(HashMap::new);
                     mappings.insert(keys, action);
                 },
                 Set(name, value) => self.set_setting(Sett::to_variant(&name, value)?),
@@ -853,8 +829,20 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
         Ok(())
     }
 
+    /// Call the callback added by the user.
+    /// Otherwise, exit the main loop.
+    fn quit(&self) -> Inhibit {
+        if let Some(ref callback) = self.close_callback {
+            callback();
+        }
+        else {
+            gtk::main_quit();
+        }
+        Inhibit(true)
+    }
+
     /// Handle the escape event.
-    fn reset(&self) {
+    fn reset(&mut self) {
         self.reset_colors();
         self.status_bar.hide();
         self.message.set_text("");
@@ -865,29 +853,28 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     /// Reset the background and foreground colors of the status bar.
     fn reset_colors(&self) {
         self.status_bar.override_background_color(STATE_FLAG_NORMAL, TRANSPARENT);
-        self.status_bar.override_color(STATE_FLAG_NORMAL, &self.foreground_color.borrow());
+        self.status_bar.override_color(STATE_FLAG_NORMAL, &self.foreground_color);
     }
 
     /// Go back to the normal mode from command or input mode.
     fn return_to_normal_mode(&self) {
         self.status_bar.hide_entry();
-        self.completion_view.hide();
+        self.status_bar.hide_completion();
         self.set_mode(NORMAL_MODE);
         self.set_current_identifier(':');
     }
 
     /// Get the settings.
     pub fn settings(&self) -> &Sett {
-        let settings = unsafe { &*self.settings.as_ptr() };
-        settings.as_ref().unwrap()
+        self.settings.as_ref().unwrap()
     }
 
     /// Set a setting value.
-    pub fn set_setting(&self, setting: Sett::Variant) {
-        if let Some(ref mut settings) = *self.settings.borrow_mut() {
+    pub fn set_setting(&mut self, setting: Sett::Variant) {
+        if let Some(ref mut settings) = self.settings {
             settings.set_value(setting.clone());
-            self.call_setting_callback(setting);
         }
+        self.call_setting_callback(setting);
     }
 
     /// Set the current (special) command identifier.
@@ -897,25 +884,29 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     }
 
     /// Set the answer to return to the caller of the dialog.
-    fn set_dialog_answer(&self, answer: &str) {
+    fn set_dialog_answer(&mut self, answer: &str) {
+        let mut should_reset = false;
         if self.get_mode() == BLOCKING_INPUT_MODE {
-            *self.answer.borrow_mut() = Some(answer.to_string());
+            self.answer = Some(answer.to_string());
             gtk::main_quit();
         }
-        else if let Some(ref callback) = *self.input_callback.borrow() {
+        else if let Some(ref callback) = self.input_callback {
             callback(Some(answer.to_string()));
             self.return_to_normal_mode();
-            (*self.choices.borrow_mut()).clear();
+            self.choices.clear();
+            should_reset = true;
+        }
+        if should_reset {
             self.reset();
         }
-        *self.input_callback.borrow_mut() = None;
+        self.input_callback = None;
     }
 
     /// Set the current mode.
     pub fn set_mode(&self, mode: &str) {
         *self.current_mode.borrow_mut() = mode.to_string();
         self.show_mode();
-        if let Some(ref callback) = *self.mode_changed_callback.borrow() {
+        if let Some(ref callback) = self.mode_changed_callback {
             callback(mode);
         }
     }
@@ -933,13 +924,6 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
         self.window.set_title(title);
     }
 
-    /// Show the completion view.
-    fn show_completion_view(&self) {
-        self.completion_view.unselect();
-        self.completion_view.scroll_to_first();
-        self.completion_view.show();
-    }
-
     /// Show the current mode if it is not the normal mode.
     fn show_mode(&self) {
         let mode = self.get_mode();
@@ -952,10 +936,10 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     }
 
     /// Use the dark variant of the theme if available.
-    pub fn use_dark_theme(&self) {
+    pub fn use_dark_theme(&mut self) {
         let settings = Settings::get_default().unwrap();
         settings.set_data("gtk-application-prefer-dark-theme", 1);
-        *self.foreground_color.borrow_mut() = Application::<Comm, Sett, Spec>::get_foreground_color(&self.window);
+        self.foreground_color = Application::<Comm, Sett, Spec>::get_foreground_color(&self.window);
     }
 
     /// Get the application window.

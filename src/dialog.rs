@@ -123,7 +123,7 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
           Sett: settings::Settings + EnumMetaData + SettingCompletion + 'static,
 {
     /// Ask a question to the user and block until the user provides it (or cancel).
-    pub fn blocking_input(&self, message: &str, default_answer: &str) -> Option<String> {
+    pub fn blocking_input(&mut self, message: &str, default_answer: &str) -> Option<String> {
         let builder = DialogBuilder::new()
             .blocking(true)
             .default_answer(default_answer)
@@ -132,7 +132,7 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
     }
 
     /// Ask a multiple-choice question to the user and block until the user provides it (or cancel).
-    pub fn blocking_question(&self, message: &str, choices: &[char]) -> Option<String> {
+    pub fn blocking_question(&mut self, message: &str, choices: &[char]) -> Option<String> {
         let builder = DialogBuilder::new()
             .blocking(true)
             .message(message)
@@ -141,7 +141,7 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
     }
 
     /// Show a blocking yes/no question.
-    pub fn blocking_yes_no_question(&self, message: &str) -> bool {
+    pub fn blocking_yes_no_question(&mut self, message: &str) -> bool {
         let builder = DialogBuilder::new()
             .blocking(true)
             .message(message)
@@ -150,7 +150,7 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
     }
 
     /// Ask a question to the user.
-    pub fn input<F: Fn(Option<&str>) + 'static>(&self, message: &str, default_answer: &str, callback: F) {
+    pub fn input<F: Fn(Option<&str>) + 'static>(&mut self, message: &str, default_answer: &str, callback: F) {
         let builder = DialogBuilder::new()
             .callback(callback)
             .default_answer(default_answer)
@@ -159,7 +159,7 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
     }
 
     /// Ask a multiple-choice question to the user.
-    pub fn question<F: Fn(Option<&str>) + 'static>(&self, message: &str, choices: &[char], callback: F) {
+    pub fn question<F: Fn(Option<&str>) + 'static>(&mut self, message: &str, choices: &[char], callback: F) {
         let builder = DialogBuilder::new()
             .callback(callback)
             .message(message)
@@ -168,23 +168,19 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
     }
 
     /// Show a dialog created with a `DialogBuilder`.
-    pub fn show_dialog(&self, mut dialog_builder: DialogBuilder) -> DialogResult {
+    pub fn show_dialog(&mut self, mut dialog_builder: DialogBuilder) -> DialogResult {
         self.shortcut_pressed.set(false);
         {
-            let shortcuts = &mut *self.shortcuts.borrow_mut();
-            shortcuts.clear();
+            self.shortcuts.clear();
             for (key, value) in dialog_builder.shortcuts {
-                shortcuts.insert(key, value);
+                self.shortcuts.insert(key, value);
             }
         }
 
         let choices = dialog_builder.choices.clone();
         if !choices.is_empty() {
-            {
-                let app_choices = &mut *self.choices.borrow_mut();
-                app_choices.clear();
-                app_choices.append(&mut dialog_builder.choices);
-            }
+            self.choices.clear();
+            self.choices.append(&mut dialog_builder.choices);
             let choices: Vec<_> = choices.iter().map(|c| c.to_string()).collect();
             let choices = choices.join("/");
             self.status_bar.set_identifier(&format!("{} ({}) ", dialog_builder.message, choices));
@@ -199,12 +195,12 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
         if let Some(completer) = dialog_builder.completer {
             self.status_bar.set_completer(&completer);
             self.status_bar.set_original_input(&dialog_builder.default_answer);
-            self.show_completion_view();
+            self.status_bar.show_completion();
         }
 
-        *self.answer.borrow_mut() = None;
+        self.answer = None;
         if dialog_builder.blocking {
-            *self.input_callback.borrow_mut() = Some(Box::new(|_| {
+            self.input_callback = Some(Box::new(|_| {
                 gtk::main_quit();
             }));
         }
@@ -213,7 +209,7 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
         }
         else {
             if let Some(callback) = dialog_builder.callback {
-                *self.input_callback.borrow_mut() = Some(Box::new(move |answer| {
+                self.input_callback = Some(Box::new(move |answer| {
                     callback(answer.as_ref().map(String::as_ref));
                 }));
             }
@@ -225,10 +221,9 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
             gtk::main();
             self.reset();
             self.return_to_normal_mode();
-            (*self.choices.borrow_mut()).clear();
-            let answer = self.answer.borrow().clone();
+            self.choices.clear();
             if self.shortcut_pressed.get() {
-                if let Some(answer) = answer {
+                if let Some(answer) = self.answer.clone() {
                     Shortcut(answer)
                 }
                 else {
@@ -236,7 +231,7 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
                 }
             }
             else {
-                Answer(self.answer.borrow().clone())
+                Answer(self.answer.clone())
             }
         }
         else {
@@ -245,7 +240,7 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
     }
 
     /// Show a dialog created with a `DialogBuilder` which does not contain shortcut.
-    pub fn show_dialog_without_shortcuts(&self, dialog_builder: DialogBuilder) -> Option<String> {
+    pub fn show_dialog_without_shortcuts(&mut self, dialog_builder: DialogBuilder) -> Option<String> {
         match self.show_dialog(dialog_builder) {
             Answer(answer) => answer,
             Shortcut(_) => panic!("cannot return a shortcut in show_dialog_without_shortcuts()"),

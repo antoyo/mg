@@ -24,9 +24,7 @@
 mod completers;
 mod completion_view;
 
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
 
 use gtk::{
     ListStore,
@@ -82,32 +80,33 @@ pub trait Completer {
 
 /// Completion to use with a text Entry.
 pub struct Completion {
-    completer_ident: RefCell<String>,
+    completer_ident: String,
     completers: HashMap<String, Box<Completer>>,
-    view: Rc<CompletionView>,
+    /// The completion widget.
+    pub view: Box<CompletionView>,
 }
 
 impl Completion {
     /// Create a new completion widget.
-    pub fn new(mut completers: HashMap<String, Box<Completer>>, view: Rc<CompletionView>) -> Self {
+    pub fn new(mut completers: HashMap<String, Box<Completer>>, view: Box<CompletionView>) -> Self {
         completers.insert(NO_COMPLETER_IDENT.to_string(), Box::new(NoCompleter::new()));
         Completion {
-            completer_ident: RefCell::new(String::new()),
+            completer_ident: String::new(),
             completers: completers,
             view: view,
         }
     }
 
     /// Adjust the model by using the specified completer.
-    pub fn adjust_model(&self, completer_ident: &str) -> &Completer {
-        if completer_ident != *self.completer_ident.borrow() {
-            *self.completer_ident.borrow_mut() = completer_ident.to_string();
+    pub fn adjust_model(&mut self, completer_ident: &str) {
+        if completer_ident != self.completer_ident {
+            self.completer_ident = completer_ident.to_string();
             if completer_ident == NO_COMPLETER_IDENT || !self.completers.contains_key(completer_ident) {
-                *self.completer_ident.borrow_mut() = NO_COMPLETER_IDENT.to_string();
+                self.completer_ident = NO_COMPLETER_IDENT.to_string();
                 self.view.set_model::<ListStore>(None);
             }
         }
-        &*self.completers[&*self.completer_ident.borrow()]
+        self.view.adjust_columns(&*self.completers[&self.completer_ident]);
     }
 
     /// Complete the result for the selection using the current completer.
@@ -129,14 +128,13 @@ impl Completion {
 
     /// Get the current completer.
     pub fn current_completer(&self) -> Option<&Completer> {
-        let completer_ident = &*self.completer_ident.borrow();
-        self.completers.get(completer_ident)
+        self.completers.get(&self.completer_ident)
             .map(|completer| &**completer)
     }
 
     /// Get the current completer ident.
-    pub fn current_completer_ident(&self) -> String {
-        self.completer_ident.borrow().clone()
+    pub fn current_completer_ident(&self) -> &str {
+        &self.completer_ident
     }
 }
 

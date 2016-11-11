@@ -28,8 +28,6 @@ extern crate mg_settings;
 #[macro_use]
 extern crate mg_settings_macros;
 
-use std::rc::Rc;
-
 use gtk::{ContainerExt, Entry, Label, WidgetExt};
 use gtk::Orientation::Vertical;
 use mg::ApplicationBuilder;
@@ -74,85 +72,98 @@ special_commands!(SpecialCommand {
     Search('/', always),
 });
 
+struct App {
+    app: Box<mg::Application<AppCommand, AppSettings, SpecialCommand>>,
+    label: Label,
+}
+
+impl App {
+    fn new() -> Box<Self> {
+        let mut app = ApplicationBuilder::new()
+            .modes(hash! {
+                "i" => "insert",
+            })
+            .settings(AppSettings::new())
+            .build();
+
+        app.use_dark_theme();
+
+        let item = app.add_statusbar_item();
+        item.set_text("Item");
+        let item2 = app.add_statusbar_item();
+        item2.set_text("Test");
+        item.set_text("Rightmost");
+        if let Err(error) = app.parse_config("examples/main.conf") {
+            app.error(&error.to_string());
+        }
+        app.add_variable("url", || "http://duckduckgo.com/lite".to_string());
+        app.set_window_title("First Mg Program");
+
+        let vbox = gtk::Box::new(Vertical, 0);
+        let label = Label::new(Some("Mg App"));
+        vbox.add(&label);
+        let entry = Entry::new();
+        vbox.add(&entry);
+        app.set_view(&vbox);
+
+        entry.grab_focus();
+
+
+        let mut app = Box::new(App {
+            app: app,
+            label: label,
+        });
+
+        connect!(app.app, connect_setting_changed(setting), app, Self::setting_changed(setting));
+        connect!(app.app, connect_command(command), app, Self::handle_command(command));
+        connect!(app.app, connect_mode_changed(mode), app, Self::mode_changed(mode));
+        connect!(app.app, connect_special_command(command), app, Self::handle_special_command(command));
+
+        app
+    }
+
+    fn handle_command(&self, command: AppCommand) {
+        match command {
+            Follow => (),
+            Insert => self.app.set_mode("insert"),
+            Normal => self.app.set_mode("normal"),
+            Open(url) => self.label.set_text(&format!("Opening URL {}", url)),
+            WinOpen(url) => self.label.set_text(&format!("Opening URL {} in new window", url)),
+            Quit => gtk::main_quit(),
+        }
+    }
+
+    fn handle_special_command(&self, command: SpecialCommand) {
+        match command {
+            BackwardSearch(input) => println!("Searching backward for {}", input),
+            Search(input) => println!("Searching for {}", input),
+        }
+    }
+
+    fn mode_changed(&mut self, mode: &str) {
+        if mode != "normal" {
+            {
+                let title = &self.app.settings().title;
+                self.label.set_text(&format!("Title was: {}", title));
+            }
+            self.app.set_setting(Title(mode.to_string()));
+        }
+    }
+
+    fn setting_changed(&self, setting: AppSettingsVariant) {
+        match setting {
+            CustomSet(setting) => self.label.set_text(&format!("custom setting is: {:?}", setting)),
+            Title(title) => self.app.set_window_title(&title),
+            TitleLen(len) => self.app.set_window_title(&format!("New title len: {}", len)),
+            Boolean(_) | Width(_) => (),
+        }
+    }
+}
+
 fn main() {
     gtk::init().unwrap();
 
-    let app = ApplicationBuilder::new()
-        .modes(hash! {
-            "i" => "insert",
-        })
-        .settings(AppSettings::new())
-        .build();
-    app.use_dark_theme();
-    let item = app.add_statusbar_item();
-    item.set_text("Item");
-    let item2 = app.add_statusbar_item();
-    item2.set_text("Test");
-    item.set_text("Rightmost");
-    if let Err(error) = app.parse_config("examples/main.conf") {
-        app.error(&error.to_string());
-    }
-    app.add_variable("url", || "http://duckduckgo.com/lite".to_string());
-    app.set_window_title("First Mg Program");
-
-    let vbox = gtk::Box::new(Vertical, 0);
-    let label = Label::new(Some("Mg App"));
-    vbox.add(&label);
-    let label = Rc::new(label);
-    let entry = Entry::new();
-    vbox.add(&entry);
-    app.set_view(&vbox);
-
-    {
-        let mg_app = app.clone();
-        let label = label.clone();
-        app.connect_setting_changed(move |setting| {
-            match setting {
-                CustomSet(setting) => label.set_text(&format!("custom setting is: {:?}", setting)),
-                Title(title) => mg_app.set_window_title(&title),
-                TitleLen(len) => mg_app.set_window_title(&format!("New title len: {}", len)),
-                Boolean(_) | Width(_) => (),
-            }
-        });
-    }
-
-    {
-        let mg_app = app.clone();
-        let label = label.clone();
-        app.connect_mode_changed(move |mode| {
-            if mode != "normal" {
-                let title = &mg_app.settings().title;
-                label.set_text(&format!("Title was: {}", title));
-                mg_app.set_setting(Title(mode.to_string()));
-            }
-        });
-    }
-
-    {
-        let mg_app = app.clone();
-        let label = label.clone();
-        app.connect_command(move |command| {
-            match command {
-                Follow => (),
-                Insert => mg_app.set_mode("insert"),
-                Normal => mg_app.set_mode("normal"),
-                Open(url) => label.set_text(&format!("Opening URL {}", url)),
-                WinOpen(url) => label.set_text(&format!("Opening URL {} in new window", url)),
-                Quit => gtk::main_quit(),
-            }
-        });
-    }
-
-    {
-        app.connect_special_command(move |command| {
-            match command {
-                BackwardSearch(input) => println!("Searching backward for {}", input),
-                Search(input) => println!("Searching for {}", input),
-            }
-        });
-    }
-
-    entry.grab_focus();
+    let _app = App::new();
 
     gtk::main();
 }

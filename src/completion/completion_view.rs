@@ -19,10 +19,8 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-use std::cell::RefCell;
 use std::cmp::max;
 use std::ops::Deref;
-use std::rc::Rc;
 
 use glib::{Object, ToValue};
 use gtk::{
@@ -55,14 +53,14 @@ const COMPLETION_VIEW_MAX_HEIGHT: i32 = 300;
 
 /// A widget to show completions for the command entry.
 pub struct CompletionView {
-    unselect_callback: RefCell<Option<Box<Fn()>>>,
+    unselect_callback: Option<Box<Fn()>>,
     tree_view: TreeView,
     view: ScrolledWindow,
 }
 
 impl CompletionView {
     /// Create a new completion view.
-    pub fn new() -> Rc<Self> {
+    pub fn new() -> Box<Self> {
         let tree_view = TreeView::new();
 
         tree_view.get_selection().unselect_all();
@@ -76,8 +74,8 @@ impl CompletionView {
         scrolled_window.set_max_content_height(COMPLETION_VIEW_MAX_HEIGHT);
         scrolled_window.set_propagate_natural_height(true);
 
-        let view = Rc::new(CompletionView {
-            unselect_callback: RefCell::new(None),
+        let view = Box::new(CompletionView {
+            unselect_callback: None,
             tree_view: tree_view,
             view: scrolled_window,
         });
@@ -143,8 +141,8 @@ impl CompletionView {
     }
 
     /// Add a callback to the unselect event.
-    pub fn connect_unselect<F: Fn() + 'static>(&self, callback: F) {
-        *self.unselect_callback.borrow_mut() = Some(Box::new(callback));
+    pub fn connect_unselect<F: Fn() + 'static>(&mut self, callback: F) {
+        self.unselect_callback = Some(Box::new(callback));
     }
 
     /// Adjust the policy of the scrolled window to avoid having extra space around the tree view.
@@ -256,7 +254,7 @@ impl CompletionView {
     /// Emit the event to show the original input.
     /// This is emitted when the user unselect from the completion view.
     fn show_original_input(&self) {
-        if let Some(ref callback) = *self.unselect_callback.borrow() {
+        if let Some(ref callback) = self.unselect_callback {
             callback();
         }
     }
