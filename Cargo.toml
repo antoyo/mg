@@ -7,11 +7,6 @@ name = "mg"
 repository = "https://github.com/antoyo/mg"
 version = "0.0.5-pre"
 
-[metadata]
-
-[metadata.release]
-upload-doc = true
-
 [dependencies]
 libc = "^0.2"
 log = "^0.3"

@@ -87,7 +87,7 @@ impl App {
         app
     }
 
-    fn handle_command(&self, command: AppCommand) {
+    fn handle_command(&mut self, command: AppCommand) {
         match command {
             Insert => self.app.set_mode("insert"),
             Normal => self.app.set_mode("normal"),

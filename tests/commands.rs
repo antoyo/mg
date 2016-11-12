@@ -31,7 +31,6 @@ extern crate mg_settings_macros;
 
 mod utils;
 
-use std::rc::Rc;
 use std::thread;
 
 use gtk::Label;
@@ -53,28 +52,46 @@ pub struct AppSettings {
     boolean: bool,
 }
 
+struct App {
+    app: Box<Application<AppCommand, AppSettings>>,
+    label: Label,
+}
+
+impl App {
+    fn new() -> Box<Self> {
+        let app = ApplicationBuilder::new()
+            .settings(AppSettings::new())
+            .build();
+
+        let label = Label::new(Some("Label"));
+
+        app.set_view(&label);
+
+        let mut app = Box::new(App {
+            app: app,
+            label: label,
+        });
+
+        connect!(app.app, connect_command(command), app, Self::handle_command(command));
+
+        app
+    }
+
+    fn handle_command(&self, command: AppCommand) {
+        match command {
+            Show(text) => self.label.set_text(&format!("Showing text: {}", text)),
+            Quit => gtk::main_quit(),
+        }
+    }
+}
+
 #[test]
 fn test_basic_command() {
     gtk::init().unwrap();
 
-    let app: Rc<Application<AppCommand, AppSettings>> = ApplicationBuilder::new()
-        .settings(AppSettings::new())
-        .build();
+    let app = App::new();
 
-    let label = Rc::new(Label::new(Some("Label")));
-    app.set_view(&*label);
-
-    {
-        let label = label.clone();
-        app.connect_command(move |command| {
-            match command {
-                Show(text) => label.set_text(&format!("Showing text: {}", text)),
-                Quit => gtk::main_quit(),
-            }
-        });
-    }
-
-    assert_eq!(Some("Label".to_string()), label.get_text());
+    assert_eq!(Some("Label".to_string()), app.label.get_text());
 
     thread::spawn(|| {
         let xdo = XDo::new(None).unwrap();
@@ -84,5 +101,5 @@ fn test_basic_command() {
 
     gtk::main();
 
-    assert_eq!(Some("Showing text: test".to_string()), label.get_text());
+    assert_eq!(Some("Showing text: test".to_string()), app.label.get_text());
 }

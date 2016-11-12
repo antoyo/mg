@@ -19,10 +19,9 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-use std::cell::{RefCell, Cell};
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::ops::Deref;
-use std::rc::Rc;
 
 use gdk_sys::GdkRGBA;
 use gtk::{
@@ -30,7 +29,6 @@ use gtk::{
     ContainerExt,
     CssProvider,
     EditableExt,
-    EditableSignals,
     Entry,
     EntryExt,
     Label,
@@ -59,8 +57,7 @@ pub type HBox = ::gtk::Box;
 pub struct StatusBar {
     completion: Completion,
     completion_original_input: String,
-    current_mode: Rc<RefCell<String>>,
-    entry: Entry,
+    pub entry: Entry,
     entry_shown: Cell<bool>,
     identifier_label: Label,
     inserting_completion: Cell<bool>,
@@ -69,7 +66,7 @@ pub struct StatusBar {
 
 impl StatusBar {
     /// Create a new status bar.
-    pub fn new(completion_view: Box<CompletionView>, completers: HashMap<String, Box<Completer>>, current_mode: Rc<RefCell<String>>) -> Box<Self> {
+    pub fn new(completion_view: Box<CompletionView>, completers: HashMap<String, Box<Completer>>) -> Box<Self> {
         let hbox = HBox::new(Horizontal, 0);
         hbox.set_size_request(1, 20);
 
@@ -85,7 +82,6 @@ impl StatusBar {
         let mut status_bar = Box::new(StatusBar {
             completion: completion,
             completion_original_input: String::new(),
-            current_mode: current_mode,
             entry: entry,
             entry_shown: Cell::new(false),
             identifier_label: identifier_label,
@@ -95,7 +91,6 @@ impl StatusBar {
 
         connect!(status_bar.completion.view, connect_selection_changed(selection), status_bar, Self::selection_changed(selection));
         connect!(status_bar.completion.view, connect_unselect, status_bar, Self::handle_unselect);
-        connect!(status_bar.entry, connect_changed(_), status_bar, Self::update_completions);
 
         status_bar
     }
@@ -266,10 +261,9 @@ impl StatusBar {
     }
 
     /// Update the completions.
-    pub fn update_completions(&mut self) {
-        let in_command_mode = (*self.current_mode.borrow()) == COMMAND_MODE;
+    pub fn update_completions(&mut self, current_mode: &str) {
         if !self.inserting_completion.get() {
-            if in_command_mode {
+            if current_mode == COMMAND_MODE {
                 // In command mode, the completer can change when the user type.
                 // For instance, after typing "set ", the completer switch to the settings
                 // completer.

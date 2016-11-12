@@ -63,13 +63,12 @@ mod status_bar;
 mod style_context;
 
 use std::borrow::Cow;
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 use std::char;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 use std::result;
 
 use gdk::{EventKey, RGBA, CONTROL_MASK};
@@ -77,6 +76,7 @@ use gdk::enums::key::{Escape, Tab, ISO_Left_Tab, colon};
 use gdk_sys::GdkRGBA;
 use gtk::{
     ContainerExt,
+    EditableSignals,
     Grid,
     Inhibit,
     IsA,
@@ -312,7 +312,7 @@ pub struct Application<Comm, Sett: settings::Settings = NoSettings, Spec = NoSpe
     choices: Vec<char>,
     close_callback: Option<Box<Fn()>>,
     current_command_mode: Cell<char>,
-    current_mode: Rc<RefCell<String>>,
+    current_mode: String,
     current_shortcut: Vec<Key>,
     foreground_color: RGBA,
     input_callback: Option<Box<Fn(Option<String>)>>,
@@ -345,7 +345,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
             mapping_modes: modes.keys().cloned().collect(),
         };
 
-        let current_mode = Rc::new(RefCell::new(NORMAL_MODE.to_string()));
+        let current_mode = NORMAL_MODE.to_string();
 
         let window = Window::new(WindowType::Toplevel);
 
@@ -364,7 +364,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
         for (identifier, completer) in builder.completers {
             completers.insert(identifier, completer);
         }
-        let status_bar = StatusBar::new(completion_view, completers, current_mode.clone());
+        let status_bar = StatusBar::new(completion_view, completers);
         grid.attach(&*status_bar, 0, 2, 1, 1);
         window.show_all();
         status_bar.hide();
@@ -414,6 +414,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
         connect!(app.status_bar, connect_activate(input), app, Self::command_activate(input));
         connect!(app.window, connect_key_press_event(_, key), app, Self::key_press(key));
         connect!(app.window, connect_key_release_event(_, key), app, Self::key_release(key));
+        connect!(app.status_bar.entry, connect_changed(_), app, Self::update_completions);
 
         app
     }
@@ -512,8 +513,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
 
     /// Handle the command entry activate event.
     fn command_activate(&mut self, input: Option<String>) {
-        let mode = self.get_mode();
-        if mode == INPUT_MODE || mode == BLOCKING_INPUT_MODE {
+        if self.current_mode == INPUT_MODE || self.current_mode == BLOCKING_INPUT_MODE {
             let mut should_reset = false;
             if let Some(ref callback) = self.input_callback {
                 self.answer = input.clone();
@@ -593,11 +593,6 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
         style_context.get_color(STATE_FLAG_NORMAL)
     }
 
-    /// Get the current mode.
-    pub fn get_mode(&self) -> String {
-        self.current_mode.borrow().clone()
-    }
-
     /// Handle the command activate event.
     fn handle_command(&mut self, command: Option<String>) {
         if let Some(command) = command {
@@ -630,13 +625,15 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     /// Handle a possible input of a shortcut.
     fn handle_shortcut(&mut self, key: &EventKey) -> Inhibit {
         let keyval = key.get_keyval();
-        let mode = self.get_mode();
+        let should_inhibit = self.current_mode == NORMAL_MODE ||
+            (self.current_mode == COMMAND_MODE && (keyval == Tab || keyval == ISO_Left_Tab)) ||
+            key.get_keyval() == Escape;
         let control_pressed = key.get_state() & CONTROL_MASK == CONTROL_MASK;
         if !self.status_bar.entry_shown() || control_pressed || keyval == Tab || keyval == ISO_Left_Tab {
             if let Some(key) = gdk_key_to_key(keyval, control_pressed) {
                 self.add_to_shortcut(key);
                 let action = {
-                    let mut current_mode = mode.clone();
+                    let mut current_mode = self.current_mode.clone();
                     // The input modes have the same mappings as the command mode.
                     if current_mode == INPUT_MODE || current_mode == BLOCKING_INPUT_MODE {
                         current_mode = COMMAND_MODE.to_string();
@@ -654,7 +651,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
                         Incomplete(command) => {
                             self.input_command(&command);
                             self.status_bar.show_completion();
-                            self.status_bar.update_completions();
+                            self.update_completions();
                             return Inhibit(true);
                         },
                     }
@@ -667,10 +664,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
                 }
             }
         }
-        if mode == NORMAL_MODE ||
-            (mode == COMMAND_MODE && (keyval == Tab || keyval == ISO_Left_Tab)) ||
-            key.get_keyval() == Escape
-        {
+        if should_inhibit {
             Inhibit(true)
         }
         else {
@@ -692,7 +686,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     }
 
     /// Input the specified command.
-    fn input_command(&self, command: &str) {
+    fn input_command(&mut self, command: &str) {
         self.set_mode(COMMAND_MODE);
         self.status_bar.show_entry();
         let mut command = command.to_string();
@@ -740,7 +734,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
 
     /// Handle the key press event.
     fn key_press(&mut self, key: &EventKey) -> Inhibit {
-        match self.get_mode().as_ref() {
+        match self.current_mode.as_ref() {
             NORMAL_MODE => self.normal_key_press(key),
             COMMAND_MODE => self.command_key_press(key),
             BLOCKING_INPUT_MODE | INPUT_MODE => self.input_key_press(key),
@@ -750,7 +744,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
 
     /// Handle the key release event.
     fn key_release(&self, key: &EventKey) -> Inhibit {
-        match self.get_mode().as_ref() {
+        match self.current_mode.as_ref() {
             COMMAND_MODE => self.command_key_release(key),
             _ => Inhibit(false),
         }
@@ -795,7 +789,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
 
     /// Check if there are no possible shortcuts.
     fn no_possible_shortcut(&self) -> bool {
-        if let Some(mappings) = self.mappings.get(&*self.current_mode.borrow()) {
+        if let Some(mappings) = self.mappings.get(&self.current_mode) {
             for key in mappings.keys() {
                 if key.starts_with(&self.current_shortcut) {
                     return false;
@@ -857,7 +851,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     }
 
     /// Go back to the normal mode from command or input mode.
-    fn return_to_normal_mode(&self) {
+    fn return_to_normal_mode(&mut self) {
         self.status_bar.hide_entry();
         self.status_bar.hide_completion();
         self.set_mode(NORMAL_MODE);
@@ -886,25 +880,25 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     /// Set the answer to return to the caller of the dialog.
     fn set_dialog_answer(&mut self, answer: &str) {
         let mut should_reset = false;
-        if self.get_mode() == BLOCKING_INPUT_MODE {
+        if self.current_mode == BLOCKING_INPUT_MODE {
             self.answer = Some(answer.to_string());
             gtk::main_quit();
         }
         else if let Some(ref callback) = self.input_callback {
             callback(Some(answer.to_string()));
-            self.return_to_normal_mode();
             self.choices.clear();
             should_reset = true;
         }
         if should_reset {
+            self.return_to_normal_mode();
             self.reset();
         }
         self.input_callback = None;
     }
 
     /// Set the current mode.
-    pub fn set_mode(&self, mode: &str) {
-        *self.current_mode.borrow_mut() = mode.to_string();
+    pub fn set_mode(&mut self, mode: &str) {
+        self.current_mode = mode.to_string();
         self.show_mode();
         if let Some(ref callback) = self.mode_changed_callback {
             callback(mode);
@@ -926,13 +920,17 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
 
     /// Show the current mode if it is not the normal mode.
     fn show_mode(&self) {
-        let mode = self.get_mode();
-        if mode != NORMAL_MODE && mode != COMMAND_MODE && mode != INPUT_MODE && mode != BLOCKING_INPUT_MODE {
-            self.mode_label.set_text(&mode);
+        if self.current_mode != NORMAL_MODE && self.current_mode != COMMAND_MODE && self.current_mode != INPUT_MODE && self.current_mode != BLOCKING_INPUT_MODE {
+            self.mode_label.set_text(&self.current_mode);
         }
         else {
             self.mode_label.set_text("");
         }
+    }
+
+    /// Update the completions of the status bar.
+    fn update_completions(&mut self) {
+        self.status_bar.update_completions(&self.current_mode);
     }
 
     /// Use the dark variant of the theme if available.
