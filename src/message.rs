@@ -21,9 +21,7 @@
 
 //! Non-modal message dialogs.
 
-use std::rc::Rc;
-
-use gtk::{self, Continue};
+use gtk::Continue;
 use mg_settings::{EnumFromStr, EnumMetaData, SettingCompletion};
 use mg_settings::settings;
 
@@ -50,19 +48,34 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
         self.status_bar.color_red();
     }
 
-    /// Show an information message to the user for 5 seconds.
-    pub fn info(app: &Rc<Self>, message: &str) {
-        info!("{}", message);
-        app.message.set_text(message);
-        app.reset_colors();
-        let app = app.clone();
-        let message = Some(message.to_string());
-        gtk::timeout_add(INFO_MESSAGE_DURATION, move || {
-            if app.message.get_text() == message {
-                app.message.set_text("");
+    /// Hide the information message.
+    fn hide_colored_message(&self, message: &str) -> Continue {
+        if let Some(current_message) = self.message.get_text() {
+            if current_message == message {
+                self.message.set_text("");
+                self.reset_colors();
             }
-            Continue(false)
-        });
+        }
+        Continue(false)
+    }
+
+    /// Hide the information message.
+    fn hide_info(&self, message: &str) -> Continue {
+        if let Some(current_message) = self.message.get_text() {
+            if current_message == message {
+                self.message.set_text("");
+            }
+        }
+        Continue(false)
+    }
+
+    /// Show an information message to the user for 5 seconds.
+    pub fn info(&mut self, message: &str) {
+        info!("{}", message);
+        self.message.set_text(message);
+        self.reset_colors();
+        let message = message.to_string();
+        timeout_add!(INFO_MESSAGE_DURATION, self, Self::hide_info(&message));
     }
 
     /// Show a message to the user.
@@ -71,18 +84,11 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
     }
 
     /// Show a warning message to the user for 5 seconds.
-    pub fn warning(app: &Rc<Self>, message: &str) {
+    pub fn warning(&mut self, message: &str) {
         warn!("{}", message);
-        app.message.set_text(message);
-        let app = app.clone();
-        let message = Some(message.to_string());
-        app.status_bar.color_orange();
-        gtk::timeout_add(INFO_MESSAGE_DURATION, move || {
-            if app.message.get_text() == message {
-                app.message.set_text("");
-                app.reset_colors();
-            }
-            Continue(false)
-        });
+        self.message.set_text(message);
+        let message = message.to_string();
+        self.status_bar.color_orange();
+        timeout_add!(INFO_MESSAGE_DURATION, self, Self::hide_colored_message(&message));
     }
 }

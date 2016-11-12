@@ -49,6 +49,8 @@ extern crate mg_settings;
 extern crate pango_sys;
 
 #[macro_use]
+mod gtk_timeout;
+#[macro_use]
 mod signal;
 #[macro_use]
 mod widget;
