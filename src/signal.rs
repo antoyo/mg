@@ -21,44 +21,44 @@
 
 #[macro_export]
 macro_rules! connect {
-    ($source:expr, $event:ident ( $($ident:pat),* ), $target:expr, $ty:ident :: $method:ident ( $($arg:expr),* )) => {
+    ($source:expr, $event:ident $( [ $($param:expr),* ] )* ( $($ident:pat),* ), $target:expr, $ty:ident :: $method:ident ( $($arg:expr),* )) => {
         let target = &mut *$target as *mut _;
-        $source.$event(move |$($ident),*| {
+        $source.$event($($($param,)*)* move |$($ident),*| {
             let target: &mut $ty = unsafe { &mut *target };
             target.$method($($arg),*)
         });
     };
-    ($source:expr, $event:ident ( $($ident:pat),* ), $target:expr, $ty:ident :: $method:ident) => {
+    ($source:expr, $event:ident $( [ $($param:expr),* ] )* ( $($ident:pat),* ), $target:expr, $ty:ident :: $method:ident) => {
         let target = &mut *$target as *mut _;
-        $source.$event(move |$($ident),*| {
+        $source.$event($($($param,)*)* move |$($ident),*| {
             let target: &mut $ty = unsafe { &mut *target };
             target.$method()
         });
     };
-    ($source:expr, $event:ident, $target:expr, $ty:ident :: $method:ident) => {
+    ($source:expr, $event:ident $( [ $($param:expr),* ] )*, $target:expr, $ty:ident :: $method:ident) => {
         let target = &mut *$target as *mut _;
-        $source.$event(move || {
+        $source.$event($($($param,)*)* move || {
             let target: &mut $ty = unsafe { &mut *target };
             target.$method()
         });
     };
-    ($source:expr, $event:ident ( $($ident:pat),* ), $target:expr, $method:ident ( $($arg:expr),* )) => {
+    ($source:expr, $event:ident $( [ $($param:expr),* ] )* ( $($ident:pat),* ), $target:expr, $method:ident ( $($arg:expr),* )) => {
         let target = &mut *$target as *mut _;
-        $source.$event(move |$($ident),*| {
+        $source.$event($($($param,)*)* move |$($ident),*| {
             let target: &mut Self = unsafe { &mut *target };
             target.$method($($arg),*)
         });
     };
-    ($source:expr, $event:ident ( $($ident:pat),* ), $target:expr, $method:ident) => {
+    ($source:expr, $event:ident $( [ $($param:expr),* ] )* ( $($ident:pat),* ), $target:expr, $method:ident) => {
         let target = &mut *$target as *mut _;
-        $source.$event(move |$($ident),*| {
+        $source.$event($($($param,)*)* move |$($ident),*| {
             let target: &mut Self = unsafe { &mut *target };
             target.$method()
         });
     };
-    ($source:expr, $event:ident, $target:expr, $method:ident) => {
+    ($source:expr, $event:ident $( [ $($param:expr),* ] )*, $target:expr, $method:ident) => {
         let target = &mut *$target as *mut _;
-        $source.$event(move || {
+        $source.$event($($($param,)*)* move || {
             let target: &mut Self = unsafe { &mut *target };
             target.$method()
         });
