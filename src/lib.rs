@@ -593,6 +593,11 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
         style_context.get_color(STATE_FLAG_NORMAL)
     }
 
+    /// Get the current mode.
+    pub fn get_mode(&self) -> &str {
+        &self.current_mode
+    }
+
     /// Handle the command activate event.
     fn handle_command(&mut self, command: Option<String>) {
         if let Some(command) = command {
