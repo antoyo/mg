@@ -19,7 +19,6 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-use std::cell::Cell;
 use std::collections::HashMap;
 use std::ops::Deref;
 
@@ -58,9 +57,9 @@ pub struct StatusBar {
     completion: Completion,
     completion_original_input: String,
     pub entry: Entry,
-    entry_shown: Cell<bool>,
+    entry_shown: bool,
     identifier_label: Label,
-    inserting_completion: Cell<bool>,
+    inserting_completion: bool,
     hbox: HBox,
 }
 
@@ -83,9 +82,9 @@ impl StatusBar {
             completion: completion,
             completion_original_input: String::new(),
             entry: entry,
-            entry_shown: Cell::new(false),
+            entry_shown: false,
             identifier_label: identifier_label,
-            inserting_completion: Cell::new(false),
+            inserting_completion: false,
             hbox: hbox,
         });
 
@@ -153,7 +152,7 @@ impl StatusBar {
 
     /// Get whether the entry is shown or not.
     pub fn entry_shown(&self) -> bool {
-        self.entry_shown.get()
+        self.entry_shown
     }
 
     /// Filter the completion view.
@@ -172,13 +171,9 @@ impl StatusBar {
     }
 
     /// Handle the unselect event.
-    fn handle_unselect(&self) {
-        self.set_input(&self.completion_original_input);
-    }
-
-    /// Hide all the widgets.
-    pub fn hide(&self) {
-        self.hide_entry();
+    fn handle_unselect(&mut self) {
+        let original_input = self.completion_original_input.clone();
+        self.set_input(&original_input);
     }
 
     /// Hide the completion view.
@@ -187,9 +182,9 @@ impl StatusBar {
     }
 
     /// Hide the entry.
-    pub fn hide_entry(&self) {
+    pub fn hide_entry(&mut self) {
         self.entry.set_text("");
-        self.entry_shown.set(false);
+        self.entry_shown = false;
         self.entry.hide();
         self.identifier_label.hide();
     }
@@ -209,7 +204,7 @@ impl StatusBar {
     }
 
     /// Handle the selection changed event.
-    fn selection_changed(&self, selection: &TreeSelection) {
+    fn selection_changed(&mut self, selection: &TreeSelection) {
         if let Some(completion) = self.completion.complete_result(selection) {
             self.set_input(&completion);
         }
@@ -222,11 +217,12 @@ impl StatusBar {
     }
 
     /// Set the text of the input entry and move the cursor at the end.
-    pub fn set_input(&self, command: &str) {
-        self.inserting_completion.set(true);
+    pub fn set_input(&mut self, command: &str) {
+        // Prevent updating the completions when the user selects a completion entry.
+        self.inserting_completion = true;
         self.entry.set_text(command);
         self.entry.set_position(command.len() as i32);
-        self.inserting_completion.set(false);
+        self.inserting_completion = false;
     }
 
     /// Set the identifier label text.
@@ -247,8 +243,8 @@ impl StatusBar {
     }
 
     /// Show the entry.
-    pub fn show_entry(&self) {
-        self.entry_shown.set(true);
+    pub fn show_entry(&mut self) {
+        self.entry_shown = true;
         self.entry.set_text("");
         self.entry.show();
         self.entry.grab_focus();
@@ -262,7 +258,7 @@ impl StatusBar {
 
     /// Update the completions.
     pub fn update_completions(&mut self, current_mode: &str) {
-        if !self.inserting_completion.get() {
+        if !self.inserting_completion {
             if current_mode == COMMAND_MODE {
                 // In command mode, the completer can change when the user type.
                 // For instance, after typing "set ", the completer switch to the settings

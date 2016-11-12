@@ -43,7 +43,7 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
     }
 
     /// Show an error to the user.
-    pub fn error(&self, error: &str) {
+    pub fn error(&mut self, error: &str) {
         error!("{}", error);
         self.message.set_text(error);
         self.status_bar.hide_entry();
