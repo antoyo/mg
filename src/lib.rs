@@ -63,7 +63,6 @@ mod status_bar;
 mod style_context;
 
 use std::borrow::Cow;
-use std::cell::Cell;
 use std::char;
 use std::collections::HashMap;
 use std::fs::File;
@@ -311,7 +310,7 @@ pub struct Application<Comm, Sett: settings::Settings = NoSettings, Spec = NoSpe
     command_callback: Option<Box<Fn(Comm)>>,
     choices: Vec<char>,
     close_callback: Option<Box<Fn()>>,
-    current_command_mode: Cell<char>,
+    current_command_mode: char,
     current_mode: String,
     current_shortcut: Vec<Key>,
     foreground_color: RGBA,
@@ -325,7 +324,7 @@ pub struct Application<Comm, Sett: settings::Settings = NoSettings, Spec = NoSpe
     settings_parser: Parser<Comm>,
     setting_change_callback: Option<Box<Fn(Sett::Variant)>>,
     shortcuts: HashMap<Key, String>,
-    shortcut_pressed: Cell<bool>,
+    shortcut_pressed: bool,
     special_command_callback: Option<Box<Fn(Spec)>>,
     status_bar: Box<StatusBar>,
     view: Overlay,
@@ -385,7 +384,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
             command_callback: None,
             choices: vec![],
             close_callback: None,
-            current_command_mode: Cell::new(':'),
+            current_command_mode: ':',
             current_mode: current_mode,
             current_shortcut: vec![],
             foreground_color: foreground_color,
@@ -399,7 +398,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
             settings_parser: parser,
             setting_change_callback: None,
             shortcuts: HashMap::new(),
-            shortcut_pressed: Cell::new(false),
+            shortcut_pressed: false,
             special_command_callback: None,
             status_bar: status_bar,
             view: view,
@@ -547,9 +546,8 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     }
 
     /// Handle the key release event for the command mode.
-    fn command_key_release(&self, _key: &EventKey) -> Inhibit {
-        let identifier = self.current_command_mode.get();
-        if identifier != ':' && Spec::is_always(identifier) {
+    fn command_key_release(&mut self, _key: &EventKey) -> Inhibit {
+        if self.current_command_mode != ':' && Spec::is_always(self.current_command_mode) {
             if let Some(command) = self.status_bar.get_command() {
                 self.handle_special_command(Current, &command);
             }
@@ -596,8 +594,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     /// Handle the command activate event.
     fn handle_command(&mut self, command: Option<String>) {
         if let Some(command) = command {
-            let identifier = self.current_command_mode.get();
-            if identifier == ':' {
+            if self.current_command_mode == ':' {
                 let result = self.settings_parser.parse_line(&command);
                 self.call_command(result);
             }
@@ -615,7 +612,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
             if self.shortcuts.contains_key(&key) {
                 let answer = &self.shortcuts[&key].clone();
                 self.set_dialog_answer(answer);
-                self.shortcut_pressed.set(true);
+                self.shortcut_pressed = true;
                 return true;
             }
         }
@@ -673,15 +670,18 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     }
 
     /// Handle a special command activate or key press event.
-    fn handle_special_command(&self, activation_type: ActivationType, command: &str) {
+    fn handle_special_command(&mut self, activation_type: ActivationType, command: &str) {
+        let mut update_identifier = false;
         if let Some(ref callback) = self.special_command_callback {
-            let identifier = self.current_command_mode.get();
-            if let Ok(special_command) = Spec::identifier_to_command(identifier, command) {
+            if let Ok(special_command) = Spec::identifier_to_command(self.current_command_mode, command) {
                 callback(special_command);
                 if activation_type == Final {
-                    self.set_current_identifier(':');
+                    update_identifier = true;
                 }
             }
+        }
+        if update_identifier {
+            self.set_current_identifier(':');
         }
     }
 
@@ -743,7 +743,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     }
 
     /// Handle the key release event.
-    fn key_release(&self, key: &EventKey) -> Inhibit {
+    fn key_release(&mut self, key: &EventKey) -> Inhibit {
         match self.current_mode.as_ref() {
             COMMAND_MODE => self.command_key_release(key),
             _ => Inhibit(false),
@@ -872,8 +872,8 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     }
 
     /// Set the current (special) command identifier.
-    fn set_current_identifier(&self, identifier: char) {
-        self.current_command_mode.set(identifier);
+    fn set_current_identifier(&mut self, identifier: char) {
+        self.current_command_mode = identifier;
         self.status_bar.set_identifier(&identifier.to_string());
     }
 

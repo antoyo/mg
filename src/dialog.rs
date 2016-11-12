@@ -169,7 +169,7 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
 
     /// Show a dialog created with a `DialogBuilder`.
     pub fn show_dialog(&mut self, mut dialog_builder: DialogBuilder) -> DialogResult {
-        self.shortcut_pressed.set(false);
+        self.shortcut_pressed = false;
         {
             self.shortcuts.clear();
             for (key, value) in dialog_builder.shortcuts {
@@ -222,7 +222,7 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
             self.reset();
             self.return_to_normal_mode();
             self.choices.clear();
-            if self.shortcut_pressed.get() {
+            if self.shortcut_pressed {
                 if let Some(answer) = self.answer.clone() {
                     Shortcut(answer)
                 }
