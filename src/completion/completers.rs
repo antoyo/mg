@@ -19,7 +19,6 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
@@ -53,7 +52,7 @@ impl<T: EnumMetaData> CommandCompleter<T> {
 }
 
 impl<T> Completer for CommandCompleter<T> {
-    fn completions(&self, input: &str) -> Vec<CompletionResult> {
+    fn completions(&mut self, input: &str) -> Vec<CompletionResult> {
         self.metadata.iter()
             .filter(|&&(ref command, ref help)|
                     command.to_lowercase().contains(&input) ||
@@ -81,14 +80,14 @@ impl Completer for NoCompleter {
         String::new()
     }
 
-    fn completions(&self, _input: &str) -> Vec<CompletionResult> {
+    fn completions(&mut self, _input: &str) -> Vec<CompletionResult> {
         vec![]
     }
 }
 
 /// A setting completer.
 pub struct SettingCompleter<T> {
-    selected_name: RefCell<Option<String>>,
+    selected_name: Option<String>,
     setting_names: Vec<(String, String)>,
     setting_values: HashMap<String, Vec<String>>,
     _phantom: PhantomData<T>,
@@ -104,7 +103,7 @@ impl<T: EnumMetaData + SettingCompletion> SettingCompleter<T> {
                 .collect();
         data.sort();
         SettingCompleter {
-            selected_name: RefCell::new(None),
+            selected_name: None,
             setting_names: data,
             setting_values: T::get_value_completions(),
             _phantom: PhantomData,
@@ -114,7 +113,7 @@ impl<T: EnumMetaData + SettingCompletion> SettingCompleter<T> {
 
 impl<T> Completer for SettingCompleter<T> {
     fn complete_result(&self, value: &str) -> String {
-        if let Some(ref name) = *self.selected_name.borrow() {
+        if let Some(ref name) = self.selected_name {
             format!("set {} = {}", name, value)
         }
         else {
@@ -122,14 +121,14 @@ impl<T> Completer for SettingCompleter<T> {
         }
     }
 
-    fn completions(&self, input: &str) -> Vec<CompletionResult> {
+    fn completions(&mut self, input: &str) -> Vec<CompletionResult> {
         if input.contains("= ") {
             let mut iter = input.split_whitespace();
             if let Some(name) = iter.next() {
                 if let Some(values) = self.setting_values.get(name) {
                     iter.next(); // Skip the equal token.
                     let input_value = iter.next().unwrap_or_default();
-                    *self.selected_name.borrow_mut() = Some(name.to_string());
+                    self.selected_name = Some(name.to_string());
                     return values.iter()
                         .filter(|value| value.contains(input_value))
                         .map(|value| CompletionResult::new(&[value, &String::new()]))
@@ -140,7 +139,7 @@ impl<T> Completer for SettingCompleter<T> {
         }
         else {
             let input = input.trim();
-            *self.selected_name.borrow_mut() = None;
+            self.selected_name = None;
             self.setting_names.iter()
                 .filter(|&&(ref setting, ref help)|
                         setting.to_lowercase().contains(input) ||

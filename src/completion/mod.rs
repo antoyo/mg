@@ -26,10 +26,12 @@ mod completion_view;
 
 use std::collections::HashMap;
 
+use glib::ToValue;
 use gtk::{
     ListStore,
     TreeModelExt,
     TreeSelection,
+    Type,
 };
 
 use self::Column::Expand;
@@ -70,7 +72,7 @@ pub trait Completer {
 
     /// From the user input, return the completion results.
     /// The results are on two columns, hence the 2-tuple.
-    fn completions(&self, input: &str) -> Vec<CompletionResult>;
+    fn completions(&mut self, input: &str) -> Vec<CompletionResult>;
 
     /// Set the column to use as the result of a selected text entry.
     fn text_column(&self) -> i32 {
@@ -110,10 +112,9 @@ impl Completion {
     }
 
     /// Complete the result for the selection using the current completer.
-    pub fn complete_result(&self, selection: &TreeSelection) -> Option<String> {
+    pub fn complete_result(&mut self, selection: &TreeSelection) -> Option<String> {
         let mut completion = None;
-        let current_completer = self.current_completer_ident();
-        if current_completer != NO_COMPLETER_IDENT {
+        if self.current_completer_ident() != NO_COMPLETER_IDENT {
             if let Some((model, iter)) = selection.get_selected() {
                 if let Some(completer) = self.current_completer() {
                     let value: Option<String> = model.get_value(&iter, completer.text_column()).get();
@@ -127,14 +128,47 @@ impl Completion {
     }
 
     /// Get the current completer.
-    pub fn current_completer(&self) -> Option<&Completer> {
-        self.completers.get(&self.completer_ident)
-            .map(|completer| &**completer)
+    pub fn current_completer(&mut self) -> Option<&mut Box<Completer>> {
+        self.completers.get_mut(&self.completer_ident)
     }
 
     /// Get the current completer ident.
     pub fn current_completer_ident(&self) -> &str {
         &self.completer_ident
+    }
+
+    /// Filter the rows from the input.
+    pub fn filter(&mut self, input: &str) {
+        let model =
+            self.current_completer()
+                .map(|completer| {
+                    // Multiply by 2 because each column has a foreground column.
+                    let columns = vec![Type::String; completer.column_count() * 2];
+                    let model = ListStore::new(&columns);
+
+                    let key =
+                        if let Some(index) = input.find(' ') {
+                            input[index + 1 ..].trim_left()
+                        }
+                        else {
+                            input
+                        };
+
+                    for &CompletionResult { ref columns } in &completer.completions(key) {
+                        let row = model.insert(-1);
+                        let start_column = columns.len();
+                        for (index, cell) in columns.iter().enumerate() {
+                            model.set_value(&row, index as u32, &cell.value.to_value());
+                            if let Some(ref foreground) = cell.foreground {
+                                model.set_value(&row, (index + start_column) as u32, &foreground.to_value());
+                            }
+                        }
+                    }
+                    model
+                });
+        if let Some(model) = model {
+            self.view.adjust_policy(&model);
+        }
     }
 }
 

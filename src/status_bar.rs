@@ -156,12 +156,12 @@ impl StatusBar {
     }
 
     /// Filter the completion view.
-    fn filter(&self) {
+    fn filter(&mut self) {
         // Disable the scrollbars so that commands without completion does not
         // show the completion view.
         self.completion.view.disable_scrollbars();
-        if let (Some(text), Some(completer)) = (self.entry.get_text(), self.completion.current_completer()) {
-            self.completion.view.filter(&text, completer);
+        if let Some(text) = self.entry.get_text() {
+            self.completion.filter(&text);
         }
     }
 
@@ -275,8 +275,7 @@ impl StatusBar {
                 // Do not select another completer when in input mode.
                 self.filter();
             }
-            let current_completer = self.completion.current_completer_ident();
-            if current_completer != NO_COMPLETER_IDENT {
+            if self.completion.current_completer_ident() != NO_COMPLETER_IDENT {
                 if let Some(text) = self.entry.get_text() {
                     self.filter();
                     self.completion_original_input = text;

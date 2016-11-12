@@ -22,13 +22,12 @@
 use std::cmp::max;
 use std::ops::Deref;
 
-use glib::{Object, ToValue};
+use glib::Object;
 use gtk::{
     Align,
     CellRendererText,
     ContainerExt,
     IsA,
-    ListStore,
     ScrolledWindow,
     ScrolledWindowExt,
     TreeIter,
@@ -37,13 +36,11 @@ use gtk::{
     TreeSelection,
     TreeView,
     TreeViewColumn,
-    Type,
     WidgetExt,
 };
 use gtk::PolicyType::{Automatic, Never};
 use pango_sys::PangoEllipsizeMode;
 
-use completion::CompletionResult;
 use completion::Column::{self, Expand};
 use gobject::ObjectExtManual;
 use scrolled_window::ScrolledWindowExtManual;
@@ -124,7 +121,8 @@ impl CompletionView {
     }
 
     /// Adjust the policy of the scrolled window to avoid having extra space around the tree view.
-    fn adjust_policy<M: IsA<Object> + IsA<TreeModel>>(&self, model: &M) {
+    pub fn adjust_policy<M: IsA<Object> + IsA<TreeModel>>(&self, model: &M) {
+        self.tree_view.set_model(Some(model));
         let policy =
             if model.iter_n_children(None) < 2 {
                 Never
@@ -148,34 +146,6 @@ impl CompletionView {
     /// Adjust the policy of the scrolled window to avoid having extra space around the tree view.
     pub fn disable_scrollbars(&self) {
         self.view.set_policy(Never, Never);
-    }
-
-    /// Filter the rows from the input.
-    pub fn filter(&self, input: &str, completer: &Completer) {
-        // Multiply by 2 because each column has a foreground column.
-        let columns = vec![Type::String; completer.column_count() * 2];
-        let model = ListStore::new(&columns);
-
-        let key =
-            if let Some(index) = input.find(' ') {
-                input[index + 1 ..].trim_left()
-            }
-            else {
-                input
-            };
-
-        for &CompletionResult { ref columns } in &completer.completions(key) {
-            let row = model.insert(-1);
-            let start_column = columns.len();
-            for (index, cell) in columns.iter().enumerate() {
-                model.set_value(&row, index as u32, &cell.value.to_value());
-                if let Some(ref foreground) = cell.foreground {
-                    model.set_value(&row, (index + start_column) as u32, &foreground.to_value());
-                }
-            }
-        }
-        self.tree_view.set_model(Some(&model));
-        self.adjust_policy(&model);
     }
 
     /// Remove all the columns.
