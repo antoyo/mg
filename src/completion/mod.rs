@@ -64,8 +64,8 @@ pub trait Completer {
     }
 
     /// From the selected text entry, return the text that should be written in the text input.
-    fn complete_result(&self, input: &str) -> String {
-        input.to_string()
+    fn complete_result(&self, value: &str) -> String {
+        value.to_string()
     }
 
     /// From the user input, return the completion results.

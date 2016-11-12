@@ -363,10 +363,10 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
         for (identifier, completer) in builder.completers {
             completers.insert(identifier, completer);
         }
-        let status_bar = StatusBar::new(completion_view, completers);
+        let mut status_bar = StatusBar::new(completion_view, completers);
         grid.attach(&*status_bar, 0, 2, 1, 1);
         window.show_all();
-        status_bar.hide();
+        status_bar.hide_widgets();
         status_bar.hide_completion();
 
         let foreground_color = Application::<Comm, Sett, Spec>::get_foreground_color(&window);
@@ -838,7 +838,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     /// Handle the escape event.
     fn reset(&mut self) {
         self.reset_colors();
-        self.status_bar.hide();
+        self.status_bar.hide_widgets();
         self.message.set_text("");
         self.show_mode();
         self.clear_shortcut();

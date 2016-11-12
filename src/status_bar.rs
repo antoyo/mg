@@ -176,6 +176,12 @@ impl StatusBar {
         self.set_input(&original_input);
     }
 
+    /// Hide the completion view and the entry.
+    pub fn hide_widgets(&mut self) {
+        self.hide_completion();
+        self.hide_entry();
+    }
+
     /// Hide the completion view.
     pub fn hide_completion(&self) {
         self.completion.view.hide();

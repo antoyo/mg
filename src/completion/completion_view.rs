@@ -163,6 +163,7 @@ impl CompletionView {
             else {
                 input
             };
+
         for &CompletionResult { ref columns } in &completer.completions(key) {
             let row = model.insert(-1);
             let start_column = columns.len();
