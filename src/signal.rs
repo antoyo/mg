@@ -42,4 +42,25 @@ macro_rules! connect {
             target.$method()
         });
     };
+    ($source:expr, $event:ident ( $($ident:pat),* ), $target:expr, $method:ident ( $($arg:expr),* )) => {
+        let target = &mut *$target as *mut _;
+        $source.$event(move |$($ident),*| {
+            let target: &mut Self = unsafe { &mut *target };
+            target.$method($($arg),*)
+        });
+    };
+    ($source:expr, $event:ident ( $($ident:pat),* ), $target:expr, $method:ident) => {
+        let target = &mut *$target as *mut _;
+        $source.$event(move |$($ident),*| {
+            let target: &mut Self = unsafe { &mut *target };
+            target.$method()
+        });
+    };
+    ($source:expr, $event:ident, $target:expr, $method:ident) => {
+        let target = &mut *$target as *mut _;
+        $source.$event(move || {
+            let target: &mut Self = unsafe { &mut *target };
+            target.$method()
+        });
+    };
 }

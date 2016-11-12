@@ -75,7 +75,7 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
         self.message.set_text(message);
         self.reset_colors();
         let message = message.to_string();
-        timeout_add!(INFO_MESSAGE_DURATION, self, Self::hide_info(&message));
+        timeout_add!(INFO_MESSAGE_DURATION, self, hide_info(&message));
     }
 
     /// Show a message to the user.
@@ -89,6 +89,6 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
         self.message.set_text(message);
         let message = message.to_string();
         self.status_bar.color_orange();
-        timeout_add!(INFO_MESSAGE_DURATION, self, Self::hide_colored_message(&message));
+        timeout_add!(INFO_MESSAGE_DURATION, self, hide_colored_message(&message));
     }
 }

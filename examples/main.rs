@@ -113,10 +113,10 @@ impl App {
             label: label,
         });
 
-        connect!(app.app, connect_setting_changed(setting), app, Self::setting_changed(setting));
-        connect!(app.app, connect_command(command), app, Self::handle_command(command));
-        connect!(app.app, connect_mode_changed(mode), app, Self::mode_changed(mode));
-        connect!(app.app, connect_special_command(command), app, Self::handle_special_command(command));
+        connect!(app.app, connect_setting_changed(setting), app, setting_changed(setting));
+        connect!(app.app, connect_command(command), app, handle_command(command));
+        connect!(app.app, connect_mode_changed(mode), app, mode_changed(mode));
+        connect!(app.app, connect_special_command(command), app, handle_special_command(command));
 
         app
     }

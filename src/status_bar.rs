@@ -88,8 +88,8 @@ impl StatusBar {
             hbox: hbox,
         });
 
-        connect!(status_bar.completion.view, connect_selection_changed(selection), status_bar, Self::selection_changed(selection));
-        connect!(status_bar.completion.view, connect_unselect, status_bar, Self::handle_unselect);
+        connect!(status_bar.completion.view, connect_selection_changed(selection), status_bar, selection_changed(selection));
+        connect!(status_bar.completion.view, connect_unselect, status_bar, handle_unselect);
 
         status_bar
     }

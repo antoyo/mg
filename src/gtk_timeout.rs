@@ -35,4 +35,18 @@ macro_rules! timeout_add {
             target.$method($($param),*)
         });
     };
+    ($time:expr, $target:expr, $method:ident) => {
+        let target = &mut *$target as *mut _;
+        ::gtk::timeout_add($time, move || {
+            let target: &mut Self = unsafe { &mut *target };
+            target.$method()
+        });
+    };
+    ($time:expr, $target:expr, $method:ident ( $($param:expr),* )) => {
+        let target = &mut *$target as *mut _;
+        ::gtk::timeout_add($time, move || {
+            let target: &mut Self = unsafe { &mut *target };
+            target.$method($($param),*)
+        });
+    };
 }

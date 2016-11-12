@@ -72,7 +72,7 @@ impl App {
             label: label,
         });
 
-        connect!(app.app, connect_command(command), app, Self::handle_command(command));
+        connect!(app.app, connect_command(command), app, handle_command(command));
 
         app
     }

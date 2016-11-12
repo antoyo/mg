@@ -411,11 +411,11 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
         app.status_bar.add_item(&app.mode_label);
         app.status_bar.add_item(&app.message);
 
-        connect!(app.window, connect_delete_event(_, _), app, Self::quit);
-        connect!(app.status_bar, connect_activate(input), app, Self::command_activate(input));
-        connect!(app.window, connect_key_press_event(_, key), app, Self::key_press(key));
-        connect!(app.window, connect_key_release_event(_, key), app, Self::key_release(key));
-        connect!(app.status_bar.entry, connect_changed(_), app, Self::update_completions);
+        connect!(app.window, connect_delete_event(_, _), app, quit);
+        connect!(app.status_bar, connect_activate(input), app, command_activate(input));
+        connect!(app.window, connect_key_press_event(_, key), app, key_press(key));
+        connect!(app.window, connect_key_release_event(_, key), app, key_release(key));
+        connect!(app.status_bar.entry, connect_changed(_), app, update_completions);
 
         app
     }
