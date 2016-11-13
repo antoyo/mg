@@ -20,13 +20,13 @@
  */
 
 /*
+ * TODO: Show the current shortcut in the status bar.
  * TODO: set the size of the status bar according to the size of the font.
  * TODO: supports shortcuts like <C-a> and <C-w> in the command entry.
  * TODO: smart home (with Ctrl-A) in the command text entry.
  * TODO: support non-"always" in special commands.
  * TODO: different event for activate event of special commands.
  * TODO: use the gtk::Statusbar widget?
- * TODO: Show the current shortcut in the status bar.
  * TODO: support shortcuts with number like "50G".
  * TODO: Associate a color with modes.
  */
@@ -52,8 +52,6 @@ extern crate pango_sys;
 mod gtk_timeout;
 #[macro_use]
 mod signal;
-#[macro_use]
-mod widget;
 pub mod completion;
 pub mod dialog;
 mod gobject;
@@ -366,7 +364,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
             completers.insert(identifier, completer);
         }
         let mut status_bar = StatusBar::new(completion_view, completers);
-        grid.attach(&*status_bar, 0, 2, 1, 1);
+        grid.attach(&**status_bar, 0, 2, 1, 1);
         window.show_all();
         status_bar.hide_widgets();
         status_bar.hide_completion();

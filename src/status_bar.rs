@@ -98,10 +98,10 @@ impl StatusBar {
     pub fn add_item(&self, item: &StatusBarItem) {
         item.label.show();
         if item.left {
-            self.hbox.pack_start(item, false, false, 3);
+            self.hbox.pack_start(&**item, false, false, 3);
         }
         else {
-            self.hbox.pack_end(item, false, false, 3);
+            self.hbox.pack_end(&**item, false, false, 3);
         }
     }
 
@@ -299,8 +299,6 @@ impl Deref for StatusBar {
     }
 }
 
-is_widget!(StatusBar, hbox);
-
 /// A status bar text item.
 pub struct StatusBarItem {
     label: Label,
@@ -337,4 +335,10 @@ impl StatusBarItem {
     }
 }
 
-is_widget!(StatusBarItem, label);
+impl Deref for StatusBarItem {
+    type Target = Label;
+
+    fn deref(&self) -> &Self::Target {
+        &self.label
+    }
+}
