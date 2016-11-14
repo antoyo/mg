@@ -25,7 +25,8 @@ use gtk::Continue;
 use mg_settings::{EnumFromStr, EnumMetaData, SettingCompletion};
 use mg_settings::settings;
 
-use super::{Application, SpecialCommand};
+use app::Application;
+use SpecialCommand;
 
 const INFO_MESSAGE_DURATION: u32 = 5000;
 

@@ -40,9 +40,9 @@ use gtk::prelude::WidgetExtManual;
 use gtk::Orientation::Horizontal;
 use pango_sys::PangoEllipsizeMode;
 
+use app::COMMAND_MODE;
 use completion::{Completer, Completion, CompletionView, DEFAULT_COMPLETER_IDENT, NO_COMPLETER_IDENT};
 use gtk_widgets::LabelExtManual;
-use super::COMMAND_MODE;
 
 const BLUE: &'static GdkRGBA = &GdkRGBA { red: 0.0, green: 0.0, blue: 1.0, alpha: 1.0 };
 const ORANGE: &'static GdkRGBA = &GdkRGBA { red: 0.9, green: 0.55, blue: 0.0, alpha: 1.0 };
@@ -109,7 +109,7 @@ impl StatusBar {
     fn adjust_entry(entry: &Entry) {
         entry.set_name("mg-input-command");
         let style_context = entry.get_style_context().unwrap();
-        let style = include_str!("../style/command-input.css");
+        let style = include_str!("../../style/command-input.css");
         let provider = CssProvider::new();
         provider.load_from_data(style).unwrap();
         style_context.add_provider(&provider, STYLE_PROVIDER_PRIORITY_APPLICATION);

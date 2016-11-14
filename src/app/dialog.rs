@@ -28,8 +28,9 @@ use mg_settings::{EnumFromStr, EnumMetaData, SettingCompletion};
 use mg_settings::key::Key;
 use mg_settings::settings;
 
+use app::{Application, BLOCKING_INPUT_MODE, INPUT_MODE};
 use self::DialogResult::{Answer, Shortcut};
-use super::{Application, SpecialCommand, BLOCKING_INPUT_MODE, INPUT_MODE};
+use SpecialCommand;
 
 /// Builder to create a new dialog.
 pub struct DialogBuilder {
