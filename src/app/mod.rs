@@ -23,7 +23,7 @@ pub mod dialog;
 mod message;
 pub mod settings;
 mod shortcut;
-mod status_bar;
+pub mod status_bar;
 
 use std::borrow::Cow;
 use std::char;

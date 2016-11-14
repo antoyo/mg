@@ -52,7 +52,7 @@ mod gtk_timeout;
 #[macro_use]
 mod signal;
 mod app;
-mod completion;
+pub mod completion;
 mod gobject;
 mod gtk_widgets;
 mod key_converter;
@@ -65,6 +65,7 @@ use std::result;
 pub use app::{Application, ApplicationBuilder, SimpleApplicationBuilder};
 pub use app::dialog::{DialogBuilder, DialogResult};
 pub use app::settings::NoSettings;
+pub use app::status_bar::StatusBarItem;
 
 #[macro_export]
 macro_rules! hash {
