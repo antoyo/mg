@@ -81,6 +81,7 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
 
     /// Show a message to the user.
     pub fn message(&self, message: &str) {
+        self.reset_colors();
         self.message.set_text(message);
     }
 
