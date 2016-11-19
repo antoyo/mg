@@ -179,7 +179,7 @@ pub struct Application<Comm, Sett: mg_settings::settings::Settings = NoSettings,
     mode_label: StatusBarItem,
     settings: Option<Sett>,
     settings_parser: Parser<Comm>,
-    setting_change_callback: Option<Box<Fn(Sett::Variant)>>,
+    setting_change_callback: Option<Box<Fn(&Sett::Variant)>>,
     shortcuts: HashMap<Key, String>,
     shortcut_label: StatusBarItem,
     shortcut_pressed: bool,
@@ -351,7 +351,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     }
 
     /// Call the setting changed callback.
-    fn call_setting_callback(&self, setting: Sett::Variant) {
+    fn call_setting_callback(&self, setting: &Sett::Variant) {
         if let Some(ref callback) = self.setting_change_callback {
             callback(setting);
         }
@@ -423,7 +423,7 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     }
 
     /// Add a callback to setting changed event.
-    pub fn connect_setting_changed<F: Fn(Sett::Variant) + 'static>(&mut self, callback: F) {
+    pub fn connect_setting_changed<F: Fn(&Sett::Variant) + 'static>(&mut self, callback: F) {
         self.setting_change_callback = Some(Box::new(callback));
     }
 
@@ -640,10 +640,10 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
 
     /// Set a setting value.
     pub fn set_setting(&mut self, setting: Sett::Variant) {
+        self.call_setting_callback(&setting);
         if let Some(ref mut settings) = self.settings {
-            settings.set_value(setting.clone());
+            settings.set_value(setting);
         }
-        self.call_setting_callback(setting);
     }
 
     /// Set the current (special) command identifier.

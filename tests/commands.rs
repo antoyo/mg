@@ -47,7 +47,7 @@ enum AppCommand {
     Quit,
 }
 
-#[derive(Settings)]
+#[derive(Default, Settings)]
 pub struct AppSettings {
     boolean: bool,
 }
@@ -60,7 +60,7 @@ struct App {
 impl App {
     fn new() -> Box<Self> {
         let app = ApplicationBuilder::new()
-            .settings(AppSettings::new())
+            .settings(AppSettings::default())
             .build();
 
         let label = Label::new(Some("Label"));
