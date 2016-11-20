@@ -137,6 +137,11 @@ impl Completion {
         &self.completer_ident
     }
 
+    /// Delete the current completion item.
+    pub fn delete_current_completion_item(&self) {
+        self.view.delete_current_completion_item();
+    }
+
     /// Filter the rows from the input.
     pub fn filter(&mut self, input: &str) {
         let model =

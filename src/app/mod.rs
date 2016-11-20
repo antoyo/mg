@@ -432,6 +432,11 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
         self.special_command_callback = Some(Box::new(callback));
     }
 
+    /// Delete the current completion item.
+    pub fn delete_current_completion_item(&self) {
+        self.status_bar.delete_current_completion_item();
+    }
+
     /// Get the text of the status bar command entry.
     pub fn get_command(&self) -> String {
         self.status_bar.get_command().unwrap_or_default()

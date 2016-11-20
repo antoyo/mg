@@ -22,12 +22,13 @@
 use std::cmp::max;
 use std::ops::Deref;
 
-use glib::Object;
+use glib::{Cast, Object};
 use gtk::{
     Align,
     CellRendererText,
     ContainerExt,
     IsA,
+    ListStore,
     ScrolledWindow,
     ScrolledWindowExt,
     TreeIter,
@@ -141,6 +142,16 @@ impl CompletionView {
     /// Add a callback to the unselect event.
     pub fn connect_unselect<F: Fn() + 'static>(&mut self, callback: F) {
         self.unselect_callback = Some(Box::new(callback));
+    }
+
+    /// Delete the current completion item.
+    pub fn delete_current_completion_item(&self) {
+        if let Some((model, iter)) = self.tree_view.get_selection().get_selected() {
+            if let Ok(model) = model.downcast::<ListStore>() {
+                self.select_next();
+                model.remove(&iter);
+            }
+        }
     }
 
     /// Adjust the policy of the scrolled window to avoid having extra space around the tree view.

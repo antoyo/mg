@@ -150,6 +150,11 @@ impl StatusBar {
         self.entry.connect_activate(move |entry| callback(entry.get_text()));
     }
 
+    /// Delete the current completion item.
+    pub fn delete_current_completion_item(&self) {
+        self.completion.delete_current_completion_item();
+    }
+
     /// Get whether the entry is shown or not.
     pub fn entry_shown(&self) -> bool {
         self.entry_shown
