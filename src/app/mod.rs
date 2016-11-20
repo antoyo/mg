@@ -432,6 +432,11 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
         self.special_command_callback = Some(Box::new(callback));
     }
 
+    /// Get the text of the status bar command entry.
+    pub fn get_command(&self) -> String {
+        self.status_bar.get_command().unwrap_or_default()
+    }
+
     /// Get the color of the text.
     fn get_foreground_color(window: &Window) -> RGBA {
         let style_context = window.get_style_context().unwrap();
