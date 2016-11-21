@@ -152,7 +152,7 @@ impl App {
     fn setting_changed(&self, setting: &AppSettingsVariant) {
         match *setting {
             CustomSet(ref setting) => self.label.set_text(&format!("custom setting is: {:?}", setting)),
-            Title(ref title) => self.app.set_window_title(&title),
+            Title(ref title) => self.app.set_window_title(title),
             TitleLen(ref len) => self.app.set_window_title(&format!("New title len: {}", len)),
             Boolean(_) | Width(_) => (),
         }
