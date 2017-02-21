@@ -64,3 +64,21 @@ macro_rules! connect {
         });
     };
 }
+
+#[macro_export]
+macro_rules! connect_static {
+    ($source:ident, $event:ident $( [ $($param:expr),* ] )* ( $($ident:pat),* ), $target:expr, $method:ident ( $($arg:expr),* )) => {
+        let target = &mut *$target as *mut _;
+        $source::$event($($($param,)*)* move |$($ident),*| {
+            let target: &mut Self = unsafe { &mut *target };
+            target.$method($($arg),*)
+        });
+    };
+    ($source:ident, $event:ident $( [ $($param:expr),* ] )*, $target:expr, $method:ident) => {
+        let target = &mut *$target as *mut _;
+        $source::$event($($($param,)*)* move || {
+            let target: &mut Self = unsafe { &mut *target };
+            target.$method()
+        });
+    };
+}
