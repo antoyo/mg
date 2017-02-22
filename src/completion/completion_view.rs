@@ -25,6 +25,7 @@ use std::ops::Deref;
 use glib::{Cast, Object};
 use gtk::{
     Align,
+    CellLayoutExt,
     CellRendererText,
     ContainerExt,
     IsA,
