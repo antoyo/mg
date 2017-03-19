@@ -34,7 +34,6 @@ use std::path::{Path, PathBuf};
 
 use gdk::{EventKey, RGBA};
 use gdk::enums::key::{Escape, colon};
-use gdk_sys::GdkRGBA;
 use gtk::{
     self,
     ContainerExt,
@@ -51,7 +50,6 @@ use gtk::{
     WindowType,
     STATE_FLAG_NORMAL,
 };
-use gtk::prelude::WidgetExtManual;
 use mg_settings::{self, Config, EnumFromStr, EnumMetaData, Parser, SettingCompletion};
 use mg_settings::Command::{self, App, Custom, Map, Set, Unmap};
 use mg_settings::error::{Error, Result};
@@ -72,7 +70,6 @@ use self::settings::NoSettings;
 use self::ShortcutCommand::{Complete, Incomplete};
 use self::status_bar::StatusBar;
 pub use self::status_bar::StatusBarItem;
-use style_context::StyleContextExtManual;
 use super::{NoSpecialCommands, SpecialCommand};
 
 #[derive(PartialEq)]
@@ -92,14 +89,14 @@ enum ShortcutCommand {
     Incomplete(String),
 }
 
-const TRANSPARENT: &'static GdkRGBA = &GdkRGBA { red: 0.0, green: 0.0, blue: 0.0, alpha: 0.0 };
+const TRANSPARENT: &RGBA = &RGBA { red: 0.0, green: 0.0, blue: 0.0, alpha: 0.0 };
 
-const BLOCKING_INPUT_MODE: &'static str = "blocking-input";
-const COMMAND_MODE: &'static str = "command";
-const COMPLETE_NEXT_COMMAND: &'static str = "complete-next";
-const COMPLETE_PREVIOUS_COMMAND: &'static str = "complete-previous";
-const INPUT_MODE: &'static str = "input";
-const NORMAL_MODE: &'static str = "normal";
+const BLOCKING_INPUT_MODE: &str = "blocking-input";
+const COMMAND_MODE: &str = "command";
+const COMPLETE_NEXT_COMMAND: &str = "complete-next";
+const COMPLETE_PREVIOUS_COMMAND: &str = "complete-previous";
+const INPUT_MODE: &str = "input";
+const NORMAL_MODE: &str = "normal";
 
 /// Alias for an application builder without settings.
 pub type SimpleApplicationBuilder = ApplicationBuilder<NoSettings>;
@@ -631,8 +628,8 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
 
     /// Reset the background and foreground colors of the status bar.
     fn reset_colors(&self) {
-        self.status_bar.override_background_color(STATE_FLAG_NORMAL, TRANSPARENT);
-        self.status_bar.override_color(STATE_FLAG_NORMAL, &self.foreground_color);
+        self.status_bar.override_background_color(STATE_FLAG_NORMAL, Some(TRANSPARENT));
+        self.status_bar.override_color(STATE_FLAG_NORMAL, Some(&self.foreground_color));
     }
 
     /// Go back to the normal mode from command or input mode.

@@ -79,7 +79,7 @@ impl DialogBuilder {
 
     /// Set the choices available for the input.
     pub fn choices(mut self, choices: &[char]) -> Self {
-        self.choices = choices.iter().cloned().collect();
+        self.choices = choices.to_vec();
         self
     }
 

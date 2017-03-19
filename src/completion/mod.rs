@@ -39,10 +39,10 @@ pub use self::completers::{CommandCompleter, NoCompleter, SettingCompleter};
 pub use self::completion_view::CompletionView;
 
 /// The identifier of the default completer.
-pub const DEFAULT_COMPLETER_IDENT: &'static str = "__mg_default";
+pub const DEFAULT_COMPLETER_IDENT: &str = "__mg_default";
 
 /// The identifier of the null completer.
-pub const NO_COMPLETER_IDENT: &'static str = "__mg_no_completer";
+pub const NO_COMPLETER_IDENT: &str = "__mg_no_completer";
 
 /// The type of a column.
 #[derive(Clone, Copy, PartialEq)]

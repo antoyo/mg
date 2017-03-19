@@ -20,7 +20,7 @@
  */
 
 use gdk::RGBA;
-use glib::translate::ToGlibPtr;
+use glib::translate::{ToGlibPtr, ToGlibPtrMut};
 use gtk::{StateFlags, StyleContext};
 use gtk_sys::{GtkStateFlags, GtkStyleContext, gtk_style_context_get_background_color, gtk_style_context_get_color};
 
@@ -39,7 +39,7 @@ impl StyleContextExtManual for StyleContext {
             green: 0.0,
             red: 0.0,
         };
-        unsafe { gtk_style_context_get_background_color(context, state, &mut color as *mut _) };
+        unsafe { gtk_style_context_get_background_color(context, state, color.to_glib_none_mut().0) };
         color
     }
 
@@ -52,7 +52,7 @@ impl StyleContextExtManual for StyleContext {
             green: 0.0,
             red: 0.0,
         };
-        unsafe { gtk_style_context_get_color(context, state, &mut color as *mut _) };
+        unsafe { gtk_style_context_get_color(context, state, color.to_glib_none_mut().0) };
         color
     }
 }

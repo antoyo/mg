@@ -22,7 +22,7 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 
-use gdk_sys::GdkRGBA;
+use gdk::RGBA;
 use gtk::{
     BoxExt,
     ContainerExt,
@@ -36,7 +36,6 @@ use gtk::{
     STATE_FLAG_NORMAL,
     STYLE_PROVIDER_PRIORITY_APPLICATION,
 };
-use gtk::prelude::WidgetExtManual;
 use gtk::Orientation::Horizontal;
 use pango_sys::PangoEllipsizeMode;
 
@@ -44,12 +43,11 @@ use app::COMMAND_MODE;
 use completion::{Completer, Completion, CompletionView, DEFAULT_COMPLETER_IDENT, NO_COMPLETER_IDENT};
 use gtk_widgets::LabelExtManual;
 
-const BLUE: &'static GdkRGBA = &GdkRGBA { red: 0.0, green: 0.0, blue: 1.0, alpha: 1.0 };
-const ORANGE: &'static GdkRGBA = &GdkRGBA { red: 0.9, green: 0.55, blue: 0.0, alpha: 1.0 };
-const RED: &'static GdkRGBA = &GdkRGBA { red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0 };
-const WHITE: &'static GdkRGBA = &GdkRGBA { red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0 };
+const BLUE: &RGBA = &RGBA { red: 0.0, green: 0.0, blue: 1.0, alpha: 1.0 };
+const ORANGE: &RGBA = &RGBA { red: 0.9, green: 0.55, blue: 0.0, alpha: 1.0 };
+const RED: &RGBA = &RGBA { red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0 };
+const WHITE: &RGBA = &RGBA { red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0 };
 
-pub type StatusBarWidget = HBox;
 pub type HBox = ::gtk::Box;
 
 /// The window status bar.
@@ -119,19 +117,19 @@ impl StatusBar {
 
     /// Color the status bar in blue.
     pub fn color_blue(&self) {
-        self.override_background_color(STATE_FLAG_NORMAL, BLUE);
+        self.override_background_color(STATE_FLAG_NORMAL, Some(BLUE));
         self.white_foreground();
     }
 
     /// Color the status bar in orange.
     pub fn color_orange(&self) {
-        self.override_background_color(STATE_FLAG_NORMAL, ORANGE);
+        self.override_background_color(STATE_FLAG_NORMAL, Some(ORANGE));
         self.white_foreground();
     }
 
     /// Color the status bar in red.
     pub fn color_red(&self) {
-        self.override_background_color(STATE_FLAG_NORMAL, RED);
+        self.override_background_color(STATE_FLAG_NORMAL, Some(RED));
         self.white_foreground();
     }
 
@@ -292,7 +290,7 @@ impl StatusBar {
 
     /// Set the foreground (text) color to white.
     pub fn white_foreground(&self) {
-        self.override_color(STATE_FLAG_NORMAL, WHITE);
+        self.override_color(STATE_FLAG_NORMAL, Some(WHITE));
     }
 }
 

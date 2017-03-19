@@ -1,5 +1,6 @@
 [package]
 authors = ["Antoni Boucher <bouanto@zoho.com>"]
+categories = ["gui"]
 description = "Minimal UI library based on GTK+."
 documentation = "https://antoyo.github.io/mg/mg/"
 license = "MIT"
