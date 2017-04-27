@@ -9,51 +9,24 @@ repository = "https://github.com/antoyo/mg"
 version = "0.0.5-pre"
 
 [dependencies]
+gdk = "^0.5.2"
+gdk-sys = "^0.3.3"
+glib = "^0.1.2"
+glib-sys = "^0.3.3"
+gobject-sys = "^0.3.3"
+gtk = "^0.1.2"
+gtk-sys = "^0.3.3"
 libc = "^0.2"
 log = "^0.3"
-
-[dependencies.gdk]
-git = "https://github.com/gtk-rs/gdk"
-version = "0.5.0"
-
-[dependencies.gdk-sys]
-git = "https://github.com/gtk-rs/sys"
-version = "0.3.1"
-
-[dependencies.glib]
-git = "https://github.com/gtk-rs/glib"
-version = "0.1.0"
-
-[dependencies.glib-sys]
-git = "https://github.com/gtk-rs/sys"
-version = "0.3.1"
-
-[dependencies.gobject-sys]
-git = "https://github.com/gtk-rs/sys"
-version = "0.3.1"
-
-[dependencies.gtk]
-git = "https://github.com/gtk-rs/gtk"
-version = "0.1.0"
-
-[dependencies.gtk-sys]
-git = "https://github.com/gtk-rs/sys"
-version = "0.3.1"
-
-[dependencies.mg-settings]
-git = "https://github.com/antoyo/mg-settings"
-version = "^0.0.5-pre"
-
-[dependencies.pango-sys]
-git = "https://github.com/gtk-rs/sys"
-version = "0.3.1"
+mg-settings = "^0.0.5"
+pango-sys = "^0.3.3"
+relm ="^0.8.0"
+relm-attributes = "^0.8.0"
+relm-derive = "^0.8.0"
 
 [dev-dependencies]
 libxdo = "^0.4.1"
-
-[dev-dependencies.mg-settings-macros]
-git = "https://github.com/antoyo/mg-settings"
-version = "^0.0.1"
+mg-settings-macros = "^0.0.2"
 
 [features]
 nightly = []

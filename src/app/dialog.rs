@@ -184,19 +184,19 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
             self.choices.append(&mut dialog_builder.choices);
             let choices: Vec<_> = choices.iter().map(|c| c.to_string()).collect();
             let choices = choices.join("/");
-            self.status_bar.set_identifier(&format!("{} ({}) ", dialog_builder.message, choices));
-            self.status_bar.show_identifier();
+            //self.status_bar.set_identifier(&format!("{} ({}) ", dialog_builder.message, choices));
+            //self.status_bar.show_identifier();
         }
         else {
-            self.status_bar.set_identifier(&format!("{} ", dialog_builder.message));
-            self.status_bar.show_entry();
-            self.status_bar.set_input(&dialog_builder.default_answer);
+            //self.status_bar.set_identifier(&format!("{} ", dialog_builder.message));
+            //self.status_bar.show_entry();
+            //self.status_bar.set_input(&dialog_builder.default_answer);
         }
 
         if let Some(completer) = dialog_builder.completer {
-            self.status_bar.set_completer(&completer);
-            self.status_bar.set_original_input(&dialog_builder.default_answer);
-            self.status_bar.show_completion();
+            //self.status_bar.set_completer(&completer);
+            //self.status_bar.set_original_input(&dialog_builder.default_answer);
+            //self.status_bar.show_completion();
         }
 
         self.answer = None;
@@ -217,7 +217,7 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
             self.set_mode(INPUT_MODE);
 
         }
-        self.status_bar.color_blue();
+        //self.status_bar.color_blue();
         if dialog_builder.blocking {
             gtk::main();
             self.reset();

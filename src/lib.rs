@@ -33,6 +33,7 @@
 //! Minimal UI library based on GTK+.
 
 #![warn(missing_docs)]
+#![feature(proc_macro)]
 
 extern crate gdk;
 extern crate gdk_sys;
@@ -46,11 +47,16 @@ extern crate libc;
 extern crate log;
 extern crate mg_settings;
 extern crate pango_sys;
+#[macro_use]
+extern crate relm;
+extern crate relm_attributes;
+#[macro_use]
+extern crate relm_derive;
 
 #[macro_use]
 mod gtk_timeout;
-#[macro_use]
-mod signal;
+//#[macro_use]
+//mod signal;
 mod app;
 pub mod completion;
 mod gobject;
@@ -62,10 +68,10 @@ mod style_context;
 use std::char;
 use std::result;
 
-pub use app::{Application, ApplicationBuilder, SimpleApplicationBuilder};
-pub use app::dialog::{DialogBuilder, DialogResult};
+pub use app::{Mg, View};
+//pub use app::dialog::{DialogBuilder, DialogResult};
 pub use app::settings::NoSettings;
-pub use app::status_bar::StatusBarItem;
+pub use app::status_bar::{StatusBar, StatusBarItem};
 
 #[macro_export]
 macro_rules! hash {

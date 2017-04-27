@@ -38,15 +38,15 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
     /// Show an alert message to the user.
     pub fn alert(&self, message: &str) {
         self.message.set_text(message);
-        self.status_bar.color_blue();
+        //self.status_bar.color_blue();
     }
 
     /// Show an error to the user.
     pub fn error(&mut self, error: &str) {
         error!("{}", error);
         self.message.set_text(error);
-        self.status_bar.hide_entry();
-        self.status_bar.color_red();
+        //self.status_bar.hide_entry();
+        //self.status_bar.color_red();
     }
 
     /// Hide the information message.
@@ -90,7 +90,7 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
         warn!("{}", message);
         self.message.set_text(message);
         let message = message.to_string();
-        self.status_bar.color_orange();
+        //self.status_bar.color_orange();
         timeout_add!(INFO_MESSAGE_DURATION, self, hide_colored_message(&message));
     }
 }

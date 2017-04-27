@@ -23,6 +23,7 @@ use std::collections::HashMap;
 use std::ops::Deref;
 
 use gdk::RGBA;
+use gtk;
 use gtk::{
     BoxExt,
     ContainerExt,
@@ -31,13 +32,19 @@ use gtk::{
     Entry,
     EntryExt,
     Label,
+    OrientableExt,
+    PackType,
     TreeSelection,
     WidgetExt,
     STATE_FLAG_NORMAL,
     STYLE_PROVIDER_PRIORITY_APPLICATION,
 };
+use gtk::prelude::WidgetExtManual;
 use gtk::Orientation::Horizontal;
 use pango_sys::PangoEllipsizeMode;
+use relm::Widget;
+use relm::gtk_ext::BoxExtManual;
+use relm_attributes::widget;
 
 use app::COMMAND_MODE;
 use completion::{Completer, Completion, CompletionView, DEFAULT_COMPLETER_IDENT, NO_COMPLETER_IDENT};
@@ -50,6 +57,88 @@ const WHITE: &RGBA = &RGBA { red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0 };
 
 pub type HBox = ::gtk::Box;
 
+#[derive(Msg)]
+pub enum Msg {
+}
+
+#[derive(Clone)]
+pub struct Model {
+    entry_shown: bool,
+    identifier_label: &'static str,
+}
+
+#[widget]
+impl Widget for StatusBar {
+    fn init_view(&self) {
+        // Adjust the look of the entry.
+        let style_context = self.command_entry.get_style_context().unwrap();
+        let style = include_str!("../../style/command-input.css");
+        let provider = CssProvider::new();
+        provider.load_from_data(style).unwrap();
+        style_context.add_provider(&provider, STYLE_PROVIDER_PRIORITY_APPLICATION);
+    }
+
+    fn model() -> Model {
+        Model {
+            entry_shown: false,
+            identifier_label: ":",
+        }
+    }
+
+    fn update(&mut self, msg: Msg, model: &mut Model) {
+    }
+
+    view! {
+        #[container]
+        gtk::Box {
+            property_height_request: 20, // TODO: is this still useful?
+            orientation: Horizontal,
+            gtk::Label {
+                text: model.identifier_label,
+                visible: model.entry_shown,
+            },
+            #[name="command_entry"]
+            gtk::Entry {
+                has_frame: false,
+                hexpand: true,
+                name: "mg-input-command",
+                visible: model.entry_shown,
+            },
+        }
+    }
+}
+
+#[derive(Msg)]
+pub enum ItemMsg {
+}
+
+#[widget]
+impl Widget for StatusBarItem {
+    fn model() -> () {
+        ()
+    }
+
+    fn update(&mut self, msg: ItemMsg, model: &mut ()) {
+    }
+
+    view! {
+        #[name="label"]
+        gtk::Label {
+            packing: {
+                pack_type: PackType::End,
+                padding: 3,
+            },
+        }
+    }
+}
+
+impl StatusBarItem {
+    pub fn set_text(&self, text: &str) {
+        self.label.set_text(text);
+    }
+}
+
+/*
 /// The window status bar.
 pub struct StatusBar {
     completion: Completion,
@@ -64,17 +153,7 @@ pub struct StatusBar {
 impl StatusBar {
     /// Create a new status bar.
     pub fn new(completion_view: Box<CompletionView>, completers: HashMap<String, Box<Completer>>) -> Box<Self> {
-        let hbox = HBox::new(Horizontal, 0);
-        hbox.set_size_request(1, 20);
-
-        let identifier_label = Label::new(Some(":"));
-        hbox.add(&identifier_label);
-
-        let entry = Entry::new();
         let completion = Completion::new(completers, completion_view);
-
-        StatusBar::adjust_entry(&entry);
-        hbox.add(&entry);
 
         let mut status_bar = Box::new(StatusBar {
             completion: completion,
@@ -86,8 +165,8 @@ impl StatusBar {
             hbox: hbox,
         });
 
-        connect!(status_bar.completion.view, connect_selection_changed(selection), status_bar, selection_changed(selection));
-        connect!(status_bar.completion.view, connect_unselect, status_bar, handle_unselect);
+        //connect!(status_bar.completion.view, connect_selection_changed(selection), status_bar, selection_changed(selection));
+        //connect!(status_bar.completion.view, connect_unselect, status_bar, handle_unselect);
 
         status_bar
     }
@@ -103,33 +182,21 @@ impl StatusBar {
         }
     }
 
-    /// Adjust the look of the entry.
-    fn adjust_entry(entry: &Entry) {
-        entry.set_name("mg-input-command");
-        let style_context = entry.get_style_context().unwrap();
-        let style = include_str!("../../style/command-input.css");
-        let provider = CssProvider::new();
-        provider.load_from_data(style).unwrap();
-        style_context.add_provider(&provider, STYLE_PROVIDER_PRIORITY_APPLICATION);
-        entry.set_has_frame(false);
-        entry.set_hexpand(true);
-    }
-
     /// Color the status bar in blue.
     pub fn color_blue(&self) {
-        self.override_background_color(STATE_FLAG_NORMAL, Some(BLUE));
+        self.override_background_color(STATE_FLAG_NORMAL, &BLUE);
         self.white_foreground();
     }
 
     /// Color the status bar in orange.
     pub fn color_orange(&self) {
-        self.override_background_color(STATE_FLAG_NORMAL, Some(ORANGE));
+        self.override_background_color(STATE_FLAG_NORMAL, &ORANGE);
         self.white_foreground();
     }
 
     /// Color the status bar in red.
     pub fn color_red(&self) {
-        self.override_background_color(STATE_FLAG_NORMAL, Some(RED));
+        self.override_background_color(STATE_FLAG_NORMAL, &RED);
         self.white_foreground();
     }
 
@@ -151,11 +218,6 @@ impl StatusBar {
     /// Delete the current completion item.
     pub fn delete_current_completion_item(&self) {
         self.completion.delete_current_completion_item();
-    }
-
-    /// Get whether the entry is shown or not.
-    pub fn entry_shown(&self) -> bool {
-        self.entry_shown
     }
 
     /// Filter the completion view.
@@ -193,9 +255,6 @@ impl StatusBar {
     /// Hide the entry.
     pub fn hide_entry(&mut self) {
         self.entry.set_text("");
-        self.entry_shown = false;
-        self.entry.hide();
-        self.identifier_label.hide();
     }
 
     /// Select the completer based on the currently typed command.
@@ -234,11 +293,6 @@ impl StatusBar {
         self.inserting_completion = false;
     }
 
-    /// Set the identifier label text.
-    pub fn set_identifier(&self, identifier: &str) {
-        self.identifier_label.set_text(identifier);
-    }
-
     /// Set the original input.
     pub fn set_original_input(&mut self, input: &str) {
         self.completion_original_input = input.to_string();
@@ -253,16 +307,8 @@ impl StatusBar {
 
     /// Show the entry.
     pub fn show_entry(&mut self) {
-        self.entry_shown = true;
         self.entry.set_text("");
-        self.entry.show();
         self.entry.grab_focus();
-        self.show_identifier();
-    }
-
-    /// Show the identifier label.
-    pub fn show_identifier(&self) {
-        self.identifier_label.show();
     }
 
     /// Update the completions.
@@ -290,15 +336,7 @@ impl StatusBar {
 
     /// Set the foreground (text) color to white.
     pub fn white_foreground(&self) {
-        self.override_color(STATE_FLAG_NORMAL, Some(WHITE));
-    }
-}
-
-impl Deref for StatusBar {
-    type Target = HBox;
-
-    fn deref(&self) -> &Self::Target {
-        &self.hbox
+        self.override_color(STATE_FLAG_NORMAL, &WHITE);
     }
 }
 
@@ -327,6 +365,11 @@ impl StatusBarItem {
 
     /// Set the item to be on the left.
     pub fn left(mut self) -> Self {
+        // TODO: use:
+        // packing {
+        //     pack_type: PackType::End
+        // }
+        // instead of this.
         self.left = true;
         self
     }
@@ -336,12 +379,4 @@ impl StatusBarItem {
         self.label.set_text(text);
         self.label.show();
     }
-}
-
-impl Deref for StatusBarItem {
-    type Target = Label;
-
-    fn deref(&self) -> &Self::Target {
-        &self.label
-    }
-}
+}*/

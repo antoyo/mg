@@ -25,7 +25,7 @@ use gtk::Inhibit;
 use mg_settings::{self, EnumFromStr, EnumMetaData, SettingCompletion};
 use mg_settings::key::Key;
 
-use app::{Application, BLOCKING_INPUT_MODE, COMMAND_MODE, INPUT_MODE, NORMAL_MODE};
+use app::{/*Application, */ Mg, Msg, BLOCKING_INPUT_MODE, COMMAND_MODE, INPUT_MODE, NORMAL_MODE};
 use app::ShortcutCommand::{Complete, Incomplete};
 use key_converter::gdk_key_to_key;
 use SpecialCommand;
@@ -36,7 +36,60 @@ pub fn shortcut_to_string(keys: &[Key]) -> String {
     strings.join("")
 }
 
-impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
+impl Mg {
+    /// Handle a possible input of a shortcut.
+    pub fn handle_shortcut(key: &EventKey, current_mode: &str) -> (Option<Msg>, Inhibit) {
+        let keyval = key.get_keyval();
+        let should_inhibit = current_mode == NORMAL_MODE ||
+            (current_mode == COMMAND_MODE && (keyval == Tab || keyval == ISO_Left_Tab)) ||
+            key.get_keyval() == Escape;
+        let control_pressed = key.get_state() & CONTROL_MASK == CONTROL_MASK;
+        /*if !self.status_bar.entry_shown() || control_pressed || keyval == Tab || keyval == ISO_Left_Tab {
+            if let Some(key) = gdk_key_to_key(keyval, control_pressed) {
+                self.add_to_shortcut(key);
+                let action = {
+                    let mut current_mode = self.current_mode.clone();
+                    // The input modes have the same mappings as the command mode.
+                    if current_mode == INPUT_MODE || current_mode == BLOCKING_INPUT_MODE {
+                        current_mode = COMMAND_MODE.to_string();
+                    }
+                    self.mappings.get(&current_mode)
+                        .and_then(|mappings| mappings.get(&self.current_shortcut).cloned())
+                };
+                if let Some(action) = action {
+                    // FIXME: this is copied a couple of lines below.
+                    if !self.status_bar.entry_shown() {
+                        self.reset();
+                    }
+                    self.clear_shortcut();
+                    match self.action_to_command(&action) {
+                        Complete(command) => self.handle_command(Some(command)),
+                        Incomplete(command) => {
+                            self.input_command(&command);
+                            //self.status_bar.show_completion();
+                            self.update_completions();
+                            return Inhibit(true);
+                        },
+                    }
+                }
+                else if self.no_possible_shortcut() {
+                    if !self.status_bar.entry_shown() {
+                        self.reset();
+                    }
+                    self.clear_shortcut();
+                }
+            }
+        }*/
+        if should_inhibit {
+            (None, Inhibit(true))
+        }
+        else {
+            (None, Inhibit(false))
+        }
+    }
+}
+
+/*impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     where Spec: SpecialCommand + 'static,
           Comm: EnumFromStr + EnumMetaData + 'static,
           Sett: mg_settings::settings::Settings + EnumMetaData + SettingCompletion + 'static,
@@ -68,56 +121,6 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
         false
     }
 
-    /// Handle a possible input of a shortcut.
-    pub fn handle_shortcut(&mut self, key: &EventKey) -> Inhibit {
-        let keyval = key.get_keyval();
-        let should_inhibit = self.current_mode == NORMAL_MODE ||
-            (self.current_mode == COMMAND_MODE && (keyval == Tab || keyval == ISO_Left_Tab)) ||
-            key.get_keyval() == Escape;
-        let control_pressed = key.get_state() & CONTROL_MASK == CONTROL_MASK;
-        if !self.status_bar.entry_shown() || control_pressed || keyval == Tab || keyval == ISO_Left_Tab {
-            if let Some(key) = gdk_key_to_key(keyval, control_pressed) {
-                self.add_to_shortcut(key);
-                let action = {
-                    let mut current_mode = self.current_mode.clone();
-                    // The input modes have the same mappings as the command mode.
-                    if current_mode == INPUT_MODE || current_mode == BLOCKING_INPUT_MODE {
-                        current_mode = COMMAND_MODE.to_string();
-                    }
-                    self.mappings.get(&current_mode)
-                        .and_then(|mappings| mappings.get(&self.current_shortcut).cloned())
-                };
-                if let Some(action) = action {
-                    if !self.status_bar.entry_shown() {
-                        self.reset();
-                    }
-                    self.clear_shortcut();
-                    match self.action_to_command(&action) {
-                        Complete(command) => self.handle_command(Some(command)),
-                        Incomplete(command) => {
-                            self.input_command(&command);
-                            self.status_bar.show_completion();
-                            self.update_completions();
-                            return Inhibit(true);
-                        },
-                    }
-                }
-                else if self.no_possible_shortcut() {
-                    if !self.status_bar.entry_shown() {
-                        self.reset();
-                    }
-                    self.clear_shortcut();
-                }
-            }
-        }
-        if should_inhibit {
-            Inhibit(true)
-        }
-        else {
-            Inhibit(false)
-        }
-    }
-
     /// Check if there are no possible shortcuts.
     fn no_possible_shortcut(&self) -> bool {
         if let Some(mappings) = self.mappings.get(&self.current_mode) {
@@ -134,4 +137,4 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     fn update_shortcut_label(&self) {
         self.shortcut_label.set_text(&shortcut_to_string(&self.current_shortcut));
     }
-}
+}*/

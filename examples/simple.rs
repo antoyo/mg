@@ -19,32 +19,108 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-// TODO: will be fixed when #[special_command] attribute is added.
-
 #![feature(proc_macro)]
 
+extern crate glib;
 extern crate gtk;
-#[macro_use]
 extern crate mg;
 extern crate mg_settings;
 #[macro_use]
 extern crate mg_settings_macros;
+#[macro_use]
+extern crate relm;
+extern crate relm_attributes;
+#[macro_use]
+extern crate relm_derive;
 
-use gtk::{ContainerExt, Entry, Label, WidgetExt};
+use gtk::{
+    Inhibit,
+    OrientableExt,
+    WidgetExt,
+    WindowExt,
+};
 use gtk::Orientation::Vertical;
-use mg::{Application, NoSettings, NoSpecialCommands, SimpleApplicationBuilder};
+use mg::{
+    Mg,
+    NoSettings,
+    NoSpecialCommands,
+    StatusBar,
+    StatusBarItem,
+    View,
+};
+use relm::Widget;
+use relm_attributes::widget;
 
 use AppCommand::*;
+use Msg::*;
+
+#[derive(Clone)]
+pub struct Model {
+    text: String,
+}
+
+#[derive(Msg)]
+pub enum Msg {
+    Command(AppCommand),
+}
 
 #[derive(Commands)]
-enum AppCommand {
+pub enum AppCommand {
     Insert,
     Normal,
     Open(String),
     Quit,
 }
 
-struct App {
+#[widget]
+impl Widget for Win {
+    fn model() -> Model {
+        Model {
+            text: "Mg App".to_string(),
+        }
+    }
+
+    fn update(&mut self, event: Msg, model: &mut Model) {
+        match event {
+            Command(command) => {
+                match command {
+                    Insert => (), //self.app.set_mode("insert"),
+                    Normal => (), //self.app.set_mode("normal"),
+                    Open(url) => model.text = format!("Opening URL {}", url),
+                    Quit => gtk::main_quit(),
+                }
+            },
+        }
+    }
+
+    view! {
+        Mg {
+            dark_theme: true,
+            title: "First Mg Program",
+            View {
+                gtk::Box {
+                    orientation: Vertical,
+                    gtk::Label {
+                        text: &model.text,
+                    },
+                    gtk::Entry {
+                    },
+                }
+            },
+            StatusBar {
+                StatusBarItem {
+                    text: "Rightmost",
+                },
+                StatusBarItem {
+                    text: "Test",
+                },
+            },
+            //Command => Command, // TODO
+        }
+    }
+}
+
+/*struct App {
     app: Box<mg::Application<AppCommand, NoSettings, NoSpecialCommands>>,
     label: Label,
 }
@@ -56,51 +132,19 @@ impl App {
                 "i" => "insert",
             })
             .build();
-        app.use_dark_theme();
-        let item = app.add_statusbar_item();
-        item.set_text("Item");
-        let item2 = app.add_statusbar_item();
-        item2.set_text("Test");
-        item.set_text("Rightmost");
         if let Err(error) = app.parse_config("examples/main.conf") {
             app.error(&error.to_string());
         }
         app.add_variable("url", || "http://duckduckgo.com/lite".to_string());
-        app.set_window_title("First Mg Program");
 
-        let vbox = gtk::Box::new(Vertical, 0);
-        let label = Label::new(Some("Mg App"));
-        vbox.add(&label);
-        let entry = Entry::new();
-        vbox.add(&entry);
-        app.set_view(&vbox);
-
-        let mut app = Box::new(App {
-            app: app,
-            label: label,
-        });
-
-        connect!(app.app, connect_command(command), app, handle_command(command));
+        //connect!(app.app, connect_command(command), app, handle_command(command));
 
         entry.grab_focus();
 
         app
     }
-
-    fn handle_command(&mut self, command: AppCommand) {
-        match command {
-            Insert => self.app.set_mode("insert"),
-            Normal => self.app.set_mode("normal"),
-            Open(url) => self.label.set_text(&format!("Opening URL {}", url)),
-            Quit => gtk::main_quit(),
-        }
-    }
-}
+}*/
 
 fn main() {
-    gtk::init().unwrap();
-
-    let _app = App::new();
-
-    gtk::main();
+    relm::run::<Win>().unwrap();
 }
