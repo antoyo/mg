@@ -23,6 +23,7 @@
 
 extern crate glib;
 extern crate gtk;
+#[macro_use]
 extern crate mg;
 extern crate mg_settings;
 #[macro_use]
@@ -33,6 +34,8 @@ extern crate relm_attributes;
 #[macro_use]
 extern crate relm_derive;
 
+use std::sync::Arc;
+
 use gtk::{
     Inhibit,
     OrientableExt,
@@ -42,12 +45,16 @@ use gtk::{
 use gtk::Orientation::Vertical;
 use mg::{
     Mg,
+    Modes,
     NoSettings,
     NoSpecialCommands,
     StatusBar,
     StatusBarItem,
     View,
+    parse_config,
 };
+use mg_settings::Parser;
+use mg_settings::error;
 use relm::Widget;
 use relm_attributes::widget;
 
@@ -56,6 +63,7 @@ use Msg::*;
 
 #[derive(Clone)]
 pub struct Model {
+    parser: Arc<error::Result<Parser<AppCommand>>>,
     text: String,
 }
 
@@ -72,10 +80,15 @@ pub enum AppCommand {
     Quit,
 }
 
+static modes: &[(&str, &str)] = &[
+    ("i", "insert"),
+];
+
 #[widget]
 impl Widget for Win {
     fn model() -> Model {
         Model {
+            parser: Arc::new(parse_config("examples/main.conf", modes, None)),
             text: "Mg App".to_string(),
         }
     }
@@ -94,7 +107,7 @@ impl Widget for Win {
     }
 
     view! {
-        Mg {
+        Mg(modes) {
             dark_theme: true,
             title: "First Mg Program",
             View {
@@ -146,5 +159,5 @@ impl App {
 }*/
 
 fn main() {
-    relm::run::<Win>().unwrap();
+    Win::run(()).unwrap();
 }

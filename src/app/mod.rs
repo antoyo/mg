@@ -83,7 +83,7 @@ use self::Msg::*;
 pub use self::status_bar::StatusBarItem;
 pub use self::view::View;
 use style_context::StyleContextExtManual;
-use super::{NoSpecialCommands, SpecialCommand};
+use super::{Modes, NoSpecialCommands, SpecialCommand};
 
 #[derive(PartialEq)]
 enum ActivationType {
@@ -91,7 +91,7 @@ enum ActivationType {
     Final,
 }
 
-type Modes = HashMap<String, String>;
+//type Modes = HashMap<String, String>;
 
 /// A command from a map command.
 #[derive(Debug)]
@@ -111,71 +111,11 @@ const COMPLETE_PREVIOUS_COMMAND: &str = "complete-previous";
 const INPUT_MODE: &str = "input";
 const NORMAL_MODE: &str = "normal";
 
-/*
-/// Alias for an application builder without settings.
-pub type SimpleApplicationBuilder = ApplicationBuilder<NoSettings>;
-
-/// Application builder.
-pub struct ApplicationBuilder<Sett: mg_settings::settings::Settings> {
-    completers: HashMap<String, Box<Completer>>,
-    modes: Option<Modes>,
-    include_path: Option<PathBuf>,
-    settings: Option<Sett>,
-}
-
-impl<Sett: mg_settings::settings::Settings + 'static> ApplicationBuilder<Sett> {
-    /// Create a new application builder.
-    #[allow(new_without_default_derive)]
-    pub fn new() -> Self {
-        ApplicationBuilder {
-            completers: HashMap::new(),
-            modes: None,
-            include_path: None,
-            settings: None,
-        }
-    }
-
-    /// Create a new application with configuration and include path.
-    pub fn build<Spec, Comm>(self) -> Box<Application<Comm, Sett, Spec>>
-        where Spec: SpecialCommand + 'static,
-              Comm: EnumFromStr + EnumMetaData + 'static,
-              Sett: EnumMetaData + SettingCompletion,
-    {
-        Application::new(self)
-    }
-
-    /// Add a input completer.
-    pub fn completer<C: Completer + 'static>(mut self, name: &str, completer: C) -> Self {
-        self.completers.insert(name.to_string(), Box::new(completer));
-        self
-    }
-
-    /// Set the include path of the configuration files.
-    pub fn include_path<P: AsRef<Path>>(mut self, include_path: P) -> Self {
-        self.include_path = Some(include_path.as_ref().to_path_buf());
-        self
-    }
-
-    /// Set the configuration of the application.
-    pub fn modes(mut self, mut modes: Modes) -> Self {
-        assert!(modes.insert("n".to_string(), NORMAL_MODE.to_string()).is_none(), "Duplicate mode prefix n.");
-        assert!(modes.insert("c".to_string(), COMMAND_MODE.to_string()).is_none(), "Duplicate mode prefix c.");
-        self.modes = Some(modes);
-        self
-    }
-
-    /// Set the default settings of the application.
-    pub fn settings(mut self, settings: Sett) -> Self {
-        self.settings = Some(settings);
-        self
-    }
-}
-*/
-
 #[derive(Clone)]
 pub struct Model {
     close_callback: Option<Arc<Fn() + Send + Sync>>,
     current_mode: String,
+    modes: HashMap<&'static str, &'static str>,
 }
 
 #[derive(Msg)]
@@ -189,10 +129,17 @@ pub enum Msg {
 
 #[widget]
 impl Widget for Mg {
-    fn model() -> Model {
+    fn model(modes: Modes) -> Model {
+        let mut modes_hashmap = HashMap::new();
+        for &(key, value) in modes {
+            modes_hashmap.insert(key, value);
+        }
+        assert!(modes_hashmap.insert("n", NORMAL_MODE).is_none(), "Duplicate mode prefix n.");
+        assert!(modes_hashmap.insert("c", COMMAND_MODE).is_none(), "Duplicate mode prefix c.");
         Model {
             close_callback: None,
             current_mode: NORMAL_MODE.to_string(),
+            modes: modes_hashmap,
         }
     }
 
@@ -324,44 +271,6 @@ impl Mg {
         }
     }
 
-    /// Parse a configuration file.
-    pub fn parse_config<P: AsRef<Path>>(&mut self, filename: P) -> Result<()> {
-        let file = File::open(filename)?;
-        let buf_reader = BufReader::new(file);
-
-        // TODO: put this inside a function:
-        {
-            let modes = builder.modes.unwrap_or_default();
-            let config = Config {
-                application_commands: vec![COMPLETE_NEXT_COMMAND.to_string(), COMPLETE_PREVIOUS_COMMAND.to_string()],
-                mapping_modes: modes.keys().cloned().collect(),
-            };
-            let mut parser = Parser::new_with_config(config);
-            if let Some(include_path) = builder.include_path {
-                parser.set_include_path(include_path);
-            }
-        }
-
-        let commands = self.settings_parser.parse(buf_reader)?;
-        for command in commands {
-            match command {
-                App(command) => self.app_command(&command),
-                Custom(command) => {
-                    if let Some(ref callback) = self.command_callback {
-                        callback(command);
-                    }
-                },
-                Map { action, keys, mode } => {
-                    let mappings = self.mappings.entry(self.modes[&mode].clone()).or_insert_with(HashMap::new);
-                    mappings.insert(keys, action);
-                },
-                Set(name, value) => self.set_setting(Sett::to_variant(&name, value)?),
-                Unmap { .. } => panic!("not yet implemented"), // TODO
-            }
-        }
-        Ok(())
-    }
-
     /// Set the current (special) command identifier.
     fn set_current_identifier(&mut self, identifier: char) {
         //self.current_command_mode = identifier;
@@ -375,11 +284,117 @@ impl Mg {
         //self.foreground_color = Application::<Comm, Sett, Spec>::get_foreground_color(&self.window);
     }
 
+    pub fn set_settings<P: AsRef<Path>>(&self, filename: P) {
+    }
+
     /// Set the window title.
     pub fn set_title(&self, title: &str) {
         self.window.set_title(title);
     }
 }
+
+/// Parse a configuration file.
+pub fn parse_config<P: AsRef<Path>, Sett: EnumFromStr>(filename: P, modes: Modes, include_path: Option<&str>) -> Result<Parser<Sett>> {
+    let file = File::open(filename)?;
+    let buf_reader = BufReader::new(file);
+
+    let mut modes_hashmap = HashMap::new();
+    for &(key, value) in modes {
+        modes_hashmap.insert(key, value);
+    }
+    assert!(modes_hashmap.insert("n", NORMAL_MODE).is_none(), "Duplicate mode prefix n.");
+    assert!(modes_hashmap.insert("c", COMMAND_MODE).is_none(), "Duplicate mode prefix c.");
+    let config = Config {
+        application_commands: vec![COMPLETE_NEXT_COMMAND.to_string(), COMPLETE_PREVIOUS_COMMAND.to_string()],
+        mapping_modes: modes_hashmap.keys().cloned().collect(),
+    };
+    let mut parser = Parser::new_with_config(config);
+    if let Some(include_path) = include_path {
+        parser.set_include_path(include_path);
+    }
+    Ok(parser)
+}
+
+    /*let commands = self.settings_parser.parse(buf_reader)?;
+    for command in commands {
+        match command {
+            App(command) => self.app_command(&command),
+            Custom(command) => {
+                if let Some(ref callback) = self.command_callback {
+                    callback(command);
+                }
+            },
+            Map { action, keys, mode } => {
+                let mappings = self.mappings.entry(self.modes[&mode].clone()).or_insert_with(HashMap::new);
+                mappings.insert(keys, action);
+            },
+            Set(name, value) => self.set_setting(Sett::to_variant(&name, value)?),
+            Unmap { .. } => panic!("not yet implemented"), // TODO
+        }
+    }
+    Ok(())
+}*/
+
+/*
+/// Alias for an application builder without settings.
+pub type SimpleApplicationBuilder = ApplicationBuilder<NoSettings>;
+
+/// Application builder.
+pub struct ApplicationBuilder<Sett: mg_settings::settings::Settings> {
+    completers: HashMap<String, Box<Completer>>,
+    modes: Option<Modes>,
+    include_path: Option<PathBuf>,
+    settings: Option<Sett>,
+}
+
+impl<Sett: mg_settings::settings::Settings + 'static> ApplicationBuilder<Sett> {
+    /// Create a new application builder.
+    #[allow(new_without_default_derive)]
+    pub fn new() -> Self {
+        ApplicationBuilder {
+            completers: HashMap::new(),
+            modes: None,
+            include_path: None,
+            settings: None,
+        }
+    }
+
+    /// Create a new application with configuration and include path.
+    pub fn build<Spec, Comm>(self) -> Box<Application<Comm, Sett, Spec>>
+        where Spec: SpecialCommand + 'static,
+              Comm: EnumFromStr + EnumMetaData + 'static,
+              Sett: EnumMetaData + SettingCompletion,
+    {
+        Application::new(self)
+    }
+
+    /// Add a input completer.
+    pub fn completer<C: Completer + 'static>(mut self, name: &str, completer: C) -> Self {
+        self.completers.insert(name.to_string(), Box::new(completer));
+        self
+    }
+
+    /// Set the include path of the configuration files.
+    pub fn include_path<P: AsRef<Path>>(mut self, include_path: P) -> Self {
+        self.include_path = Some(include_path.as_ref().to_path_buf());
+        self
+    }
+
+    /// Set the configuration of the application.
+    pub fn modes(mut self, mut modes: Modes) -> Self {
+        assert!(modes.insert("n".to_string(), NORMAL_MODE.to_string()).is_none(), "Duplicate mode prefix n.");
+        assert!(modes.insert("c".to_string(), COMMAND_MODE.to_string()).is_none(), "Duplicate mode prefix c.");
+        self.modes = Some(modes);
+        self
+    }
+
+    /// Set the default settings of the application.
+    pub fn settings(mut self, settings: Sett) -> Self {
+        self.settings = Some(settings);
+        self
+    }
+}
+*/
 
 /*
 /// Create a new MG application window.
