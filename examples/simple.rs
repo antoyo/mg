@@ -45,16 +45,11 @@ use gtk::{
 use gtk::Orientation::Vertical;
 use mg::{
     Mg,
-    Modes,
-    NoSettings,
     NoSpecialCommands,
     StatusBar,
     StatusBarItem,
     View,
-    parse_config,
 };
-use mg_settings::Parser;
-use mg_settings::error;
 use relm::Widget;
 use relm_attributes::widget;
 
@@ -63,7 +58,6 @@ use Msg::*;
 
 #[derive(Clone)]
 pub struct Model {
-    parser: Arc<error::Result<Parser<AppCommand>>>,
     text: String,
 }
 
@@ -80,7 +74,7 @@ pub enum AppCommand {
     Quit,
 }
 
-static modes: &[(&str, &str)] = &[
+static MODES: &[(&str, &str)] = &[
     ("i", "insert"),
 ];
 
@@ -88,7 +82,6 @@ static modes: &[(&str, &str)] = &[
 impl Widget for Win {
     fn model() -> Model {
         Model {
-            parser: Arc::new(parse_config("examples/main.conf", modes, None)),
             text: "Mg App".to_string(),
         }
     }
@@ -107,7 +100,7 @@ impl Widget for Win {
     }
 
     view! {
-        Mg(modes) {
+        Mg<AppCommand>((MODES, "examples/main.conf")) {
             dark_theme: true,
             title: "First Mg Program",
             View {

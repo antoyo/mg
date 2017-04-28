@@ -111,11 +111,12 @@ const COMPLETE_PREVIOUS_COMMAND: &str = "complete-previous";
 const INPUT_MODE: &str = "input";
 const NORMAL_MODE: &str = "normal";
 
-#[derive(Clone)]
-pub struct Model {
+#[derive(ManualClone)]
+pub struct Model<COMM> {
     close_callback: Option<Arc<Fn() + Send + Sync>>,
     current_mode: String,
     modes: HashMap<&'static str, &'static str>,
+    settings_parser: Arc<Parser<COMM>>,
 }
 
 #[derive(Msg)]
@@ -128,8 +129,9 @@ pub enum Msg {
 }
 
 #[widget]
-impl Widget for Mg {
-    fn model(modes: Modes) -> Model {
+impl<COMM: EnumFromStr + 'static> Widget for Mg<COMM> {
+    // TODO: switch from a &'static str to a String.
+    fn model((modes, settings_filename): (Modes, &'static str)) -> Model<COMM> {
         let mut modes_hashmap = HashMap::new();
         for &(key, value) in modes {
             modes_hashmap.insert(key, value);
@@ -140,6 +142,7 @@ impl Widget for Mg {
             close_callback: None,
             current_mode: NORMAL_MODE.to_string(),
             modes: modes_hashmap,
+            settings_parser: Arc::new(parse_config(settings_filename, modes, None).unwrap()), // TODO: show the error instead of unwrapping.
         }
     }
 
@@ -193,7 +196,7 @@ impl Widget for Mg {
     }
 }
 
-impl Mg {
+impl<COMM> Mg<COMM> {
     /// Handle the key press event for the command mode.
     #[allow(non_upper_case_globals)]
     fn command_key_press(key: &EventKey, current_mode: &str) -> (Option<Msg>, Inhibit) {
@@ -207,7 +210,7 @@ impl Mg {
     }
 
     /// Connect the close event to the specified callback.
-    pub fn connect_close<F: Fn() + Send + Sync + 'static>(&mut self, callback: F, model: &mut Model) {
+    pub fn connect_close<F: Fn() + Send + Sync + 'static>(&mut self, callback: F, model: &mut Model<COMM>) {
         model.close_callback = Some(Arc::new(callback));
     }
 
@@ -294,7 +297,7 @@ impl Mg {
 }
 
 /// Parse a configuration file.
-pub fn parse_config<P: AsRef<Path>, Sett: EnumFromStr>(filename: P, modes: Modes, include_path: Option<&str>) -> Result<Parser<Sett>> {
+pub fn parse_config<P: AsRef<Path>, COMM: EnumFromStr>(filename: P, modes: Modes, include_path: Option<&str>) -> Result<Parser<COMM>> {
     let file = File::open(filename)?;
     let buf_reader = BufReader::new(file);
 

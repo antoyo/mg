@@ -36,7 +36,7 @@ pub fn shortcut_to_string(keys: &[Key]) -> String {
     strings.join("")
 }
 
-impl Mg {
+impl<COMM> Mg<COMM> {
     /// Handle a possible input of a shortcut.
     pub fn handle_shortcut(key: &EventKey, current_mode: &str) -> (Option<Msg>, Inhibit) {
         let keyval = key.get_keyval();
