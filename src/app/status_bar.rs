@@ -122,7 +122,7 @@ impl Widget for StatusBarItem {
     }
 
     view! {
-        #[data="status-bar-item"]
+        #[parent="status-bar-item"]
         #[name="label"]
         gtk::Label {
             packing: {
