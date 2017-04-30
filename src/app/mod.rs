@@ -24,7 +24,6 @@
 pub mod settings;
 mod shortcut;
 pub mod status_bar;
-pub mod view;
 
 use std::borrow::Cow;
 use std::char;
@@ -40,8 +39,8 @@ use gdk::{EventKey, RGBA};
 use gdk::enums::key::{Escape, colon};
 use glib;
 use glib::translate::ToGlib;
+use gtk;
 use gtk::{
-    self,
     ContainerExt,
     EditableSignals,
     Grid,
@@ -49,6 +48,7 @@ use gtk::{
     IsA,
     OrientableExt,
     Overlay,
+    PackType,
     Settings,
     WidgetExt,
     Window,
@@ -81,7 +81,6 @@ use self::ShortcutCommand::{Complete, Incomplete};
 use self::status_bar::StatusBar;
 use self::Msg::*;
 pub use self::status_bar::StatusBarItem;
-pub use self::view::View;
 use style_context::StyleContextExtManual;
 use super::{Modes, NoSpecialCommands, SpecialCommand};
 
@@ -90,6 +89,9 @@ enum ActivationType {
     Current,
     Final,
 }
+
+type Mappings = HashMap<&'static str, HashMap<Vec<Key>, String>>;
+type ModesHash = HashMap<&'static str, &'static str>;
 
 //type Modes = HashMap<String, String>;
 
@@ -115,7 +117,8 @@ const NORMAL_MODE: &str = "normal";
 pub struct Model<COMM> {
     close_callback: Option<Arc<Fn() + Send + Sync>>,
     current_mode: String,
-    modes: HashMap<&'static str, &'static str>,
+    mappings: Mappings,
+    modes: ModesHash,
     settings_parser: Arc<Parser<COMM>>,
 }
 
@@ -131,18 +134,15 @@ pub enum Msg {
 #[widget]
 impl<COMM: EnumFromStr + 'static> Widget for Mg<COMM> {
     // TODO: switch from a &'static str to a String.
-    fn model((modes, settings_filename): (Modes, &'static str)) -> Model<COMM> {
-        let mut modes_hashmap = HashMap::new();
-        for &(key, value) in modes {
-            modes_hashmap.insert(key, value);
-        }
-        assert!(modes_hashmap.insert("n", NORMAL_MODE).is_none(), "Duplicate mode prefix n.");
-        assert!(modes_hashmap.insert("c", COMMAND_MODE).is_none(), "Duplicate mode prefix c.");
+    fn model((user_modes, settings_filename): (Modes, &'static str)) -> Model<COMM> {
+        // TODO: show the error instead of unwrapping.
+        let (parser, mappings, modes) = parse_config(settings_filename, user_modes, None).unwrap();
         Model {
             close_callback: None,
             current_mode: NORMAL_MODE.to_string(),
-            modes: modes_hashmap,
-            settings_parser: Arc::new(parse_config(settings_filename, modes, None).unwrap()), // TODO: show the error instead of unwrapping.
+            mappings: mappings,
+            modes: modes,
+            settings_parser: Arc::new(parser),
         }
     }
 
@@ -188,8 +188,14 @@ impl<COMM: EnumFromStr + 'static> Widget for Mg<COMM> {
             #[container]
             gtk::Box {
                 orientation: Vertical,
-            }
-            key_press_event(_, key) with model => return Self::key_press(&key, &model.current_mode),
+                #[container="status-bar-item"]
+                StatusBar {
+                    packing: {
+                        pack_type: PackType::End,
+                    },
+                },
+            },
+            key_press_event(_, key) with model => return Self::key_press(&key, model),
             key_release_event(_, key) => (KeyRelease(key.get_keyval()), Inhibit(false)),
             delete_event(_, _) => (Quit, Inhibit(false)),
         }
@@ -199,13 +205,13 @@ impl<COMM: EnumFromStr + 'static> Widget for Mg<COMM> {
 impl<COMM> Mg<COMM> {
     /// Handle the key press event for the command mode.
     #[allow(non_upper_case_globals)]
-    fn command_key_press(key: &EventKey, current_mode: &str) -> (Option<Msg>, Inhibit) {
+    fn command_key_press(key: &EventKey, model: &Model<COMM>) -> (Option<Msg>, Inhibit) {
         match key.get_keyval() {
             Escape => {
                 // TODO: this should not call the callback (in update(EnterNormalMode)).
                 (Some(EnterNormalMode), Inhibit(false))
             },
-            _ => Self::handle_shortcut(key, current_mode),
+            _ => Self::handle_shortcut(key, model),
         }
     }
 
@@ -216,7 +222,7 @@ impl<COMM> Mg<COMM> {
 
     /// Handle the key press event for the input mode.
     #[allow(non_upper_case_globals)]
-    fn input_key_press(key: &EventKey, current_mode: &str) -> (Option<Msg>, Inhibit) {
+    fn input_key_press(key: &EventKey, model: &Model<COMM>) -> (Option<Msg>, Inhibit) {
         match key.get_keyval() {
             Escape => {
                 (Some(EnterNormalMode), Inhibit(false))
@@ -231,30 +237,30 @@ impl<COMM> Mg<COMM> {
                         return (None, Inhibit(true));
                     }
                 }*/
-                Self::handle_shortcut(key, current_mode)
+                Self::handle_shortcut(key, model)
             },
         }
     }
 
     /// Handle the key press event.
-    fn key_press(key: &EventKey, current_mode: &str) -> (Option<Msg>, Inhibit) {
-        match current_mode.as_ref() {
-            NORMAL_MODE => Self::normal_key_press(key, current_mode),
-            COMMAND_MODE => Self::command_key_press(key, current_mode),
-            BLOCKING_INPUT_MODE | INPUT_MODE => Self::input_key_press(key, current_mode),
-            _ => Self::handle_shortcut(key, current_mode)
+    fn key_press(key: &EventKey, model: &Model<COMM>) -> (Option<Msg>, Inhibit) {
+        match model.current_mode.as_ref() {
+            NORMAL_MODE => Self::normal_key_press(key, model),
+            COMMAND_MODE => Self::command_key_press(key, model),
+            BLOCKING_INPUT_MODE | INPUT_MODE => Self::input_key_press(key, model),
+            _ => Self::handle_shortcut(key, model)
         }
     }
 
     /// Handle the key press event for the normal mode.
     #[allow(non_upper_case_globals)]
-    fn normal_key_press(key: &EventKey, current_mode: &str) -> (Option<Msg>, Inhibit) {
+    fn normal_key_press(key: &EventKey, model: &Model<COMM>) -> (Option<Msg>, Inhibit) {
         match key.get_keyval() {
             colon => (Some(EnterCommandMode), Inhibit(true)),
             Escape => {
                 //self.reset();
                 //Self::clear_shortcut();
-                Self::handle_shortcut(key, current_mode)
+                Self::handle_shortcut(key, model)
             },
             keyval => {
                 let character = keyval as u8 as char;
@@ -268,7 +274,7 @@ impl<COMM> Mg<COMM> {
                     Inhibit(true)
                 }
                 else {*/
-                    Self::handle_shortcut(key, current_mode)
+                    Self::handle_shortcut(key, model)
                 //}
             },
         }
@@ -297,46 +303,48 @@ impl<COMM> Mg<COMM> {
 }
 
 /// Parse a configuration file.
-pub fn parse_config<P: AsRef<Path>, COMM: EnumFromStr>(filename: P, modes: Modes, include_path: Option<&str>) -> Result<Parser<COMM>> {
+pub fn parse_config<P: AsRef<Path>, COMM: EnumFromStr>(filename: P, user_modes: Modes, include_path: Option<&str>)
+    -> Result<(Parser<COMM>, Mappings, ModesHash)>
+{
+    let mut mappings = HashMap::new();
     let file = File::open(filename)?;
     let buf_reader = BufReader::new(file);
 
-    let mut modes_hashmap = HashMap::new();
-    for &(key, value) in modes {
-        modes_hashmap.insert(key, value);
+    let mut modes = HashMap::new();
+    for &(key, value) in user_modes {
+        modes.insert(key, value);
     }
-    assert!(modes_hashmap.insert("n", NORMAL_MODE).is_none(), "Duplicate mode prefix n.");
-    assert!(modes_hashmap.insert("c", COMMAND_MODE).is_none(), "Duplicate mode prefix c.");
+    assert!(modes.insert("n", NORMAL_MODE).is_none(), "Duplicate mode prefix n.");
+    assert!(modes.insert("c", COMMAND_MODE).is_none(), "Duplicate mode prefix c.");
     let config = Config {
         application_commands: vec![COMPLETE_NEXT_COMMAND.to_string(), COMPLETE_PREVIOUS_COMMAND.to_string()],
-        mapping_modes: modes_hashmap.keys().cloned().collect(),
+        mapping_modes: modes.keys().cloned().collect(),
     };
     let mut parser = Parser::new_with_config(config);
     if let Some(include_path) = include_path {
         parser.set_include_path(include_path);
     }
-    Ok(parser)
-}
 
-    /*let commands = self.settings_parser.parse(buf_reader)?;
+    let commands = parser.parse(buf_reader)?;
     for command in commands {
         match command {
-            App(command) => self.app_command(&command),
-            Custom(command) => {
-                if let Some(ref callback) = self.command_callback {
-                    callback(command);
-                }
-            },
+            //App(command) => self.app_command(&command),
+            //Custom(command) => {
+            //if let Some(ref callback) = self.command_callback {
+            //callback(command);
+            //}
+            //},
             Map { action, keys, mode } => {
-                let mappings = self.mappings.entry(self.modes[&mode].clone()).or_insert_with(HashMap::new);
-                mappings.insert(keys, action);
+                let mode_mappings = mappings.entry(modes[mode.as_str()].clone()).or_insert_with(HashMap::new);
+                mode_mappings.insert(keys, action);
             },
-            Set(name, value) => self.set_setting(Sett::to_variant(&name, value)?),
-            Unmap { .. } => panic!("not yet implemented"), // TODO
+            _ => (), // TODO: to remove.
+            //Set(name, value) => self.set_setting(Sett::to_variant(&name, value)?),
+            //Unmap { .. } => panic!("not yet implemented"), // TODO
         }
     }
-    Ok(())
-}*/
+    Ok((parser, mappings, modes))
+}
 
 /*
 /// Alias for an application builder without settings.

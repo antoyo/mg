@@ -46,9 +46,7 @@ use gtk::Orientation::Vertical;
 use mg::{
     Mg,
     NoSpecialCommands,
-    StatusBar,
     StatusBarItem,
-    View,
 };
 use relm::Widget;
 use relm_attributes::widget;
@@ -103,23 +101,19 @@ impl Widget for Win {
         Mg<AppCommand>((MODES, "examples/main.conf")) {
             dark_theme: true,
             title: "First Mg Program",
-            View {
-                gtk::Box {
-                    orientation: Vertical,
-                    gtk::Label {
-                        text: &model.text,
-                    },
-                    gtk::Entry {
-                    },
-                }
+            gtk::Box {
+                orientation: Vertical,
+                gtk::Label {
+                    text: &model.text,
+                },
+                gtk::Entry {
+                },
             },
-            StatusBar {
-                StatusBarItem {
-                    text: "Rightmost",
-                },
-                StatusBarItem {
-                    text: "Test",
-                },
+            StatusBarItem {
+                text: "Rightmost",
+            },
+            StatusBarItem {
+                text: "Test",
             },
             //Command => Command, // TODO
         }

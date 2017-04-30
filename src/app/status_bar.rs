@@ -122,6 +122,7 @@ impl Widget for StatusBarItem {
     }
 
     view! {
+        #[data="status-bar-item"]
         #[name="label"]
         gtk::Label {
             packing: {

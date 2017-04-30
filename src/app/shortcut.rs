@@ -25,7 +25,7 @@ use gtk::Inhibit;
 use mg_settings::{self, EnumFromStr, EnumMetaData, SettingCompletion};
 use mg_settings::key::Key;
 
-use app::{/*Application, */ Mg, Msg, BLOCKING_INPUT_MODE, COMMAND_MODE, INPUT_MODE, NORMAL_MODE};
+use app::{/*Application, */ Mg, Model, Msg, BLOCKING_INPUT_MODE, COMMAND_MODE, INPUT_MODE, NORMAL_MODE};
 use app::ShortcutCommand::{Complete, Incomplete};
 use key_converter::gdk_key_to_key;
 use SpecialCommand;
@@ -38,10 +38,10 @@ pub fn shortcut_to_string(keys: &[Key]) -> String {
 
 impl<COMM> Mg<COMM> {
     /// Handle a possible input of a shortcut.
-    pub fn handle_shortcut(key: &EventKey, current_mode: &str) -> (Option<Msg>, Inhibit) {
+    pub fn handle_shortcut(key: &EventKey, model: &Model<COMM>) -> (Option<Msg>, Inhibit) {
         let keyval = key.get_keyval();
-        let should_inhibit = current_mode == NORMAL_MODE ||
-            (current_mode == COMMAND_MODE && (keyval == Tab || keyval == ISO_Left_Tab)) ||
+        let should_inhibit = model.current_mode == NORMAL_MODE ||
+            (model.current_mode == COMMAND_MODE && (keyval == Tab || keyval == ISO_Left_Tab)) ||
             key.get_keyval() == Escape;
         let control_pressed = key.get_state() & CONTROL_MASK == CONTROL_MASK;
         /*if !self.status_bar.entry_shown() || control_pressed || keyval == Tab || keyval == ISO_Left_Tab {
