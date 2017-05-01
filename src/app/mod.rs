@@ -20,18 +20,20 @@
  */
 
 //pub mod dialog;
-//mod message;
+mod message;
 pub mod settings;
 mod shortcut;
 pub mod status_bar;
 
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::char;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
+use std::mem;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::rc::Rc;
 
 use gdk;
 use gdk::enums::key::Key as GdkKey;
@@ -56,6 +58,7 @@ use gtk::{
     WindowType,
     STATE_FLAG_NORMAL,
 };
+use gtk::prelude::WidgetExtManual;
 use gtk::Orientation::Vertical;
 use mg_settings::{self, Config, EnumFromStr, EnumMetaData, Parser, SettingCompletion};
 use mg_settings::Command::{self, App, Custom, Map, Set, Unmap};
@@ -66,6 +69,7 @@ use relm::Widget;
 use relm::gtk_ext::BoxExtManual;
 use relm_attributes::widget;
 
+use app::shortcut::shortcut_to_string;
 use completion::{
     CommandCompleter,
     Completer,
@@ -79,10 +83,11 @@ use self::ActivationType::{Current, Final};
 use self::settings::NoSettings;
 use self::ShortcutCommand::{Complete, Incomplete};
 use self::status_bar::StatusBar;
+use self::status_bar::Msg::*;
 use self::Msg::*;
 pub use self::status_bar::StatusBarItem;
 use style_context::StyleContextExtManual;
-use super::{Modes, NoSpecialCommands, SpecialCommand};
+use super::{Modes, NoSpecialCommands, SpecialCommand, Variables};
 
 #[derive(PartialEq)]
 enum ActivationType {
@@ -115,15 +120,22 @@ const NORMAL_MODE: &str = "normal";
 
 #[derive(ManualClone)]
 pub struct Model<COMM> {
-    close_callback: Option<Arc<Fn() + Send + Sync>>,
+    close_callback: Option<Rc<Fn() + Send + Sync>>,
+    current_command_mode: char,
     current_mode: String,
+    current_shortcut: Vec<Key>,
+    entry_shown: bool,
+    foreground_color: RGBA,
     mappings: Mappings,
     modes: ModesHash,
-    settings_parser: Arc<Parser<COMM>>,
+    settings_parser: Rc<RefCell<Parser<COMM>>>,
+    //special_command_callback: Option<Box<Fn(SPEC)>>,
+    variables: HashMap<String, fn() -> String>,
 }
 
 #[derive(Msg)]
-pub enum Msg {
+pub enum Msg<COMM> {
+    CustomCommand(COMM),
     EnterCommandMode,
     EnterNormalMode,
     KeyPress(GdkKey),
@@ -132,38 +144,51 @@ pub enum Msg {
 }
 
 #[widget]
-impl<COMM: EnumFromStr + 'static> Widget for Mg<COMM> {
+impl<COMM: Clone + EnumFromStr + Send + 'static> Widget for Mg<COMM> {
+    fn init_view(&self, model: &mut Model<COMM>) {
+        // FIXME: this is executed too late, so the color is not good.
+        model.foreground_color = self.get_foreground_color();
+    }
+
     // TODO: switch from a &'static str to a String.
-    fn model((user_modes, settings_filename): (Modes, &'static str)) -> Model<COMM> {
+    fn model((user_modes, variables, settings_filename): (Modes, Variables, &'static str)) -> Model<COMM> {
         // TODO: show the error instead of unwrapping.
         let (parser, mappings, modes) = parse_config(settings_filename, user_modes, None).unwrap();
         Model {
             close_callback: None,
+            current_command_mode: ':',
             current_mode: NORMAL_MODE.to_string(),
+            current_shortcut: vec![],
+            entry_shown: false,
+            foreground_color: unsafe { mem::zeroed() },
             mappings: mappings,
             modes: modes,
-            settings_parser: Arc::new(parser),
+            settings_parser: Rc::new(RefCell::new(parser)),
+            //special_command_callback: None,
+            variables: variables.iter().map(|&(string, func)| (string.to_string(), func)).collect(),
         }
     }
 
-    fn update(&mut self, event: Msg, model: &mut Self::Model) {
+    fn update(&mut self, event: Msg<COMM>, model: &mut Self::Model) {
         match event {
+            CustomCommand(_) => (), // To be listened to by the user.
             EnterCommandMode => {
                 //self.status_bar.set_completer(DEFAULT_COMPLETER_IDENT);
-                self.set_current_identifier(':');
-                model.current_mode = COMMAND_MODE.to_string(); // FIXME: other things needed (see set_mode).
-                //self.reset();
-                //self.clear_shortcut();
+                self.set_current_identifier(':', model);
+                self.set_mode(COMMAND_MODE, model);
+                self.reset(model);
+                self.clear_shortcut(model);
                 //self.status_bar.show_completion();
-                //self.status_bar.show_entry();
+                self.show_entry(model);
             },
             EnterNormalMode => {
-                //self.status_bar.hide_entry();
+                let status_bar = self.status_bar.widget();
+                model.entry_shown = false;
                 //self.status_bar.hide_completion();
-                model.current_mode = NORMAL_MODE.to_string(); // FIXME: other things needed (see set_mode).
-                self.set_current_identifier(':');
-                //self.reset();
-                //self.clear_shortcut();
+                self.set_mode(NORMAL_MODE, model);
+                self.set_current_identifier(':', model);
+                self.reset(model);
+                self.clear_shortcut(model);
                 /*if let Some(ref callback) = self.input_callback {
                     callback(None);
                 }
@@ -189,40 +214,193 @@ impl<COMM: EnumFromStr + 'static> Widget for Mg<COMM> {
             gtk::Box {
                 orientation: Vertical,
                 #[container="status-bar-item"]
+                #[name="status_bar"]
                 StatusBar {
+                    Activate(input) with model => self.command_activate(input, model),
+                    entry_shown: model.entry_shown,
                     packing: {
                         pack_type: PackType::End,
                     },
+                    #[name="message"]
+                    StatusBarItem {
+                        text: "", // TODO: bind to a model field.
+                    },
+                    #[name="mode"]
+                    StatusBarItem {
+                        text: &model.current_mode,
+                    },
+                    #[name="shortcut"]
+                    StatusBarItem {
+                        text: &shortcut_to_string(&model.current_shortcut),
+                    },
                 },
             },
-            key_press_event(_, key) with model => return Self::key_press(&key, model),
+            key_press_event(_, key) with model => return self.key_press(&key, model),
             key_release_event(_, key) => (KeyRelease(key.get_keyval()), Inhibit(false)),
             delete_event(_, _) => (Quit, Inhibit(false)),
         }
     }
 }
 
-impl<COMM> Mg<COMM> {
+impl<COMM: EnumFromStr> Mg<COMM> {
+    /// Convert an action String to a command String.
+    fn action_to_command(&self, action: &str) -> ShortcutCommand {
+        if let Some(':') = action.chars().next() {
+            if let Some(index) = action.find("<Enter>") {
+                Complete(action[1..index].to_string())
+            }
+            else {
+                Incomplete(action[1..].to_string())
+            }
+        }
+        else {
+            Complete(action.to_string())
+        }
+    }
+
+    /// Handle an application command.
+    fn app_command(&self, command: &str) {
+        match command {
+            //COMPLETE_NEXT_COMMAND => self.status_bar.complete_next(),
+            //COMPLETE_PREVIOUS_COMMAND => self.status_bar.complete_previous(),
+            _ => unreachable!(),
+        }
+    }
+
+    /// Call the callback with the command or show an error if the command cannot be parsed.
+    fn call_command(&self, command: Result<Command<COMM>>) -> Option<Msg<COMM>> {
+        match command {
+            Ok(command) => {
+                match command {
+                    App(command) => self.app_command(&command),
+                    Custom(command) => return Some(CustomCommand(command)),
+                    Set(name, value) => {
+                        /*match Sett::to_variant(&name, value) {
+                            Ok(setting) => self.set_setting(setting),
+                            Err(error) => {
+                                let message = format!("Error setting value: {}", error);
+                                self.error(&message);
+                            },
+                        }*/
+                    },
+                    _ => unimplemented!(),
+                }
+            },
+            Err(error) => {
+                if let Error::Parse(error) = error {
+                    let message =
+                        match error.typ {
+                            MissingArgument => "Argument required".to_string(),
+                            NoCommand => return None,
+                            Parse => format!("Parse error: unexpected {}, expecting: {}", error.unexpected, error.expected),
+                            UnknownCommand => format!("Not a command: {}", error.unexpected),
+                        };
+                    self.error(&message);
+                }
+            },
+        }
+        None
+    }
+
+    /// Handle the command entry activate event.
+    fn command_activate(&self, input: Option<String>, model: &mut Model<COMM>) -> Msg<COMM> {
+        let message =
+        /*if self.current_mode == INPUT_MODE || self.current_mode == BLOCKING_INPUT_MODE {
+            let mut should_reset = false;
+            if let Some(ref callback) = self.input_callback {
+                self.answer = input.clone();
+                callback(input);
+                should_reset = true;
+            }
+            if should_reset {
+                self.reset();
+            }
+            self.input_callback = None;
+            self.choices.clear();
+        }
+        else {*/
+            self.handle_command(input, model)
+        //}
+        ;
+        //self.return_to_normal_mode();
+        message.unwrap()
+    }
+
     /// Handle the key press event for the command mode.
     #[allow(non_upper_case_globals)]
-    fn command_key_press(key: &EventKey, model: &Model<COMM>) -> (Option<Msg>, Inhibit) {
+    fn command_key_press(&self, key: &EventKey, model: &mut Model<COMM>) -> (Option<Msg<COMM>>, Inhibit) {
         match key.get_keyval() {
             Escape => {
+                println!("Escape");
                 // TODO: this should not call the callback (in update(EnterNormalMode)).
                 (Some(EnterNormalMode), Inhibit(false))
             },
-            _ => Self::handle_shortcut(key, model),
+            _ => self.handle_shortcut(key, model),
         }
     }
 
     /// Connect the close event to the specified callback.
     pub fn connect_close<F: Fn() + Send + Sync + 'static>(&mut self, callback: F, model: &mut Model<COMM>) {
-        model.close_callback = Some(Arc::new(callback));
+        model.close_callback = Some(Rc::new(callback));
+    }
+
+    /// Get the color of the text.
+    fn get_foreground_color(&self) -> RGBA {
+        let style_context = self.window.get_style_context().unwrap();
+        style_context.get_color(STATE_FLAG_NORMAL)
+    }
+
+    /// Handle the command activate event.
+    fn handle_command(&self, command: Option<String>, model: &mut Model<COMM>) -> Option<Msg<COMM>> {
+        if let Some(command) = command {
+            if model.current_command_mode == ':' {
+                let result = (*model.settings_parser.borrow_mut()).parse_line(&command);
+                return self.call_command(result);
+            }
+            else {
+                self.handle_special_command(Final, &command, model);
+            }
+        }
+        None
+    }
+
+    /// Handle a special command activate or key press event.
+    fn handle_special_command(&self, activation_type: ActivationType, command: &str, model: &mut Model<COMM>) {
+        let mut update_identifier = false;
+        /*if let Some(ref callback) = model.special_command_callback {
+            if let Ok(special_command) = Spec::identifier_to_command(model.current_command_mode, command) {
+                callback(special_command);
+                if activation_type == Final {
+                    update_identifier = true;
+                }
+            }
+        }*/
+        if update_identifier {
+            self.set_current_identifier(':', model);
+        }
+    }
+
+    /// Input the specified command.
+    fn input_command(&self, command: &str, model: &mut Model<COMM>) {
+        self.set_mode(COMMAND_MODE, model);
+        self.show_entry(model);
+        let mut command = command.to_string();
+        for (variable, function) in &model.variables {
+            command = command.replace(&format!("<{}>", variable), &function());
+        }
+        let text: Cow<str> =
+            if command.contains(' ') {
+                command.into()
+            }
+            else {
+                format!("{} ", command).into()
+            };
+        self.status_bar.widget().set_input(&text);
     }
 
     /// Handle the key press event for the input mode.
     #[allow(non_upper_case_globals)]
-    fn input_key_press(key: &EventKey, model: &Model<COMM>) -> (Option<Msg>, Inhibit) {
+    fn input_key_press(&self, key: &EventKey, model: &mut Model<COMM>) -> (Option<Msg<COMM>>, Inhibit) {
         match key.get_keyval() {
             Escape => {
                 (Some(EnterNormalMode), Inhibit(false))
@@ -237,30 +415,30 @@ impl<COMM> Mg<COMM> {
                         return (None, Inhibit(true));
                     }
                 }*/
-                Self::handle_shortcut(key, model)
+                self.handle_shortcut(key, model)
             },
         }
     }
 
     /// Handle the key press event.
-    fn key_press(key: &EventKey, model: &Model<COMM>) -> (Option<Msg>, Inhibit) {
+    fn key_press(&self, key: &EventKey, model: &mut Model<COMM>) -> (Option<Msg<COMM>>, Inhibit) {
         match model.current_mode.as_ref() {
-            NORMAL_MODE => Self::normal_key_press(key, model),
-            COMMAND_MODE => Self::command_key_press(key, model),
-            BLOCKING_INPUT_MODE | INPUT_MODE => Self::input_key_press(key, model),
-            _ => Self::handle_shortcut(key, model)
+            NORMAL_MODE => self.normal_key_press(key, model),
+            COMMAND_MODE => self.command_key_press(key, model),
+            BLOCKING_INPUT_MODE | INPUT_MODE => self.input_key_press(key, model),
+            _ => self.handle_shortcut(key, model)
         }
     }
 
     /// Handle the key press event for the normal mode.
     #[allow(non_upper_case_globals)]
-    fn normal_key_press(key: &EventKey, model: &Model<COMM>) -> (Option<Msg>, Inhibit) {
+    fn normal_key_press(&self, key: &EventKey, model: &mut Model<COMM>) -> (Option<Msg<COMM>>, Inhibit) {
         match key.get_keyval() {
             colon => (Some(EnterCommandMode), Inhibit(true)),
             Escape => {
-                //self.reset();
-                //Self::clear_shortcut();
-                Self::handle_shortcut(key, model)
+                self.reset(model);
+                self.clear_shortcut(model);
+                self.handle_shortcut(key, model)
             },
             keyval => {
                 let character = keyval as u8 as char;
@@ -268,29 +446,58 @@ impl<COMM> Mg<COMM> {
                     //self.status_bar.set_completer(NO_COMPLETER_IDENT);
                     self.set_current_identifier(character);
                     self.set_mode(COMMAND_MODE);
-                    self.reset();
-                    self.clear_shortcut();
-                    //self.status_bar.show_entry();
+                    self.reset(model);
+                    self.clear_shortcut(model);
+                    self.show_entry(model);
                     Inhibit(true)
                 }
                 else {*/
-                    Self::handle_shortcut(key, model)
+                    self.handle_shortcut(key, model)
                 //}
             },
         }
     }
 
+    /// Handle the escape event.
+    fn reset(&self, model: &mut Model<COMM>) {
+        self.reset_colors(model);
+        //self.status_bar.hide_widgets();
+        //self.message.set_text("");
+        self.show_mode(model);
+        self.clear_shortcut(model);
+    }
+
+    /// Reset the background and foreground colors of the status bar.
+    fn reset_colors(&self, model: &Model<COMM>) {
+        let status_bar = self.status_bar.widget().root();
+        // TODO: switch to CSS.
+        status_bar.override_background_color(STATE_FLAG_NORMAL, TRANSPARENT);
+        status_bar.override_color(STATE_FLAG_NORMAL, &model.foreground_color);
+    }
+
     /// Set the current (special) command identifier.
-    fn set_current_identifier(&mut self, identifier: char) {
-        //self.current_command_mode = identifier;
-        //self.status_bar.set_identifier(&identifier.to_string());
+    fn set_current_identifier(&self, identifier: char, model: &mut Model<COMM>) {
+        model.current_command_mode = identifier;
+        // TODO: the following should not be necessary when custom methods in the attribute will be
+        // supported.
+        self.status_bar.widget().set_identifier(&identifier.to_string());
     }
 
     /// Use the dark variant of the theme if available.
     pub fn set_dark_theme(&self, use_dark: bool) {
+        println!("set_dark_theme");
         let settings = Settings::get_default().unwrap();
         settings.set_data("gtk-application-prefer-dark-theme", use_dark.to_glib());
         //self.foreground_color = Application::<Comm, Sett, Spec>::get_foreground_color(&self.window);
+    }
+
+    /// Set the current mode.
+    pub fn set_mode(&self, mode: &str, model: &mut Model<COMM>) {
+        model.current_mode = mode.to_string();
+        self.show_mode(model);
+        /*if let Some(ref callback) = self.mode_changed_callback {
+            callback(mode);
+        }*/
     }
 
     pub fn set_settings<P: AsRef<Path>>(&self, filename: P) {
@@ -299,6 +506,26 @@ impl<COMM> Mg<COMM> {
     /// Set the window title.
     pub fn set_title(&self, title: &str) {
         self.window.set_title(title);
+    }
+
+    fn show_entry(&self, model: &mut Model<COMM>) {
+        model.entry_shown = true;
+        let status_bar = self.status_bar.widget();
+        status_bar.set_entry_shown(true);
+        status_bar.show_entry();
+    }
+
+    /// Show the current mode if it is not the normal mode.
+    fn show_mode(&self, model: &Model<COMM>) {
+        let label = self.mode.widget().root();
+        if model.current_mode != NORMAL_MODE && model.current_mode != COMMAND_MODE && model.current_mode != INPUT_MODE
+            && model.current_mode != BLOCKING_INPUT_MODE
+        {
+            label.set_text(&model.current_mode);
+        }
+        else {
+            label.set_text("");
+        }
     }
 }
 
@@ -516,21 +743,6 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
         app
     }
 
-    /// Convert an action String to a command String.
-    fn action_to_command(&self, action: &str) -> ShortcutCommand {
-        if let Some(':') = action.chars().next() {
-            if let Some(index) = action.find("<Enter>") {
-                Complete(action[1..index].to_string())
-            }
-            else {
-                Incomplete(action[1..].to_string())
-            }
-        }
-        else {
-            Complete(action.to_string())
-        }
-    }
-
     /// Create a new status bar item.
     pub fn add_statusbar_item(&self) -> StatusBarItem {
         let item = StatusBarItem::new();
@@ -544,79 +756,11 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
         self.variables.insert(variable_name.to_string(), Box::new(function));
     }
 
-    /// Handle an application command.
-    fn app_command(&self, command: &str) {
-        match command {
-            //COMPLETE_NEXT_COMMAND => self.status_bar.complete_next(),
-            //COMPLETE_PREVIOUS_COMMAND => self.status_bar.complete_previous(),
-            _ => unreachable!(),
-        }
-    }
-
-    /// Call the callback with the command or show an error if the command cannot be parsed.
-    fn call_command(&mut self, command: Result<Command<Comm>>) {
-        match command {
-            Ok(command) => {
-                match command {
-                    App(command) => self.app_command(&command),
-                    Custom(command) => {
-                        if let Some(ref callback) = self.command_callback {
-                            callback(command);
-                        }
-                    },
-                    Set(name, value) => {
-                        match Sett::to_variant(&name, value) {
-                            Ok(setting) => self.set_setting(setting),
-                            Err(error) => {
-                                let message = format!("Error setting value: {}", error);
-                                self.error(&message);
-                            },
-                        }
-                    },
-                    _ => unimplemented!(),
-                }
-            },
-            Err(error) => {
-                if let Some(error) = error.downcast_ref::<Error>() {
-                    let message =
-                        match error.typ {
-                            MissingArgument => "Argument required".to_string(),
-                            NoCommand => return,
-                            Parse => format!("Parse error: unexpected {}, expecting: {}", error.unexpected, error.expected),
-                            UnknownCommand => format!("Not a command: {}", error.unexpected),
-                        };
-                    self.error(&message);
-                }
-            },
-        }
-    }
-
     /// Call the setting changed callback.
     fn call_setting_callback(&self, setting: &Sett::Variant) {
         if let Some(ref callback) = self.setting_change_callback {
             callback(setting);
         }
-    }
-
-    /// Handle the command entry activate event.
-    fn command_activate(&mut self, input: Option<String>) {
-        if self.current_mode == INPUT_MODE || self.current_mode == BLOCKING_INPUT_MODE {
-            let mut should_reset = false;
-            if let Some(ref callback) = self.input_callback {
-                self.answer = input.clone();
-                callback(input);
-                should_reset = true;
-            }
-            if should_reset {
-                self.reset();
-            }
-            self.input_callback = None;
-            self.choices.clear();
-        }
-        else {
-            self.handle_command(input);
-        }
-        self.return_to_normal_mode();
     }
 
     /// Handle the key release event for the command mode.
@@ -670,62 +814,9 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
         //self.status_bar.get_command().unwrap_or_default()
     }
 
-    /// Get the color of the text.
-    fn get_foreground_color(window: &Window) -> RGBA {
-        let style_context = window.get_style_context().unwrap();
-        style_context.get_color(STATE_FLAG_NORMAL)
-    }
-
     /// Get the current mode.
     pub fn get_mode(&self) -> &str {
         &self.current_mode
-    }
-
-    /// Handle the command activate event.
-    fn handle_command(&mut self, command: Option<String>) {
-        if let Some(command) = command {
-            if self.current_command_mode == ':' {
-                let result = self.settings_parser.parse_line(&command);
-                self.call_command(result);
-            }
-            else {
-                self.handle_special_command(Final, &command);
-            }
-        }
-    }
-
-    /// Handle a special command activate or key press event.
-    fn handle_special_command(&mut self, activation_type: ActivationType, command: &str) {
-        let mut update_identifier = false;
-        if let Some(ref callback) = self.special_command_callback {
-            if let Ok(special_command) = Spec::identifier_to_command(self.current_command_mode, command) {
-                callback(special_command);
-                if activation_type == Final {
-                    update_identifier = true;
-                }
-            }
-        }
-        if update_identifier {
-            self.set_current_identifier(':');
-        }
-    }
-
-    /// Input the specified command.
-    fn input_command(&mut self, command: &str) {
-        self.set_mode(COMMAND_MODE);
-        //self.status_bar.show_entry();
-        let mut command = command.to_string();
-        for (variable, function) in &self.variables {
-            command = command.replace(&format!("<{}>", variable), &function());
-        }
-        let text: Cow<str> =
-            if command.contains(' ') {
-                command.into()
-            }
-            else {
-                format!("{} ", command).into()
-            };
-        //self.status_bar.set_input(&text);
     }
 
     /// Handle the key release event.
@@ -746,21 +837,6 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
             gtk::main_quit();
         }
         Inhibit(true)
-    }
-
-    /// Handle the escape event.
-    fn reset(&mut self) {
-        self.reset_colors();
-        //self.status_bar.hide_widgets();
-        self.message.set_text("");
-        self.show_mode();
-        self.clear_shortcut();
-    }
-
-    /// Reset the background and foreground colors of the status bar.
-    fn reset_colors(&self) {
-        //self.status_bar.override_background_color(STATE_FLAG_NORMAL, Some(TRANSPARENT));
-        //self.status_bar.override_color(STATE_FLAG_NORMAL, Some(&self.foreground_color));
     }
 
     /// Get the settings.
@@ -795,15 +871,6 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
         self.input_callback = None;
     }
 
-    /// Set the current mode.
-    pub fn set_mode(&mut self, mode: &str) {
-        self.current_mode = mode.to_string();
-        self.show_mode();
-        if let Some(ref callback) = self.mode_changed_callback {
-            callback(mode);
-        }
-    }
-
     /// Set the main widget.
     pub fn set_view<W: IsA<gtk::Widget> + WidgetExt>(&self, view: &W) {
         view.set_hexpand(true);
@@ -815,16 +882,6 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     /// Set the window title.
     pub fn set_window_title(&self, title: &str) {
         self.window.set_title(title);
-    }
-
-    /// Show the current mode if it is not the normal mode.
-    fn show_mode(&self) {
-        if self.current_mode != NORMAL_MODE && self.current_mode != COMMAND_MODE && self.current_mode != INPUT_MODE && self.current_mode != BLOCKING_INPUT_MODE {
-            self.mode_label.set_text(&self.current_mode);
-        }
-        else {
-            self.mode_label.set_text("");
-        }
     }
 
     /// Update the completions of the status bar.

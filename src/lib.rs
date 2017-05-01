@@ -69,8 +69,10 @@ use std::char;
 use std::result;
 
 pub type Modes = &'static [(&'static str, &'static str)];
+pub type Variables = &'static [(&'static str, fn() -> String)];
 
 pub use app::{Mg, parse_config};
+pub use app::Msg::CustomCommand;
 //pub use app::dialog::{DialogBuilder, DialogResult};
 pub use app::settings::NoSettings;
 pub use app::status_bar::{StatusBar, StatusBarItem};

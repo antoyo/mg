@@ -19,11 +19,10 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#![feature(proc_macro)]
+#![feature(closure_to_fn_coercion, proc_macro)]
 
 extern crate glib;
 extern crate gtk;
-#[macro_use]
 extern crate mg;
 extern crate mg_settings;
 #[macro_use]
@@ -34,19 +33,18 @@ extern crate relm_attributes;
 #[macro_use]
 extern crate relm_derive;
 
-use std::sync::Arc;
-
 use gtk::{
-    Inhibit,
     OrientableExt,
     WidgetExt,
-    WindowExt,
 };
 use gtk::Orientation::Vertical;
 use mg::{
+    CustomCommand,
     Mg,
+    Modes,
     NoSpecialCommands,
     StatusBarItem,
+    Variables,
 };
 use relm::Widget;
 use relm_attributes::widget;
@@ -72,8 +70,12 @@ pub enum AppCommand {
     Quit,
 }
 
-static MODES: &[(&str, &str)] = &[
+static MODES: Modes = &[
     ("i", "insert"),
+];
+
+static VARIABLES: Variables = &[
+    ("url", || "http://duckduckgo.com/lite".to_string()),
 ];
 
 #[widget]
@@ -98,7 +100,7 @@ impl Widget for Win {
     }
 
     view! {
-        Mg<AppCommand>((MODES, "examples/main.conf")) {
+        Mg<AppCommand>((MODES, VARIABLES, "examples/main.conf")) {
             dark_theme: true,
             title: "First Mg Program",
             gtk::Box {
@@ -115,33 +117,16 @@ impl Widget for Win {
             StatusBarItem {
                 text: "Test",
             },
-            //Command => Command, // TODO
+            CustomCommand(command) => Command(command), // TODO
         }
     }
 }
 
-/*struct App {
-    app: Box<mg::Application<AppCommand, NoSettings, NoSpecialCommands>>,
-    label: Label,
-}
-
-impl App {
+/*impl App {
     fn new() -> Box<Self> {
-        let mut app: Box<Application<AppCommand>> = SimpleApplicationBuilder::new()
-            .modes(hash! {
-                "i" => "insert",
-            })
-            .build();
-        if let Err(error) = app.parse_config("examples/main.conf") {
-            app.error(&error.to_string());
-        }
         app.add_variable("url", || "http://duckduckgo.com/lite".to_string());
 
-        //connect!(app.app, connect_command(command), app, handle_command(command));
-
         entry.grab_focus();
-
-        app
     }
 }*/
 

@@ -24,13 +24,25 @@
 use gtk::Continue;
 use mg_settings::{EnumFromStr, EnumMetaData, SettingCompletion};
 use mg_settings::settings;
+use relm::Widget;
 
-use app::Application;
+//use app::Application;
+use app::Mg;
 use SpecialCommand;
 
 const INFO_MESSAGE_DURATION: u32 = 5000;
 
-impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
+impl<COMM: EnumFromStr> Mg<COMM> {
+    /// Show an error to the user.
+    pub fn error(&self, error: &str) {
+        error!("{}", error);
+        self.message.widget().root().set_text(error);
+        //self.status_bar.hide_entry();
+        //self.status_bar.color_red();
+    }
+}
+
+/*impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
     where Spec: SpecialCommand + 'static,
           Comm: EnumFromStr + EnumMetaData + 'static,
           Sett: settings::Settings + EnumMetaData + SettingCompletion + 'static,
@@ -39,14 +51,6 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
     pub fn alert(&self, message: &str) {
         self.message.set_text(message);
         //self.status_bar.color_blue();
-    }
-
-    /// Show an error to the user.
-    pub fn error(&mut self, error: &str) {
-        error!("{}", error);
-        self.message.set_text(error);
-        //self.status_bar.hide_entry();
-        //self.status_bar.color_red();
     }
 
     /// Hide the information message.
@@ -93,4 +97,4 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
         //self.status_bar.color_orange();
         timeout_add!(INFO_MESSAGE_DURATION, self, hide_colored_message(&message));
     }
-}
+}*/

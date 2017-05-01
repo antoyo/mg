@@ -42,13 +42,14 @@ use gtk::{
 use gtk::prelude::WidgetExtManual;
 use gtk::Orientation::Horizontal;
 use pango_sys::PangoEllipsizeMode;
-use relm::Widget;
+use relm::{Container, Widget};
 use relm::gtk_ext::BoxExtManual;
 use relm_attributes::widget;
 
 use app::COMMAND_MODE;
 use completion::{Completer, Completion, CompletionView, DEFAULT_COMPLETER_IDENT, NO_COMPLETER_IDENT};
 use gtk_widgets::LabelExtManual;
+use self::Msg::*;
 
 const BLUE: &RGBA = &RGBA { red: 0.0, green: 0.0, blue: 1.0, alpha: 1.0 };
 const ORANGE: &RGBA = &RGBA { red: 0.9, green: 0.55, blue: 0.0, alpha: 1.0 };
@@ -59,17 +60,17 @@ pub type HBox = ::gtk::Box;
 
 #[derive(Msg)]
 pub enum Msg {
+    Activate(Option<String>),
 }
 
 #[derive(Clone)]
 pub struct Model {
-    entry_shown: bool,
     identifier_label: &'static str,
 }
 
 #[widget]
 impl Widget for StatusBar {
-    fn init_view(&self) {
+    fn init_view(&self, _model: &mut Model) {
         // Adjust the look of the entry.
         let style_context = self.command_entry.get_style_context().unwrap();
         let style = include_str!("../../style/command-input.css");
@@ -80,7 +81,6 @@ impl Widget for StatusBar {
 
     fn model() -> Model {
         Model {
-            entry_shown: false,
             identifier_label: ":",
         }
     }
@@ -93,23 +93,53 @@ impl Widget for StatusBar {
         gtk::Box {
             property_height_request: 20, // TODO: is this still useful?
             orientation: Horizontal,
+            #[name="identifier_label"]
             gtk::Label {
                 text: model.identifier_label,
-                visible: model.entry_shown,
             },
             #[name="command_entry"]
             gtk::Entry {
+                activate(entry) => Activate(entry.get_text()),
                 has_frame: false,
                 hexpand: true,
                 name: "mg-input-command",
-                visible: model.entry_shown,
             },
         }
     }
 }
 
-#[derive(Msg)]
-pub enum ItemMsg {
+impl StatusBar {
+    /// Connect the active entry event.
+    pub fn connect_activate<F: Fn(Option<String>) + 'static>(&self, callback: F) {
+        self.command_entry.connect_activate(move |entry| callback(entry.get_text()));
+    }
+
+    // TODO: merge with show_entry()?
+    pub fn set_entry_shown(&self, visible: bool) {
+        self.command_entry.set_text("");
+        self.identifier_label.set_visible(visible);
+        self.command_entry.set_visible(visible);
+    }
+
+    pub fn set_identifier(&self, identifier: &str) {
+        println!("set_identifier");
+        self.identifier_label.set_text(identifier);
+    }
+
+    /// Set the text of the input entry and move the cursor at the end.
+    pub fn set_input(&self, command: &str) {
+        // Prevent updating the completions when the user selects a completion entry.
+        // TODO: use a kind of lock for that?
+        //self.inserting_completion = true;
+        self.command_entry.set_text(command);
+        self.command_entry.set_position(command.len() as i32);
+        //self.inserting_completion = false;
+    }
+
+    /// Show the entry.
+    pub fn show_entry(&self) {
+        self.command_entry.grab_focus();
+    }
 }
 
 #[widget]
@@ -118,7 +148,7 @@ impl Widget for StatusBarItem {
         ()
     }
 
-    fn update(&mut self, msg: ItemMsg, model: &mut ()) {
+    fn update(&mut self, msg: (), model: &mut ()) {
     }
 
     view! {
@@ -211,11 +241,6 @@ impl StatusBar {
         self.completion.view.select_previous();
     }
 
-    /// Connect the active entry event.
-    pub fn connect_activate<F: Fn(Option<String>) + 'static>(&self, callback: F) {
-        self.entry.connect_activate(move |entry| callback(entry.get_text()));
-    }
-
     /// Delete the current completion item.
     pub fn delete_current_completion_item(&self) {
         self.completion.delete_current_completion_item();
@@ -253,11 +278,6 @@ impl StatusBar {
         self.completion.view.hide();
     }
 
-    /// Hide the entry.
-    pub fn hide_entry(&mut self) {
-        self.entry.set_text("");
-    }
-
     /// Select the completer based on the currently typed command.
     pub fn select_completer(&mut self) {
         if let Some(text) = self.entry.get_text() {
@@ -285,15 +305,6 @@ impl StatusBar {
         self.filter();
     }
 
-    /// Set the text of the input entry and move the cursor at the end.
-    pub fn set_input(&mut self, command: &str) {
-        // Prevent updating the completions when the user selects a completion entry.
-        self.inserting_completion = true;
-        self.entry.set_text(command);
-        self.entry.set_position(command.len() as i32);
-        self.inserting_completion = false;
-    }
-
     /// Set the original input.
     pub fn set_original_input(&mut self, input: &str) {
         self.completion_original_input = input.to_string();
@@ -304,12 +315,6 @@ impl StatusBar {
         self.completion.view.unselect();
         self.completion.view.scroll_to_first();
         self.completion.view.show();
-    }
-
-    /// Show the entry.
-    pub fn show_entry(&mut self) {
-        self.entry.set_text("");
-        self.entry.grab_focus();
     }
 
     /// Update the completions.
@@ -370,6 +375,7 @@ impl StatusBarItem {
         // packing {
         //     pack_type: PackType::End
         // }
+        // FIXME: does not seem to work, right now
         // instead of this.
         self.left = true;
         self
