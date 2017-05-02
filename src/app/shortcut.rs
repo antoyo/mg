@@ -39,57 +39,57 @@ pub fn shortcut_to_string(keys: &[Key]) -> String {
 
 impl<COMM: EnumFromStr> Mg<COMM> {
     /// Add the key to the current shortcut.
-    pub fn add_to_shortcut(&self, key: Key, model: &mut Model<COMM>) {
-        model.current_shortcut.push(key);
-        self.update_shortcut_label(model);
+    pub fn add_to_shortcut(&mut self, key: Key) {
+        self.model.current_shortcut.push(key);
+        self.update_shortcut_label();
     }
 
     /// Clear the current shortcut buffer.
-    pub fn clear_shortcut(&self, model: &mut Model<COMM>) {
-        model.current_shortcut.clear();
-        self.update_shortcut_label(model);
+    pub fn clear_shortcut(&mut self) {
+        self.model.current_shortcut.clear();
+        self.update_shortcut_label();
     }
 
     /// Handle a possible input of a shortcut.
-    pub fn handle_shortcut(&self, key: &EventKey, model: &mut Model<COMM>) -> (Option<Msg<COMM>>, Inhibit) {
+    pub fn handle_shortcut(&mut self, key: &EventKey) -> (Option<Msg<COMM>>, Inhibit) {
         let keyval = key.get_keyval();
-        let mut should_inhibit = model.current_mode == NORMAL_MODE ||
-            (model.current_mode == COMMAND_MODE && (keyval == Tab || keyval == ISO_Left_Tab)) ||
+        let mut should_inhibit = self.model.current_mode == NORMAL_MODE ||
+            (self.model.current_mode == COMMAND_MODE && (keyval == Tab || keyval == ISO_Left_Tab)) ||
             key.get_keyval() == Escape;
         let control_pressed = key.get_state() & CONTROL_MASK == CONTROL_MASK;
-        if !model.entry_shown || control_pressed || keyval == Tab || keyval == ISO_Left_Tab {
+        if !self.model.entry_shown || control_pressed || keyval == Tab || keyval == ISO_Left_Tab {
             if let Some(key) = gdk_key_to_key(keyval, control_pressed) {
-                self.add_to_shortcut(key, model);
+                self.add_to_shortcut(key);
                 let action = {
-                    let mut current_mode = model.current_mode.clone();
+                    let mut current_mode = self.model.current_mode.clone();
                     // The input modes have the same mappings as the command mode.
                     if current_mode == INPUT_MODE || current_mode == BLOCKING_INPUT_MODE {
                         current_mode = COMMAND_MODE.to_string();
                     }
-                    model.mappings.get(&current_mode.as_ref())
-                        .and_then(|mappings| mappings.get(&model.current_shortcut).cloned())
+                    self.model.mappings.get(&current_mode.as_ref())
+                        .and_then(|mappings| mappings.get(&self.model.current_shortcut).cloned())
                 };
                 if let Some(action) = action {
                     // FIXME: this is copied a couple of lines below.
-                    if !model.entry_shown {
-                        self.reset(model);
+                    if !self.model.entry_shown {
+                        self.reset();
                     }
-                    self.clear_shortcut(model);
+                    self.clear_shortcut();
                     match self.action_to_command(&action) {
-                        Complete(command) => return (self.handle_command(Some(command), model), Inhibit(false)),
+                        Complete(command) => return (self.handle_command(Some(command)), Inhibit(false)),
                         Incomplete(command) => {
-                            self.input_command(&command, model);
+                            self.input_command(&command);
                             //self.status_bar.show_completion();
                             //self.update_completions();
                             should_inhibit = true;
                         },
                     }
                 }
-                else if self.no_possible_shortcut(model) {
-                    if !model.entry_shown {
-                        self.reset(model);
+                else if self.no_possible_shortcut() {
+                    if !self.model.entry_shown {
+                        self.reset();
                     }
-                    self.clear_shortcut(model);
+                    self.clear_shortcut();
                 }
             }
         }
@@ -102,10 +102,10 @@ impl<COMM: EnumFromStr> Mg<COMM> {
     }
 
     /// Check if there are no possible shortcuts.
-    fn no_possible_shortcut(&self, model: &Model<COMM>) -> bool {
-        if let Some(mappings) = model.mappings.get(&model.current_mode.as_ref()) {
+    fn no_possible_shortcut(&self) -> bool {
+        if let Some(mappings) = self.model.mappings.get(&self.model.current_mode.as_ref()) {
             for key in mappings.keys() {
-                if key.starts_with(&model.current_shortcut) {
+                if key.starts_with(&self.model.current_shortcut) {
                     return false;
                 }
             }
@@ -115,8 +115,8 @@ impl<COMM: EnumFromStr> Mg<COMM> {
 
     // TODO: remove this when updating the model in methods outside the trait will update the view.
     /// Update the shortcut label.
-    fn update_shortcut_label(&self, model: &Model<COMM>) {
-        self.shortcut.widget().root().set_text(&shortcut_to_string(&model.current_shortcut));
+    fn update_shortcut_label(&self) {
+        self.shortcut.widget().root().set_text(&shortcut_to_string(&self.model.current_shortcut));
     }
 }
 

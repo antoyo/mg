@@ -70,7 +70,7 @@ pub struct Model {
 
 #[widget]
 impl Widget for StatusBar {
-    fn init_view(&self, _model: &mut Model) {
+    fn init_view(&self) {
         // Adjust the look of the entry.
         let style_context = self.command_entry.get_style_context().unwrap();
         let style = include_str!("../../style/command-input.css");
@@ -85,7 +85,7 @@ impl Widget for StatusBar {
         }
     }
 
-    fn update(&mut self, msg: Msg, model: &mut Model) {
+    fn update(&mut self, msg: Msg) {
     }
 
     view! {
@@ -95,7 +95,7 @@ impl Widget for StatusBar {
             orientation: Horizontal,
             #[name="identifier_label"]
             gtk::Label {
-                text: model.identifier_label,
+                text: self.model.identifier_label,
             },
             #[name="command_entry"]
             gtk::Entry {
@@ -148,7 +148,7 @@ impl Widget for StatusBarItem {
         ()
     }
 
-    fn update(&mut self, msg: (), model: &mut ()) {
+    fn update(&mut self, msg: ()) {
     }
 
     view! {

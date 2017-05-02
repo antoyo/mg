@@ -86,13 +86,13 @@ impl Widget for Win {
         }
     }
 
-    fn update(&mut self, event: Msg, model: &mut Model) {
+    fn update(&mut self, event: Msg) {
         match event {
             Command(command) => {
                 match command {
                     Insert => (), //self.app.set_mode("insert"),
                     Normal => (), //self.app.set_mode("normal"),
-                    Open(url) => model.text = format!("Opening URL {}", url),
+                    Open(url) => self.model.text = format!("Opening URL {}", url),
                     Quit => gtk::main_quit(),
                 }
             },
@@ -106,7 +106,7 @@ impl Widget for Win {
             gtk::Box {
                 orientation: Vertical,
                 gtk::Label {
-                    text: &model.text,
+                    text: &self.model.text,
                 },
                 gtk::Entry {
                 },
