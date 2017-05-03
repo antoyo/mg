@@ -23,6 +23,7 @@ use std::cmp::max;
 use std::ops::Deref;
 
 use glib::{Cast, Object};
+use gtk;
 use gtk::{
     Align,
     CellLayoutExt,
@@ -42,6 +43,8 @@ use gtk::{
 };
 use gtk::PolicyType::{Automatic, Never};
 use pango_sys::PangoEllipsizeMode;
+use relm::Widget;
+use relm_attributes::widget;
 
 use completion::Column::{self, Expand};
 use gobject::ObjectExtManual;
@@ -50,39 +53,54 @@ use super::Completer;
 
 const COMPLETION_VIEW_MAX_HEIGHT: i32 = 300;
 
-/// A widget to show completions for the command entry.
-pub struct CompletionView {
+#[derive(Msg)]
+enum Msg {
+}
+
+#[derive(Clone)]
+struct Model {
     unselect_callback: Option<Box<Fn()>>,
-    tree_view: TreeView,
-    view: ScrolledWindow,
+}
+
+/// A widget to show completions for the command entry.
+#[widget]
+impl Widget for CompletionView {
+    fn model(_: ()) -> Model {
+        Model {
+            unselect_callback: None,
+        }
+    }
+
+    fn update(&mut self, event: Msg) {
+    }
+
+    view! {
+        #[name="scrolled_window"]
+        gtk::ScrolledWindow {
+            max_content_height: COMPLETION_VIEW_MAX_HEIGHT,
+            propagate_natural_height: true,
+            valign: Align::End,
+            #[name="tree_view"]
+            gtk::TreeView {
+                can_focus: false,
+                enable_search: false,
+                headers_visible: false,
+            }
+        }
+    }
 }
 
 impl CompletionView {
     /// Create a new completion view.
-    pub fn new() -> Box<Self> {
+    /*pub fn new() -> Box<Self> {
         let tree_view = TreeView::new();
 
         tree_view.get_selection().unselect_all();
-        tree_view.set_enable_search(false);
-        tree_view.set_headers_visible(false);
-        tree_view.set_can_focus(false);
-
-        let scrolled_window = ScrolledWindow::new(None, None);
-        scrolled_window.set_valign(Align::End);
-        scrolled_window.add(&tree_view);
-        scrolled_window.set_max_content_height(COMPLETION_VIEW_MAX_HEIGHT);
-        scrolled_window.set_propagate_natural_height(true);
-
-        let view = Box::new(CompletionView {
-            unselect_callback: None,
-            tree_view: tree_view,
-            view: scrolled_window,
-        });
 
         view.add_columns(2);
 
         view
-    }
+    }*/
 
     /// Add a column to the tree view.
     fn add_column(&self, index: i32, foreground_index: i32, column: Column) {
@@ -132,7 +150,7 @@ impl CompletionView {
             else {
                 Automatic
             };
-        self.view.set_policy(Never, policy);
+        self.scrolled_window.set_policy(Never, policy);
     }
 
     /// Add a callback to the selection changed event.
@@ -142,7 +160,7 @@ impl CompletionView {
 
     /// Add a callback to the unselect event.
     pub fn connect_unselect<F: Fn() + 'static>(&mut self, callback: F) {
-        self.unselect_callback = Some(Box::new(callback));
+        self.model.unselect_callback = Some(Box::new(callback));
     }
 
     /// Delete the current completion item.
@@ -157,7 +175,7 @@ impl CompletionView {
 
     /// Adjust the policy of the scrolled window to avoid having extra space around the tree view.
     pub fn disable_scrollbars(&self) {
-        self.view.set_policy(Never, Never);
+        self.scrolled_window.set_policy(Never, Never);
     }
 
     /// Remove all the columns.
@@ -237,7 +255,7 @@ impl CompletionView {
     /// Emit the event to show the original input.
     /// This is emitted when the user unselect from the completion view.
     fn show_original_input(&self) {
-        if let Some(ref callback) = self.unselect_callback {
+        if let Some(ref callback) = self.model.unselect_callback {
             callback();
         }
     }
@@ -246,13 +264,5 @@ impl CompletionView {
     pub fn unselect(&self) {
         let selection = self.tree_view.get_selection();
         selection.unselect_all();
-    }
-}
-
-impl Deref for CompletionView {
-    type Target = ScrolledWindow;
-
-    fn deref(&self) -> &Self::Target {
-        &self.view
     }
 }
