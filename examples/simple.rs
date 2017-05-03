@@ -42,7 +42,6 @@ use mg::{
     CustomCommand,
     Mg,
     Modes,
-    NoSpecialCommands,
     StatusBarItem,
     Variables,
 };
@@ -80,6 +79,10 @@ static VARIABLES: Variables = &[
 
 #[widget]
 impl Widget for Win {
+    fn init_view(&self) {
+        self.entry.grab_focus();
+    }
+
     fn model() -> Model {
         Model {
             text: "Mg App".to_string(),
@@ -90,8 +93,8 @@ impl Widget for Win {
         match event {
             Command(command) => {
                 match command {
-                    Insert => (), //self.app.set_mode("insert"),
-                    Normal => (), //self.app.set_mode("normal"),
+                    Insert => self.mg.widget_mut().set_mode("insert"),
+                    Normal => self.mg.widget_mut().set_mode("normal"),
                     Open(url) => self.model.text = format!("Opening URL {}", url),
                     Quit => gtk::main_quit(),
                 }
@@ -99,15 +102,19 @@ impl Widget for Win {
         }
     }
 
+    // TODO: show completions.
     view! {
-        Mg<AppCommand>((MODES, VARIABLES, "examples/main.conf")) {
+        #[name="mg"]
+        Mg<AppCommand>((MODES, "examples/main.conf")) {
             dark_theme: true,
             title: "First Mg Program",
+            variables: VARIABLES,
             gtk::Box {
                 orientation: Vertical,
                 gtk::Label {
                     text: &self.model.text,
                 },
+                #[name="entry"]
                 gtk::Entry {
                 },
             },
@@ -117,18 +124,10 @@ impl Widget for Win {
             StatusBarItem {
                 text: "Test",
             },
-            CustomCommand(command) => Command(command), // TODO
+            CustomCommand(command) => Command(command),
         }
     }
 }
-
-/*impl App {
-    fn new() -> Box<Self> {
-        app.add_variable("url", || "http://duckduckgo.com/lite".to_string());
-
-        entry.grab_focus();
-    }
-}*/
 
 fn main() {
     Win::run(()).unwrap();

@@ -76,7 +76,7 @@ impl<COMM: EnumFromStr> Mg<COMM> {
                     }
                     self.clear_shortcut();
                     match self.action_to_command(&action) {
-                        Complete(command) => return (self.handle_command(Some(command)), Inhibit(false)),
+                        Complete(command) => return (self.handle_command(Some(command)), Inhibit(should_inhibit)),
                         Incomplete(command) => {
                             self.input_command(&command);
                             //self.status_bar.show_completion();
@@ -93,12 +93,7 @@ impl<COMM: EnumFromStr> Mg<COMM> {
                 }
             }
         }
-        if should_inhibit {
-            (None, Inhibit(true))
-        }
-        else {
-            (None, Inhibit(false))
-        }
+        (None, Inhibit(should_inhibit))
     }
 
     /// Check if there are no possible shortcuts.

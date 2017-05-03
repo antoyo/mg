@@ -37,8 +37,8 @@ impl<COMM: EnumFromStr> Mg<COMM> {
     pub fn error(&self, error: &str) {
         error!("{}", error);
         self.message.widget().root().set_text(error);
-        //self.status_bar.hide_entry();
-        //self.status_bar.color_red();
+        self.status_bar.widget().hide_entry();
+        self.status_bar.widget().color_red();
     }
 }
 

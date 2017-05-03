@@ -73,6 +73,7 @@ impl Widget for StatusBar {
     fn init_view(&self) {
         // Adjust the look of the entry.
         let style_context = self.command_entry.get_style_context().unwrap();
+        // TODO: remove the next line when relm supports css.
         let style = include_str!("../../style/command-input.css");
         let provider = CssProvider::new();
         provider.load_from_data(style).unwrap();
@@ -109,9 +110,26 @@ impl Widget for StatusBar {
 }
 
 impl StatusBar {
+    /// Color the status bar in red.
+    pub fn color_red(&self) {
+        self.root().override_background_color(STATE_FLAG_NORMAL, &RED);
+        self.white_foreground();
+    }
+
     /// Connect the active entry event.
     pub fn connect_activate<F: Fn(Option<String>) + 'static>(&self, callback: F) {
         self.command_entry.connect_activate(move |entry| callback(entry.get_text()));
+    }
+
+    /// Hide the entry.
+    pub fn hide_entry(&self) {
+        self.set_entry_shown(false);
+    }
+
+    /// Hide the completion view and the entry.
+    pub fn hide_widgets(&self) {
+        //self.hide_completion();
+        self.hide_entry();
     }
 
     // TODO: merge with show_entry()?
@@ -122,7 +140,6 @@ impl StatusBar {
     }
 
     pub fn set_identifier(&self, identifier: &str) {
-        println!("set_identifier");
         self.identifier_label.set_text(identifier);
     }
 
@@ -139,6 +156,11 @@ impl StatusBar {
     /// Show the entry.
     pub fn show_entry(&self) {
         self.command_entry.grab_focus();
+    }
+
+    /// Set the foreground (text) color to white.
+    pub fn white_foreground(&self) {
+        self.root().override_color(STATE_FLAG_NORMAL, &WHITE);
     }
 }
 
@@ -225,12 +247,6 @@ impl StatusBar {
         self.white_foreground();
     }
 
-    /// Color the status bar in red.
-    pub fn color_red(&self) {
-        self.override_background_color(STATE_FLAG_NORMAL, &RED);
-        self.white_foreground();
-    }
-
     /// Select the next completion entry if it is visible.
     pub fn complete_next(&self) {
         self.completion.view.select_next();
@@ -265,12 +281,6 @@ impl StatusBar {
     fn handle_unselect(&mut self) {
         let original_input = self.completion_original_input.clone();
         self.set_input(&original_input);
-    }
-
-    /// Hide the completion view and the entry.
-    pub fn hide_widgets(&mut self) {
-        self.hide_completion();
-        self.hide_entry();
     }
 
     /// Hide the completion view.
@@ -338,11 +348,6 @@ impl StatusBar {
             }
             self.completion.view.unselect();
         }
-    }
-
-    /// Set the foreground (text) color to white.
-    pub fn white_foreground(&self) {
-        self.override_color(STATE_FLAG_NORMAL, &WHITE);
     }
 }
 

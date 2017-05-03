@@ -146,12 +146,11 @@ pub enum Msg<COMM> {
 #[widget]
 impl<COMM: Clone + EnumFromStr + Send + 'static> Widget for Mg<COMM> {
     fn init_view(&self) {
-        // FIXME: this is executed too late, so the color is not good.
-        //self.model.foreground_color = self.get_foreground_color();
+        self.show_mode();
     }
 
     // TODO: switch from a &'static str to a String.
-    fn model((user_modes, variables, settings_filename): (Modes, Variables, &'static str)) -> Model<COMM> {
+    fn model((user_modes, settings_filename): (Modes, &'static str)) -> Model<COMM> {
         // TODO: show the error instead of unwrapping.
         let (parser, mappings, modes) = parse_config(settings_filename, user_modes, None).unwrap();
         Model {
@@ -165,13 +164,16 @@ impl<COMM: Clone + EnumFromStr + Send + 'static> Widget for Mg<COMM> {
             modes: modes,
             settings_parser: Rc::new(RefCell::new(parser)),
             //special_command_callback: None,
-            variables: variables.iter().map(|&(string, func)| (string.to_string(), func)).collect(),
+            variables: HashMap::new(),
         }
     }
 
     fn update(&mut self, event: Msg<COMM>) {
         match event {
-            CustomCommand(_) => (), // To be listened to by the user.
+            // To be listened to by the user.
+            CustomCommand(_) => {
+                self.return_to_normal_mode();
+            },
             EnterCommandMode => {
                 //self.status_bar.set_completer(DEFAULT_COMPLETER_IDENT);
                 self.set_current_identifier(':');
@@ -182,17 +184,7 @@ impl<COMM: Clone + EnumFromStr + Send + 'static> Widget for Mg<COMM> {
                 self.show_entry();
             },
             EnterNormalMode => {
-                //let status_bar = self.status_bar.widget();
-                self.model.entry_shown = false;
-                //self.status_bar.hide_completion();
-                self.set_mode(NORMAL_MODE);
-                self.set_current_identifier(':');
-                self.reset();
-                self.clear_shortcut();
-                /*if let Some(ref callback) = self.input_callback {
-                    callback(None);
-                }
-                self.input_callback = None;*/
+                self.return_to_normal_mode();
             },
             KeyPress(_) => println!("press"),
             KeyRelease(_) => println!("release"),
@@ -224,6 +216,9 @@ impl<COMM: Clone + EnumFromStr + Send + 'static> Widget for Mg<COMM> {
                     #[name="message"]
                     StatusBarItem {
                         text: "", // TODO: bind to a model field.
+                        packing: {
+                            pack_type: PackType::Start,
+                        },
                     },
                     #[name="mode"]
                     StatusBarItem {
@@ -303,7 +298,7 @@ impl<COMM: EnumFromStr> Mg<COMM> {
     }
 
     /// Handle the command entry activate event.
-    fn command_activate(&mut self, input: Option<String>) -> Msg<COMM> {
+    fn command_activate(&mut self, input: Option<String>) -> Option<Msg<COMM>> {
         let message =
         /*if self.current_mode == INPUT_MODE || self.current_mode == BLOCKING_INPUT_MODE {
             let mut should_reset = false;
@@ -323,7 +318,7 @@ impl<COMM: EnumFromStr> Mg<COMM> {
         //}
         ;
         //self.return_to_normal_mode();
-        message.unwrap()
+        message
     }
 
     /// Handle the key press event for the command mode.
@@ -461,8 +456,8 @@ impl<COMM: EnumFromStr> Mg<COMM> {
     /// Handle the escape event.
     fn reset(&mut self) {
         self.reset_colors();
-        //self.status_bar.hide_widgets();
-        //self.message.set_text("");
+        self.status_bar.widget().hide_widgets();
+        self.message.widget().root().set_text("");
         self.show_mode();
         self.clear_shortcut();
     }
@@ -475,6 +470,22 @@ impl<COMM: EnumFromStr> Mg<COMM> {
         status_bar.override_color(STATE_FLAG_NORMAL, &self.model.foreground_color);
     }
 
+    fn return_to_normal_mode(&mut self) {
+        //let status_bar = self.status_bar.widget();
+        self.model.entry_shown = false;
+        // TODO: remove the next line when the custom methods are analyzed by relm.
+        self.status_bar.widget().set_entry_shown(false);
+        //self.status_bar.hide_completion();
+        self.set_mode(NORMAL_MODE);
+        self.set_current_identifier(':');
+        self.reset();
+        self.clear_shortcut();
+        /*if let Some(ref callback) = self.input_callback {
+          callback(None);
+                }
+                self.input_callback = None;*/
+    }
+
     /// Set the current (special) command identifier.
     fn set_current_identifier(&mut self, identifier: char) {
         self.model.current_command_mode = identifier;
@@ -484,11 +495,10 @@ impl<COMM: EnumFromStr> Mg<COMM> {
     }
 
     /// Use the dark variant of the theme if available.
-    pub fn set_dark_theme(&self, use_dark: bool) {
-        println!("set_dark_theme");
+    pub fn set_dark_theme(&mut self, use_dark: bool) {
         let settings = Settings::get_default().unwrap();
         settings.set_data("gtk-application-prefer-dark-theme", use_dark.to_glib());
-        //self.foreground_color = Application::<Comm, Sett, Spec>::get_foreground_color(&self.window);
+        self.model.foreground_color = self.get_foreground_color();
     }
 
     /// Set the current mode.
@@ -508,6 +518,12 @@ impl<COMM: EnumFromStr> Mg<COMM> {
         self.window.set_title(title);
     }
 
+    pub fn set_variables(&mut self, variables: Variables) {
+        self.model.variables = variables.iter()
+            .map(|&(string, func)| (string.to_string(), func))
+            .collect();
+    }
+
     fn show_entry(&mut self) {
         self.model.entry_shown = true;
         let status_bar = self.status_bar.widget();
@@ -517,6 +533,7 @@ impl<COMM: EnumFromStr> Mg<COMM> {
 
     /// Show the current mode if it is not the normal mode.
     fn show_mode(&self) {
+        // TODO: remove when model changes will update the view in custom method.
         let label = self.mode.widget().root();
         if self.model.current_mode != NORMAL_MODE && self.model.current_mode != COMMAND_MODE &&
             self.model.current_mode != INPUT_MODE && self.model.current_mode != BLOCKING_INPUT_MODE
