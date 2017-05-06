@@ -140,7 +140,7 @@ impl Completion {
 
     /// Delete the current completion item.
     pub fn delete_current_completion_item(&self) {
-        //self.view.delete_current_completion_item();
+        //self.view.delete_current_completion_item(); // TODO
     }
 
     /// Filter the rows from the input.

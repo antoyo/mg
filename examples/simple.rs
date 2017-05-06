@@ -101,8 +101,6 @@ impl Widget for Win {
         }
     }
 
-    // FIXME: cannot go in command mode when an error is shown.
-    // TODO: show completions.
     view! {
         #[name="mg"]
         Mg<AppCommand>((MODES, "examples/main.conf")) {

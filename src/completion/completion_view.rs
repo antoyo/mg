@@ -71,7 +71,6 @@ pub struct Model {
 impl Widget for CompletionView {
     fn init_view(&self) {
         self.add_columns(2);
-        //tree_view.get_selection().unselect_all(); // TODO: is it needed?
     }
 
     fn model(relm: &Relm<Self>, _: ()) -> Model {
@@ -149,10 +148,7 @@ impl CompletionView {
 
     /// Adjust the policy of the scrolled window to avoid having extra space around the tree view.
     pub fn adjust_policy<M: IsA<Object> + IsA<TreeModel>>(&self, model: &M) {
-        {
-            let _lock = self.model.relm.stream().lock();
-            self.tree_view.set_model(Some(model));
-        }
+        self.tree_view.set_model(Some(model));
         let policy =
             if model.iter_n_children(None) < 2 {
                 Never
@@ -296,7 +292,6 @@ impl CompletionView {
     /// Set the current command completer.
     pub fn set_completer(&mut self, completer: &str, command_entry_text: &str) {
         if self.model.completion.adjust_model(completer) {
-            let _lock = self.model.relm.stream().lock();
             self.tree_view.set_model::<ListStore>(None);
         }
         {

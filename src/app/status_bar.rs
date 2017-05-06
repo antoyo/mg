@@ -150,12 +150,9 @@ impl StatusBar {
     /// Set the text of the input entry and move the cursor at the end.
     pub fn set_input(&self, command: &str) {
         // Prevent updating the completions when the user selects a completion entry.
-        // TODO: use a kind of lock for that?
-        //self.inserting_completion = true;
         let _lock = self.model.relm.stream().lock();
         self.command_entry.set_text(command);
         self.command_entry.set_position(command.len() as i32);
-        //self.inserting_completion = false;
     }
 
     /// Show the entry.
@@ -199,37 +196,7 @@ impl StatusBarItem {
 }
 
 /*
-/// The window status bar.
-pub struct StatusBar {
-    completion: Completion,
-    pub entry: Entry,
-    entry_shown: bool,
-    identifier_label: Label,
-    inserting_completion: bool,
-    hbox: HBox,
-}
-
 impl StatusBar {
-    /// Create a new status bar.
-    pub fn new(completion_view: Box<CompletionView>, completers: HashMap<String, Box<Completer>>) -> Box<Self> {
-        let completion = Completion::new(completers, completion_view);
-
-        let mut status_bar = Box::new(StatusBar {
-            completion: completion,
-            completion_original_input: String::new(),
-            entry: entry,
-            entry_shown: false,
-            identifier_label: identifier_label,
-            inserting_completion: false,
-            hbox: hbox,
-        });
-
-        //connect!(status_bar.completion.view, connect_selection_changed(selection), status_bar, selection_changed(selection));
-        //connect!(status_bar.completion.view, connect_unselect, status_bar, handle_unselect);
-
-        status_bar
-    }
-
     /// Add an item.
     pub fn add_item(&self, item: &StatusBarItem) {
         item.label.show();

@@ -139,6 +139,7 @@ pub enum Msg<COMM> {
     CustomCommand(COMM),
     EnterCommandMode,
     EnterNormalMode,
+    EnterNormalModeAndReset,
     KeyPress(GdkKey),
     KeyRelease(GdkKey),
     Quit,
@@ -176,7 +177,7 @@ impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Widget for Mg<COMM> {
         match key.get_keyval() {
             Escape => {
                 // TODO: this should not call the callback (in update(EnterNormalMode)).
-                (Some(EnterNormalMode), Inhibit(false))
+                (Some(EnterNormalModeAndReset), Inhibit(false))
             },
             _ => self.handle_shortcut(key),
         }
@@ -219,12 +220,18 @@ impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Widget for Mg<COMM> {
         }
     }
 
+    /// Hide the command entry and the completion view.
+    fn hide_entry_and_completion(&mut self) {
+        self.model.completion_shown = false;
+        self.model.entry_shown = false;
+    }
+
     /// Handle the key press event for the input mode.
     #[allow(non_upper_case_globals)]
     fn input_key_press(&mut self, key: &EventKey) -> (Option<Msg<COMM>>, Inhibit) {
         match key.get_keyval() {
             Escape => {
-                (Some(EnterNormalMode), Inhibit(false))
+                (Some(EnterNormalModeAndReset), Inhibit(false))
             },
             keyval => {
                 /*if self.handle_input_shortcut(key) {
@@ -304,17 +311,15 @@ impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Widget for Mg<COMM> {
     /// Handle the escape event.
     fn reset(&mut self) {
         self.reset_colors();
-        self.model.completion_shown = false;
-        self.model.entry_shown = false;
+        self.hide_entry_and_completion();
         self.message.widget().root().set_text("");
         self.clear_shortcut();
     }
 
     fn return_to_normal_mode(&mut self) {
+        self.hide_entry_and_completion();
         self.set_mode(NORMAL_MODE);
         self.set_current_identifier(':');
-        self.reset();
-        self.clear_shortcut();
         /*if let Some(ref callback) = self.input_callback {
           callback(None);
                 }
@@ -360,6 +365,11 @@ impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Widget for Mg<COMM> {
             },
             EnterNormalMode => {
                 self.return_to_normal_mode();
+            },
+            EnterNormalModeAndReset => {
+                self.return_to_normal_mode();
+                self.reset();
+                self.clear_shortcut();
             },
             KeyPress(_) | KeyRelease(_) => (),
             Quit => {
@@ -491,6 +501,7 @@ impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Mg<COMM> {
                             UnknownCommand => format!("Not a command: {}", error.unexpected),
                         };
                     self.error(&message);
+                    return Some(EnterNormalMode);
                 }
             },
         }
