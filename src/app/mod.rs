@@ -407,6 +407,9 @@ impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Widget for Mg<COMM> {
                     #[name="mode"]
                     StatusBarItem {
                         text: &self.model.mode_label,
+                        packing: {
+                            pack_type: PackType::Start,
+                        },
                     },
                     #[name="shortcut"]
                     StatusBarItem {

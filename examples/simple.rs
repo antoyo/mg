@@ -21,7 +21,6 @@
 
 #![feature(closure_to_fn_coercion, proc_macro)]
 
-extern crate glib;
 extern crate gtk;
 extern crate mg;
 extern crate mg_settings;
