@@ -20,7 +20,7 @@
  */
 
 use std::cmp::max;
-use std::ops::Deref;
+use std::collections::HashMap;
 
 use glib::{Cast, Object};
 use gtk;
@@ -43,32 +43,49 @@ use gtk::{
 };
 use gtk::PolicyType::{Automatic, Never};
 use pango_sys::PangoEllipsizeMode;
-use relm::Widget;
+use relm::{Relm, Widget};
 use relm_attributes::widget;
 
+use app::COMMAND_MODE;
 use completion::Column::{self, Expand};
 use gobject::ObjectExtManual;
 use scrolled_window::ScrolledWindowExtManual;
-use super::Completer;
+use self::Msg::*;
+use super::{Completer, Completion, DEFAULT_COMPLETER_IDENT, NO_COMPLETER_IDENT};
 
 const COMPLETION_VIEW_MAX_HEIGHT: i32 = 300;
 
 #[derive(Msg)]
-enum Msg {
+pub enum Msg {
 }
 
-#[derive(Clone)]
-struct Model {
-    unselect_callback: Option<Box<Fn()>>,
+pub struct Model {
+    completion: Completion,
+    original_input: String,
+    relm: Relm<CompletionView>,
+    visible: bool,
 }
 
 /// A widget to show completions for the command entry.
 #[widget]
 impl Widget for CompletionView {
-    fn model(_: ()) -> Model {
+    fn init_view(&self) {
+        self.add_columns(2);
+        //tree_view.get_selection().unselect_all(); // TODO: is it needed?
+    }
+
+    fn model(relm: &Relm<Self>, _: ()) -> Model {
         Model {
-            unselect_callback: None,
+            completion: Completion::new(),
+            original_input: String::new(),
+            relm: relm.clone(),
+            visible: false,
         }
+    }
+
+    /// Set the visibility of the view.
+    pub fn set_visible(&mut self, visible: bool) {
+        self.model.visible = visible;
     }
 
     fn update(&mut self, event: Msg) {
@@ -80,6 +97,7 @@ impl Widget for CompletionView {
             max_content_height: COMPLETION_VIEW_MAX_HEIGHT,
             propagate_natural_height: true,
             valign: Align::End,
+            visible: self.model.visible,
             #[name="tree_view"]
             gtk::TreeView {
                 can_focus: false,
@@ -91,17 +109,6 @@ impl Widget for CompletionView {
 }
 
 impl CompletionView {
-    /// Create a new completion view.
-    /*pub fn new() -> Box<Self> {
-        let tree_view = TreeView::new();
-
-        tree_view.get_selection().unselect_all();
-
-        view.add_columns(2);
-
-        view
-    }*/
-
     /// Add a column to the tree view.
     fn add_column(&self, index: i32, foreground_index: i32, column: Column) {
         let view_column = TreeViewColumn::new();
@@ -142,7 +149,10 @@ impl CompletionView {
 
     /// Adjust the policy of the scrolled window to avoid having extra space around the tree view.
     pub fn adjust_policy<M: IsA<Object> + IsA<TreeModel>>(&self, model: &M) {
-        self.tree_view.set_model(Some(model));
+        {
+            let _lock = self.model.relm.stream().lock();
+            self.tree_view.set_model(Some(model));
+        }
         let policy =
             if model.iter_n_children(None) < 2 {
                 Never
@@ -153,14 +163,8 @@ impl CompletionView {
         self.scrolled_window.set_policy(Never, policy);
     }
 
-    /// Add a callback to the selection changed event.
-    pub fn connect_selection_changed<F: Fn(&TreeSelection) + 'static>(&self, callback: F) {
-        self.tree_view.get_selection().connect_changed(callback);
-    }
-
-    /// Add a callback to the unselect event.
-    pub fn connect_unselect<F: Fn() + 'static>(&mut self, callback: F) {
-        self.model.unselect_callback = Some(Box::new(callback));
+    pub fn complete_result(&self, selection: &TreeSelection) -> Option<String> {
+        self.model.completion.complete_result(selection)
     }
 
     /// Delete the current completion item.
@@ -176,6 +180,22 @@ impl CompletionView {
     /// Adjust the policy of the scrolled window to avoid having extra space around the tree view.
     pub fn disable_scrollbars(&self) {
         self.scrolled_window.set_policy(Never, Never);
+    }
+
+    /// Filter the completion view.
+    fn filter(&mut self, command_entry_text: &str) {
+        // Disable the scrollbars so that commands without completion does not
+        // show the completion view.
+        self.disable_scrollbars();
+        let model = self.model.completion.filter(&command_entry_text);
+        if let Some(model) = model {
+            self.adjust_policy(&model);
+        }
+    }
+
+    /// Get the original input.
+    pub fn original_input(&self) -> &str {
+        &self.model.original_input
     }
 
     /// Remove all the columns.
@@ -203,66 +223,130 @@ impl CompletionView {
         }
     }
 
+    /// Select the completer based on the currently typed command.
+    pub fn select_completer(&mut self, command_entry_text: &str) {
+        let text = command_entry_text.trim_left();
+        if let Some(space_index) = text.find(' ') {
+            let command = &text[..space_index];
+            self.set_completer(command, command_entry_text);
+        }
+        else {
+            self.set_completer(DEFAULT_COMPLETER_IDENT, command_entry_text);
+        }
+    }
+
     /// Select the next item.
     /// This loops with the value that started the completion.
-    pub fn select_next(&self) {
-        if let Some(model) = self.tree_view.get_model() {
-            let selection = self.tree_view.get_selection();
-            if let Some((model, selected_iter)) = selection.get_selected() {
-                if model.iter_next(&selected_iter) {
-                    selection.select_iter(&selected_iter);
-                    self.scroll(&model, &selected_iter);
+    pub fn select_next(&self) -> (Option<TreeSelection>, bool) {
+        let mut unselect = false;
+        let selection =
+            if let Some(model) = self.tree_view.get_model() {
+                let selection = self.tree_view.get_selection();
+                if let Some((model, selected_iter)) = selection.get_selected() {
+                    if model.iter_next(&selected_iter) {
+                        selection.select_iter(&selected_iter);
+                        self.scroll(&model, &selected_iter);
+                    }
+                    else {
+                        self.unselect();
+                        unselect = true;
+                    }
                 }
-                else {
-                    self.unselect();
-                    self.show_original_input();
+                else if let Some(iter) = model.get_iter_first() {
+                    self.scroll(&model, &iter);
+                    selection.select_iter(&iter);
                 }
+                Some(selection)
             }
-            else if let Some(iter) = model.get_iter_first() {
-                self.scroll(&model, &iter);
-                selection.select_iter(&iter);
-            }
-        }
+            else {
+                None
+            };
+        (selection, unselect)
     }
 
     /// Select the previous item.
     /// This loops with the value that started the completion.
-    pub fn select_previous(&self) {
-        if let Some(model) = self.tree_view.get_model() {
-            let selection = self.tree_view.get_selection();
-            if let Some((model, selected_iter)) = selection.get_selected() {
-                if model.iter_previous(&selected_iter) {
-                    selection.select_iter(&selected_iter);
-                    self.scroll(&model, &selected_iter);
+    pub fn select_previous(&self) -> (Option<TreeSelection>, bool) {
+        let mut unselect = false;
+        let selection =
+            if let Some(model) = self.tree_view.get_model() {
+                let selection = self.tree_view.get_selection();
+                if let Some((model, selected_iter)) = selection.get_selected() {
+                    if model.iter_previous(&selected_iter) {
+                        selection.select_iter(&selected_iter);
+                        self.scroll(&model, &selected_iter);
+                    }
+                    else {
+                        self.unselect();
+                        unselect = true;
+                    }
                 }
-                else {
-                    self.unselect();
-                    self.show_original_input();
+                else if let Some(iter) = model.iter_nth_child(None, max(0, model.iter_n_children(None) - 1)) {
+                    self.scroll(&model, &iter);
+                    selection.select_iter(&iter);
                 }
+                Some(selection)
             }
-            else if let Some(iter) = model.iter_nth_child(None, max(0, model.iter_n_children(None) - 1)) {
-                self.scroll(&model, &iter);
-                selection.select_iter(&iter);
-            }
-        }
+            else {
+                None
+            };
+        (selection, unselect)
     }
 
-    /// Set the model.
-    pub fn set_model<T: IsA<TreeModel>>(&self, model: Option<&T>) {
-        self.tree_view.set_model(model);
+    /// Set the current command completer.
+    pub fn set_completer(&mut self, completer: &str, command_entry_text: &str) {
+        if self.model.completion.adjust_model(completer) {
+            let _lock = self.model.relm.stream().lock();
+            self.tree_view.set_model::<ListStore>(None);
+        }
+        {
+            let completer = self.model.completion.current_completer().expect("completer should be set");
+            self.adjust_columns(&**completer);
+        }
+        self.filter(command_entry_text);
     }
 
-    /// Emit the event to show the original input.
-    /// This is emitted when the user unselect from the completion view.
-    fn show_original_input(&self) {
-        if let Some(ref callback) = self.model.unselect_callback {
-            callback();
-        }
+    /// Set all the completers.
+    pub fn set_completers(&mut self, completers: HashMap<String, Box<Completer>>) {
+        self.model.completion.set_completers(completers);
+    }
+
+    /// Set the original input.
+    pub fn set_original_input(&mut self, input: &str) {
+        self.model.original_input = input.to_string();
+    }
+
+    /// Show the completion view.
+    pub fn show_completion(&mut self) {
+        self.unselect();
+        self.scroll_to_first();
+        self.model.visible = true;
     }
 
     /// Unselect the item.
     pub fn unselect(&self) {
         let selection = self.tree_view.get_selection();
         selection.unselect_all();
+    }
+
+    /// Update the completions.
+    pub fn update_completions(&mut self, current_mode: &str, command_entry_text: &str) {
+        if current_mode == COMMAND_MODE {
+            // In command mode, the completer can change when the user type.
+            // For instance, after typing "set ", the completer switch to the settings
+            // completer.
+            // TODO: add command_entry_text in the model?
+            self.select_completer(command_entry_text);
+        }
+        else {
+            // Do not select another completer when in input mode.
+            self.filter(command_entry_text);
+        }
+        if self.model.completion.current_completer_ident() != NO_COMPLETER_IDENT {
+            self.filter(command_entry_text);
+            // return Some(SetOriginalInput(text); // TODO
+            self.set_original_input(command_entry_text);
+        }
+        self.unselect();
     }
 }

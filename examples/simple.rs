@@ -51,7 +51,6 @@ use relm_attributes::widget;
 use AppCommand::*;
 use Msg::*;
 
-#[derive(Clone)]
 pub struct Model {
     text: String,
 }
@@ -102,6 +101,7 @@ impl Widget for Win {
         }
     }
 
+    // FIXME: cannot go in command mode when an error is shown.
     // TODO: show completions.
     view! {
         #[name="mg"]

@@ -22,7 +22,7 @@
 //! Trait and widget for input completion.
 
 mod completers;
-mod completion_view;
+pub mod completion_view;
 
 use std::collections::HashMap;
 
@@ -84,35 +84,31 @@ pub trait Completer {
 pub struct Completion {
     completer_ident: String,
     completers: HashMap<String, Box<Completer>>,
-    /// The completion widget.
-    pub view: Box<CompletionView>,
 }
 
 impl Completion {
     /// Create a new completion widget.
-    pub fn new(mut completers: HashMap<String, Box<Completer>>, view: Box<CompletionView>) -> Self {
-        completers.insert(NO_COMPLETER_IDENT.to_string(), Box::new(NoCompleter::new()));
+    pub fn new() -> Self {
         Completion {
             completer_ident: String::new(),
-            completers: completers,
-            view: view,
+            completers: HashMap::new(),
         }
     }
 
     /// Adjust the model by using the specified completer.
-    pub fn adjust_model(&mut self, completer_ident: &str) {
+    pub fn adjust_model(&mut self, completer_ident: &str) -> bool {
         if completer_ident != self.completer_ident {
             self.completer_ident = completer_ident.to_string();
             if completer_ident == NO_COMPLETER_IDENT || !self.completers.contains_key(completer_ident) {
                 self.completer_ident = NO_COMPLETER_IDENT.to_string();
-                self.view.set_model::<ListStore>(None);
+                return true;
             }
         }
-        self.view.adjust_columns(&*self.completers[&self.completer_ident]);
+        false
     }
 
     /// Complete the result for the selection using the current completer.
-    pub fn complete_result(&mut self, selection: &TreeSelection) -> Option<String> {
+    pub fn complete_result(&self, selection: &TreeSelection) -> Option<String> {
         let mut completion = None;
         if self.current_completer_ident() != NO_COMPLETER_IDENT {
             if let Some((model, iter)) = selection.get_selected() {
@@ -128,7 +124,12 @@ impl Completion {
     }
 
     /// Get the current completer.
-    pub fn current_completer(&mut self) -> Option<&mut Box<Completer>> {
+    pub fn current_completer(&self) -> Option<&Box<Completer>> {
+        self.completers.get(&self.completer_ident)
+    }
+
+    /// Get the current completer.
+    pub fn current_completer_mut(&mut self) -> Option<&mut Box<Completer>> {
         self.completers.get_mut(&self.completer_ident)
     }
 
@@ -139,41 +140,43 @@ impl Completion {
 
     /// Delete the current completion item.
     pub fn delete_current_completion_item(&self) {
-        self.view.delete_current_completion_item();
+        //self.view.delete_current_completion_item();
     }
 
     /// Filter the rows from the input.
-    pub fn filter(&mut self, input: &str) {
-        let model =
-            self.current_completer()
-                .map(|completer| {
-                    // Multiply by 2 because each column has a foreground column.
-                    let columns = vec![Type::String; completer.column_count() * 2];
-                    let model = ListStore::new(&columns);
+    pub fn filter(&mut self, input: &str) -> Option<ListStore> {
+        self.current_completer_mut()
+            .map(|completer| {
+                // Multiply by 2 because each column has a foreground column.
+                let columns = vec![Type::String; completer.column_count() * 2];
+                let model = ListStore::new(&columns);
 
-                    let key =
-                        if let Some(index) = input.find(' ') {
-                            input[index + 1 ..].trim_left()
-                        }
-                        else {
-                            input
-                        };
+                let key =
+                    if let Some(index) = input.find(' ') {
+                        input[index + 1 ..].trim_left()
+                    }
+                    else {
+                        input
+                    };
 
-                    for &CompletionResult { ref columns } in &completer.completions(key) {
-                        let row = model.insert(-1);
-                        let start_column = columns.len();
-                        for (index, cell) in columns.iter().enumerate() {
-                            model.set_value(&row, index as u32, &cell.value.to_value());
-                            if let Some(ref foreground) = cell.foreground {
-                                model.set_value(&row, (index + start_column) as u32, &foreground.to_value());
-                            }
+                for &CompletionResult { ref columns } in &completer.completions(key) {
+                    let row = model.insert(-1);
+                    let start_column = columns.len();
+                    for (index, cell) in columns.iter().enumerate() {
+                        model.set_value(&row, index as u32, &cell.value.to_value());
+                        if let Some(ref foreground) = cell.foreground {
+                            model.set_value(&row, (index + start_column) as u32, &foreground.to_value());
                         }
                     }
-                    model
-                });
-        if let Some(model) = model {
-            self.view.adjust_policy(&model);
-        }
+                }
+                model
+            })
+    }
+
+    /// Set all the completers.
+    pub fn set_completers(&mut self, mut completers: HashMap<String, Box<Completer>>) {
+        completers.insert(NO_COMPLETER_IDENT.to_string(), Box::new(NoCompleter::new()));
+        self.completers = completers;
     }
 }
 

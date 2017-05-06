@@ -29,6 +29,7 @@ use gtk::{
     ContainerExt,
     CssProvider,
     EditableExt,
+    EditableSignals,
     Entry,
     EntryExt,
     Label,
@@ -42,7 +43,7 @@ use gtk::{
 use gtk::prelude::WidgetExtManual;
 use gtk::Orientation::Horizontal;
 use pango_sys::PangoEllipsizeMode;
-use relm::{Container, Widget};
+use relm::{Container, Relm, Widget};
 use relm::gtk_ext::BoxExtManual;
 use relm_attributes::widget;
 
@@ -60,12 +61,13 @@ pub type HBox = ::gtk::Box;
 
 #[derive(Msg)]
 pub enum Msg {
-    Activate(Option<String>),
+    EntryActivate(Option<String>),
+    EntryChanged(Option<String>),
 }
 
-#[derive(Clone)]
 pub struct Model {
     identifier_label: &'static str,
+    relm: Relm<StatusBar>,
 }
 
 #[widget]
@@ -80,9 +82,10 @@ impl Widget for StatusBar {
         style_context.add_provider(&provider, STYLE_PROVIDER_PRIORITY_APPLICATION);
     }
 
-    fn model() -> Model {
+    fn model(relm: &Relm<Self>, _: ()) -> Model {
         Model {
             identifier_label: ":",
+            relm: relm.clone(),
         }
     }
 
@@ -100,7 +103,8 @@ impl Widget for StatusBar {
             },
             #[name="command_entry"]
             gtk::Entry {
-                activate(entry) => Activate(entry.get_text()),
+                activate(entry) => EntryActivate(entry.get_text()),
+                changed(entry) => EntryChanged(entry.get_text()),
                 has_frame: false,
                 hexpand: true,
                 name: "mg-input-command",
@@ -116,50 +120,14 @@ impl StatusBar {
         self.white_foreground();
     }
 
-    /// Select the next completion entry if it is visible.
-    pub fn complete_next(&self) {
-        self.completion.view.select_next();
-    }
-
-    /// Select the previous completion entry if it is visible.
-    pub fn complete_previous(&self) {
-        self.completion.view.select_previous();
-    }
-
     /// Connect the active entry event.
     pub fn connect_activate<F: Fn(Option<String>) + 'static>(&self, callback: F) {
         self.command_entry.connect_activate(move |entry| callback(entry.get_text()));
     }
 
-    /// Delete the current completion item.
-    pub fn delete_current_completion_item(&self) {
-        self.completion.delete_current_completion_item();
-    }
-
-    /// Filter the completion view.
-    fn filter(&mut self) {
-        // Disable the scrollbars so that commands without completion does not
-        // show the completion view.
-        self.completion.view.disable_scrollbars();
-        if let Some(text) = self.entry.get_text() {
-            self.completion.filter(&text);
-        }
-    }
-
     /// Get the text of the command entry.
     pub fn get_command(&self) -> Option<String> {
-        self.entry.get_text()
-    }
-
-    /// Handle the unselect event.
-    fn handle_unselect(&mut self) {
-        let original_input = self.completion_original_input.clone();
-        self.set_input(&original_input);
-    }
-
-    /// Hide the completion view.
-    pub fn hide_completion(&self) {
-        self.completion.view.hide();
+        self.command_entry.get_text()
     }
 
     /// Hide the entry.
@@ -167,41 +135,9 @@ impl StatusBar {
         self.set_entry_shown(false);
     }
 
-    /// Hide the completion view and the entry.
-    pub fn hide_widgets(&self) {
-        //self.hide_completion();
-        self.hide_entry();
-    }
-
-    /// Select the completer based on the currently typed command.
-    pub fn select_completer(&mut self) {
-        if let Some(text) = self.entry.get_text() {
-            let text = text.trim_left();
-            if let Some(space_index) = text.find(' ') {
-                let command = &text[..space_index];
-                self.set_completer(command);
-            }
-            else {
-                self.set_completer(DEFAULT_COMPLETER_IDENT);
-            }
-        }
-    }
-
-    /// Handle the selection changed event.
-    fn selection_changed(&mut self, selection: &TreeSelection) {
-        if let Some(completion) = self.completion.complete_result(selection) {
-            self.set_input(&completion);
-        }
-    }
-
-    /// Set the current command completer.
-    pub fn set_completer(&mut self, completer: &str) {
-        self.completion.adjust_model(completer);
-        self.filter();
-    }
-
     // TODO: merge with show_entry()?
     pub fn set_entry_shown(&self, visible: bool) {
+        let _lock = self.model.relm.stream().lock();
         self.command_entry.set_text("");
         self.identifier_label.set_visible(visible);
         self.command_entry.set_visible(visible);
@@ -216,49 +152,15 @@ impl StatusBar {
         // Prevent updating the completions when the user selects a completion entry.
         // TODO: use a kind of lock for that?
         //self.inserting_completion = true;
+        let _lock = self.model.relm.stream().lock();
         self.command_entry.set_text(command);
         self.command_entry.set_position(command.len() as i32);
         //self.inserting_completion = false;
     }
 
-    /// Set the original input.
-    pub fn set_original_input(&mut self, input: &str) {
-        self.completion_original_input = input.to_string();
-    }
-
-    /// Show the completion view.
-    pub fn show_completion(&self) {
-        self.completion.view.unselect();
-        self.completion.view.scroll_to_first();
-        self.completion.view.show();
-    }
-
     /// Show the entry.
     pub fn show_entry(&self) {
         self.command_entry.grab_focus();
-    }
-
-    /// Update the completions.
-    pub fn update_completions(&mut self, current_mode: &str) {
-        if !self.inserting_completion {
-            if current_mode == COMMAND_MODE {
-                // In command mode, the completer can change when the user type.
-                // For instance, after typing "set ", the completer switch to the settings
-                // completer.
-                self.select_completer();
-            }
-            else {
-                // Do not select another completer when in input mode.
-                self.filter();
-            }
-            if self.completion.current_completer_ident() != NO_COMPLETER_IDENT {
-                if let Some(text) = self.entry.get_text() {
-                    self.filter();
-                    self.completion_original_input = text;
-                }
-            }
-            self.completion.view.unselect();
-        }
     }
 
     /// Set the foreground (text) color to white.
@@ -300,7 +202,6 @@ impl StatusBarItem {
 /// The window status bar.
 pub struct StatusBar {
     completion: Completion,
-    completion_original_input: String,
     pub entry: Entry,
     entry_shown: bool,
     identifier_label: Label,

@@ -37,7 +37,7 @@ pub fn shortcut_to_string(keys: &[Key]) -> String {
     strings.join("")
 }
 
-impl<COMM: EnumFromStr> Mg<COMM> {
+impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Mg<COMM> {
     /// Add the key to the current shortcut.
     pub fn add_to_shortcut(&mut self, key: Key) {
         self.model.current_shortcut.push(key);

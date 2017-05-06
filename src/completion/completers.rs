@@ -27,12 +27,12 @@ use mg_settings::{EnumMetaData, SettingCompletion};
 use completion::{Completer, CompletionResult};
 
 /// A command completer.
-pub struct CommandCompleter<T> {
+pub struct CommandCompleter<T: Clone> {
     metadata: Vec<(String, String)>,
     _phantom: PhantomData<T>,
 }
 
-impl<T: EnumMetaData> CommandCompleter<T> {
+impl<T: Clone + EnumMetaData> CommandCompleter<T> {
     /// Create a new command completer.
     pub fn new() -> CommandCompleter<T> {
         let mut data: Vec<_> =
@@ -51,7 +51,7 @@ impl<T: EnumMetaData> CommandCompleter<T> {
     }
 }
 
-impl<T> Completer for CommandCompleter<T> {
+impl<T: Clone> Completer for CommandCompleter<T> {
     fn completions(&mut self, input: &str) -> Vec<CompletionResult> {
         self.metadata.iter()
             .filter(|&&(ref command, ref help)|
@@ -111,7 +111,7 @@ impl<T: EnumMetaData + SettingCompletion> SettingCompleter<T> {
     }
 }
 
-impl<T> Completer for SettingCompleter<T> {
+impl<T: Clone> Completer for SettingCompleter<T> {
     fn complete_result(&self, value: &str) -> String {
         if let Some(ref name) = self.selected_name {
             format!("set {} = {}", name, value)
