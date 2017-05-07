@@ -103,7 +103,7 @@ impl Widget for Win {
 
     view! {
         #[name="mg"]
-        Mg<AppCommand, NoSettings>((MODES, "examples/main.conf")) {
+        Mg<AppCommand, NoSettings>((MODES, "examples/main.conf", None)) {
             dark_theme: true,
             title: "First Mg Program",
             variables: VARIABLES,

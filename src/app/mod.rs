@@ -366,13 +366,14 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     }
 
     // TODO: switch from a &'static str to a String.
-    fn model(relm: &Relm<Self>, (user_modes, settings_filename): (Modes, &'static str)) -> Model<COMM, SETT> {
-        // TODO: support non-None include path.
+    fn model(relm: &Relm<Self>, (user_modes, settings_filename, include_path): (Modes, &'static str, Option<String>))
+        -> Model<COMM, SETT>
+    {
         let mut settings_parser = Box::new(Parser::new());
         let mut mappings = HashMap::new();
         let mut modes = HashMap::new();
         let mut initial_error = None;
-        match parse_config(settings_filename, user_modes, None) {
+        match parse_config(settings_filename, user_modes, include_path.as_ref().map(String::as_str)) {
             Ok((parser, initial_mappings, initial_modes)) => {
                 settings_parser = Box::new(parser);
                 mappings = initial_mappings;
@@ -677,7 +678,10 @@ impl<COMM, SETT> Mg<COMM, SETT>
                     _ => unimplemented!(),
                 }
             },
-            Err(error) => return self.show_parse_error(error),
+            Err(error) => {
+                self.show_parse_error(error);
+                return Some(EnterNormalMode);
+            },
         }
         None
     }
@@ -778,19 +782,20 @@ impl<COMM, SETT> Mg<COMM, SETT>
         status_bar.show_entry();
     }
 
-    fn show_parse_error(&mut self, error: Error) -> Option<Msg<COMM, SETT>> {
-        if let Error::Parse(error) = error {
-            let message =
-                match error.typ {
-                    MissingArgument => "Argument required".to_string(),
-                    NoCommand => return None,
-                    Parse => format!("Parse error: unexpected {}, expecting: {}", error.unexpected, error.expected),
-                    UnknownCommand => format!("Not a command: {}", error.unexpected),
-                };
-            self.error(&message);
-            return Some(EnterNormalMode);
+    fn show_parse_error(&mut self, error: Error) {
+        match error {
+            Error::Parse(error) => {
+                let message =
+                    match error.typ {
+                        MissingArgument => "Argument required".to_string(),
+                        NoCommand => return,
+                        Parse => format!("Parse error: unexpected {}, expecting: {}", error.unexpected, error.expected),
+                        UnknownCommand => format!("Not a command: {}", error.unexpected),
+                    };
+                self.error(&message);
+            },
+            Error::Io(error) => self.error(&format!("{}", error)),
         }
-        None
     }
 
     fn update_completions(&self, input: Option<String>) -> Option<Msg<COMM, SETT>> {
