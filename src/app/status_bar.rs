@@ -131,21 +131,13 @@ impl StatusBar {
         else if let Some(text) = self.command_entry.get_text() {
             if !text.is_empty() {
                 let pos = self.command_entry.get_position();
-                let upos = pos as usize;
-                let mut end = upos;
-                if end > 0 {
-                    end -= 1;
-                    let text: Vec<char> = text.chars().collect();
-                    while text[end].is_whitespace() && end > 0 {
-                        end -= 1;
-                    }
-                    let mut start = end;
-                    while !text[start].is_whitespace() && start > 0 {
-                        start -= 1;
-                    }
-                    if text[start].is_whitespace() && start >= upos {
-                        start += 1;
-                    }
+                if pos > 0 {
+                    let start = text.chars().rev().enumerate()
+                        .skip_while(|&(_, c)| !c.is_alphanumeric())
+                        .skip_while(|&(_, c)| c.is_alphanumeric())
+                        .map(|(index, _)| text.len() - index)
+                        .next()
+                        .unwrap_or_default();
                     let _lock = self.model.relm.stream().lock();
                     self.command_entry.delete_text(start as i32, pos);
                 }
@@ -213,14 +205,13 @@ impl StatusBar {
         let pos = self.command_entry.get_position();
         if pos == 0 {
             let text = self.command_entry.get_text().unwrap_or_default();
-            let mut maybe_pos: Vec<_> = text.chars().enumerate()
+            let position = text.chars().enumerate()
                 .skip_while(|&(_, c)| c.is_whitespace())
                 .skip_while(|&(_, c)| !c.is_whitespace())
                 .skip_while(|&(_, c)| c.is_whitespace())
-                .take(1)
                 .map(|(index, _)| index)
-                .collect();
-            let position = maybe_pos.pop().unwrap_or_default();
+                .next()
+                .unwrap_or_default();
             self.command_entry.set_position(position as i32);
         }
         else {

@@ -499,7 +499,10 @@ impl<COMM, SETT> Mg<COMM, SETT>
                     }
                 }
             },
-            ENTRY_DELETE_PREVIOUS_WORD => self.status_bar.widget().delete_previous_word(),
+            ENTRY_DELETE_PREVIOUS_WORD => {
+                self.status_bar.widget().delete_previous_word();
+                self.update_completions(self.status_bar.widget().get_command());
+            },
             ENTRY_NEXT_CHAR => self.status_bar.widget().next_char(),
             ENTRY_PREVIOUS_CHAR => self.status_bar.widget().previous_char(),
             ENTRY_SMART_HOME => self.status_bar.widget().smart_home(),

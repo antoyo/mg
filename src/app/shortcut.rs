@@ -55,6 +55,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
     /// Handle a possible input of a shortcut.
     pub fn handle_shortcut(&mut self, key: &EventKey) -> (Option<Msg<COMM, SETT>>, Inhibit) {
         let keyval = key.get_keyval();
+        // TODO: refactor this to only inhibit shortcuts found in the config file.
         let control_pressed = key.get_state() & CONTROL_MASK == CONTROL_MASK;
         let mut should_inhibit = self.model.current_mode == NORMAL_MODE ||
             (self.model.current_mode == COMMAND_MODE && (keyval == Tab || keyval == ISO_Left_Tab || control_pressed)) ||
