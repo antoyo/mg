@@ -19,22 +19,137 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#![feature(closure_to_fn_coercion, proc_macro)]
+
 extern crate gtk;
-#[macro_use]
 extern crate mg;
 extern crate mg_settings;
 #[macro_use]
 extern crate mg_settings_macros;
+#[macro_use]
+extern crate relm;
+extern crate relm_attributes;
+#[macro_use]
+extern crate relm_derive;
 
-use gtk::{ContainerExt, Entry, Label, WidgetExt};
+use gtk::{OrientableExt, WidgetExt};
 use gtk::Orientation::Vertical;
-use mg::ApplicationBuilder;
+use mg::{
+    CustomCommand,
+    Mg,
+    Modes,
+    SettingChanged,
+    StatusBarItem,
+    Variables,
+};
+use relm::Widget;
+use relm_attributes::widget;
+
+use AppSettingsVariant::*;
+//use SpecialCommand::*;
 
 use AppCommand::*;
-use AppSettingsVariant::*;
-use SpecialCommand::*;
+use Msg::*;
 
-#[derive(Debug, Setting)]
+pub struct Model {
+    text: String,
+    title: String,
+}
+
+#[derive(Msg)]
+pub enum Msg {
+    Command(AppCommand),
+    Setting(AppSettingsVariant),
+}
+
+static MODES: Modes = &[
+    ("i", "insert"),
+];
+
+static VARIABLES: Variables = &[
+    ("url", || "http://duckduckgo.com/lite".to_string()),
+];
+
+#[widget]
+impl Widget for Win {
+    fn init_view(&self) {
+        self.entry.grab_focus();
+    }
+
+    fn model() -> Model {
+        Model {
+            text: "Mg App".to_string(),
+            title: "First Mg Program".to_string(),
+        }
+    }
+
+    fn mode_changed(&mut self, mode: &str) {
+        if mode != "normal" {
+            /*{
+                let title = &self.app.settings().title;
+                self.model.text = format!("Title was: {}", title);
+            }
+            self.app.set_setting(Title(mode.to_string()));*/
+        }
+    }
+
+    fn setting_changed(&mut self, setting: AppSettingsVariant) {
+        match setting {
+            CustomSet(setting) => self.model.text = format!("custom setting is: {:?}", setting),
+            Title(title) => self.model.title = title,
+            TitleLen(len) => self.model.title = format!("New title len: {}", len),
+            Boolean(_) | Width(_) => (),
+        }
+    }
+
+    fn update(&mut self, event: Msg) {
+        match event {
+            Command(command) => {
+                match command {
+                    Follow => (),
+                    Insert => self.mg.widget_mut().set_mode("insert"),
+                    Normal => self.mg.widget_mut().set_mode("normal"),
+                    Open(url) => self.model.text = format!("Opening URL {}", url),
+                    WinOpen(url) => self.model.text = format!("Opening URL {} in new window", url),
+                    Quit => gtk::main_quit(),
+                }
+            },
+            Setting(setting) => self.setting_changed(setting),
+        }
+    }
+
+    view! {
+        #[name="mg"]
+        Mg<AppCommand, AppSettings>((MODES, "examples/main.conf")) {
+            dark_theme: true,
+            title: &self.model.title,
+            variables: VARIABLES,
+            gtk::Box {
+                orientation: Vertical,
+                gtk::Label {
+                    text: &self.model.text,
+                },
+                #[name="entry"]
+                gtk::Entry {
+                },
+            },
+            StatusBarItem {
+                text: "Rightmost",
+            },
+            StatusBarItem {
+                text: "Test",
+            },
+            CustomCommand(command) => Command(command),
+            SettingChanged(setting) => Setting(setting),
+        }
+    }
+}
+
+fn main() {
+    Win::run(()).unwrap();
+}
+
+#[derive(Clone, Debug, Setting)]
 pub enum CustomSetting {
     #[default]
     Choice,
@@ -42,7 +157,7 @@ pub enum CustomSetting {
 }
 
 #[derive(Commands)]
-enum AppCommand {
+pub enum AppCommand {
     #[completion(hidden)]
     Follow,
     Insert,
@@ -65,69 +180,17 @@ pub struct AppSettings {
     width: i64,
 }
 
-special_commands!(SpecialCommand {
+/*special_commands!(SpecialCommand {
     BackwardSearch('?', always),
     Search('/', always),
 });
 
-struct App {
-    app: Box<mg::Application<AppCommand, AppSettings, SpecialCommand>>,
-    label: Label,
-}
-
 impl App {
     fn new() -> Box<Self> {
-        let mut app = ApplicationBuilder::new()
-            .modes(hash! {
-                "i" => "insert",
-            })
-            .settings(AppSettings::default())
-            .build();
-
-        app.use_dark_theme();
-
-        let item = app.add_statusbar_item();
-        item.set_text("Item");
-        let item2 = app.add_statusbar_item();
-        item2.set_text("Test");
-        item.set_text("Rightmost");
-        if let Err(error) = app.parse_config("examples/main.conf") {
-            app.error(&error.to_string());
-        }
-        app.add_variable("url", || "http://duckduckgo.com/lite".to_string());
-        app.set_window_title("First Mg Program");
-
-        let vbox = gtk::Box::new(Vertical, 0);
-        let label = Label::new(Some("Mg App"));
-        vbox.add(&label);
-        let entry = Entry::new();
-        vbox.add(&entry);
-        app.set_view(&vbox);
-
-        entry.grab_focus();
-
-        let mut app = Box::new(App {
-            app: app,
-            label: label,
-        });
-
-        connect!(app.app, connect_setting_changed(setting), app, setting_changed(setting));
-        connect!(app.app, connect_command(command), app, handle_command(command));
         connect!(app.app, connect_mode_changed(mode), app, mode_changed(mode));
         connect!(app.app, connect_special_command(command), app, handle_special_command(command));
 
         app
-    }
-
-    fn handle_command(&mut self, command: AppCommand) {
-        match command {
-            Follow => (),
-            Insert => self.app.set_mode("insert"),
-            Normal => self.app.set_mode("normal"),
-            Open(url) => self.label.set_text(&format!("Opening URL {}", url)),
-            WinOpen(url) => self.label.set_text(&format!("Opening URL {} in new window", url)),
-            Quit => gtk::main_quit(),
-        }
     }
 
     fn handle_special_command(&self, command: SpecialCommand) {
@@ -136,31 +199,4 @@ impl App {
             Search(input) => println!("Searching for {}", input),
         }
     }
-
-    fn mode_changed(&mut self, mode: &str) {
-        if mode != "normal" {
-            {
-                let title = &self.app.settings().title;
-                self.label.set_text(&format!("Title was: {}", title));
-            }
-            self.app.set_setting(Title(mode.to_string()));
-        }
-    }
-
-    fn setting_changed(&self, setting: &AppSettingsVariant) {
-        match *setting {
-            CustomSet(ref setting) => self.label.set_text(&format!("custom setting is: {:?}", setting)),
-            Title(ref title) => self.app.set_window_title(title),
-            TitleLen(ref len) => self.app.set_window_title(&format!("New title len: {}", len)),
-            Boolean(_) | Width(_) => (),
-        }
-    }
-}
-
-fn main() {
-    gtk::init().unwrap();
-
-    let _app = App::new();
-
-    gtk::main();
-}
+}*/

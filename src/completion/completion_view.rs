@@ -28,41 +28,32 @@ use gtk::{
     Align,
     CellLayoutExt,
     CellRendererText,
-    ContainerExt,
+    CellRendererTextExt,
     IsA,
     ListStore,
-    ScrolledWindow,
     ScrolledWindowExt,
     TreeIter,
     TreeModel,
     TreeModelExt,
     TreeSelection,
-    TreeView,
     TreeViewColumn,
     WidgetExt,
 };
 use gtk::PolicyType::{Automatic, Never};
-use pango_sys::PangoEllipsizeMode;
+use pango::EllipsizeMode;
 use relm::{Relm, Widget};
 use relm_attributes::widget;
 
 use app::COMMAND_MODE;
 use completion::Column::{self, Expand};
-use gobject::ObjectExtManual;
-use scrolled_window::ScrolledWindowExtManual;
-use self::Msg::*;
 use super::{Completer, Completion, DEFAULT_COMPLETER_IDENT, NO_COMPLETER_IDENT};
 
 const COMPLETION_VIEW_MAX_HEIGHT: i32 = 300;
 
-#[derive(Msg)]
-pub enum Msg {
-}
-
+#[allow(missing_docs)]
 pub struct Model {
     completion: Completion,
     original_input: String,
-    relm: Relm<CompletionView>,
     visible: bool,
 }
 
@@ -73,11 +64,10 @@ impl Widget for CompletionView {
         self.add_columns(2);
     }
 
-    fn model(relm: &Relm<Self>, _: ()) -> Model {
+    fn model(_relm: &Relm<Self>, _: ()) -> Model {
         Model {
             completion: Completion::new(),
             original_input: String::new(),
-            relm: relm.clone(),
             visible: false,
         }
     }
@@ -87,7 +77,7 @@ impl Widget for CompletionView {
         self.model.visible = visible;
     }
 
-    fn update(&mut self, event: Msg) {
+    fn update(&mut self, _event: ()) {
     }
 
     view! {
@@ -113,7 +103,7 @@ impl CompletionView {
         let view_column = TreeViewColumn::new();
         let cell = CellRendererText::new();
         if column == Expand {
-            cell.set_ellipsize_data("ellipsize", PangoEllipsizeMode::End);
+            cell.set_property_ellipsize(EllipsizeMode::End);
             view_column.set_expand(true);
         }
         view_column.pack_start(&cell, true);
@@ -159,6 +149,7 @@ impl CompletionView {
         self.scrolled_window.set_policy(Never, policy);
     }
 
+    /// Complete the result for the selection using the current completer.
     pub fn complete_result(&self, selection: &TreeSelection) -> Option<String> {
         self.model.completion.complete_result(selection)
     }
@@ -292,7 +283,8 @@ impl CompletionView {
     /// Set the current command completer.
     pub fn set_completer(&mut self, completer: &str, command_entry_text: &str) {
         if self.model.completion.adjust_model(completer) {
-            self.tree_view.set_model::<ListStore>(None);
+            let model: Option<&ListStore> = None;
+            self.tree_view.set_model(model);
         }
         {
             let completer = self.model.completion.current_completer().expect("completer should be set");

@@ -32,7 +32,10 @@ use SpecialCommand;
 
 const INFO_MESSAGE_DURATION: u32 = 5000;
 
-impl<COMM: EnumFromStr> Mg<COMM> {
+impl<COMM, SETT> Mg<COMM, SETT>
+    where COMM: Clone + EnumFromStr + EnumMetaData + 'static,
+          SETT: settings::Settings + EnumMetaData + SettingCompletion + 'static,
+{
     /// Show an error to the user.
     pub fn error(&self, error: &str) {
         error!("{}", error);

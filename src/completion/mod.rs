@@ -22,6 +22,7 @@
 //! Trait and widget for input completion.
 
 mod completers;
+#[allow(missing_docs)]
 pub mod completion_view;
 
 use std::collections::HashMap;

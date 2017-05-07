@@ -19,45 +19,26 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-use std::collections::HashMap;
-use std::ops::Deref;
-
 use gdk::RGBA;
 use gtk;
 use gtk::{
     BoxExt,
-    ContainerExt,
     CssProvider,
     EditableExt,
     EditableSignals,
-    Entry,
     EntryExt,
-    Label,
     OrientableExt,
     PackType,
-    TreeSelection,
     WidgetExt,
     STATE_FLAG_NORMAL,
     STYLE_PROVIDER_PRIORITY_APPLICATION,
 };
-use gtk::prelude::WidgetExtManual;
 use gtk::Orientation::Horizontal;
-use pango_sys::PangoEllipsizeMode;
-use relm::{Container, Relm, Widget};
-use relm::gtk_ext::BoxExtManual;
+use pango::EllipsizeMode;
+use relm::{Relm, Widget};
 use relm_attributes::widget;
 
-use app::COMMAND_MODE;
-use completion::{Completer, Completion, CompletionView, DEFAULT_COMPLETER_IDENT, NO_COMPLETER_IDENT};
-use gtk_widgets::LabelExtManual;
 use self::Msg::*;
-
-const BLUE: &RGBA = &RGBA { red: 0.0, green: 0.0, blue: 1.0, alpha: 1.0 };
-const ORANGE: &RGBA = &RGBA { red: 0.9, green: 0.55, blue: 0.0, alpha: 1.0 };
-const RED: &RGBA = &RGBA { red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0 };
-const WHITE: &RGBA = &RGBA { red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0 };
-
-pub type HBox = ::gtk::Box;
 
 #[derive(Msg)]
 pub enum Msg {
@@ -89,7 +70,7 @@ impl Widget for StatusBar {
         }
     }
 
-    fn update(&mut self, msg: Msg) {
+    fn update(&mut self, _msg: Msg) {
     }
 
     view! {
@@ -114,9 +95,26 @@ impl Widget for StatusBar {
 }
 
 impl StatusBar {
+    /// Color the status bar in blue.
+    pub fn color_blue(&self) {
+        self.root().override_background_color(STATE_FLAG_NORMAL, &RGBA::blue());
+        self.white_foreground();
+    }
+
+    /// Color the status bar in orange.
+    pub fn color_orange(&self) {
+        self.root().override_background_color(STATE_FLAG_NORMAL, &RGBA {
+            red: 0.9,
+            green: 0.55,
+            blue: 0.0,
+            alpha: 1.0 ,
+        });
+        self.white_foreground();
+    }
+
     /// Color the status bar in red.
     pub fn color_red(&self) {
-        self.root().override_background_color(STATE_FLAG_NORMAL, &RED);
+        self.root().override_background_color(STATE_FLAG_NORMAL, &RGBA::red());
         self.white_foreground();
     }
 
@@ -136,6 +134,7 @@ impl StatusBar {
     }
 
     // TODO: merge with show_entry()?
+    /// Set whether the entry is visible or not.
     pub fn set_entry_shown(&self, visible: bool) {
         let _lock = self.model.relm.stream().lock();
         self.command_entry.set_text("");
@@ -143,6 +142,7 @@ impl StatusBar {
         self.command_entry.set_visible(visible);
     }
 
+    /// Seth the prefix identifier shown at the left of the command entry.
     pub fn set_identifier(&self, identifier: &str) {
         self.identifier_label.set_text(identifier);
     }
@@ -162,7 +162,7 @@ impl StatusBar {
 
     /// Set the foreground (text) color to white.
     pub fn white_foreground(&self) {
-        self.root().override_color(STATE_FLAG_NORMAL, &WHITE);
+        self.root().override_color(STATE_FLAG_NORMAL, &RGBA::white());
     }
 }
 
@@ -173,14 +173,14 @@ impl Widget for StatusBarItem {
         ()
     }
 
-    fn update(&mut self, msg: ()) {
+    fn update(&mut self, _msg: ()) {
     }
 
     view! {
         #[parent="status-bar-item"]
         #[name="label"]
         gtk::Label {
-            ellipsize: PangoEllipsizeMode::End,
+            ellipsize: EllipsizeMode::End,
             packing: {
                 pack_type: PackType::End,
                 padding: 3,
@@ -190,6 +190,7 @@ impl Widget for StatusBarItem {
 }
 
 impl StatusBarItem {
+    /// Set the text of the status bar item.
     pub fn set_text(&self, text: &str) {
         self.label.set_text(text);
     }
@@ -206,18 +207,6 @@ impl StatusBar {
         else {
             self.hbox.pack_end(&**item, false, false, 3);
         }
-    }
-
-    /// Color the status bar in blue.
-    pub fn color_blue(&self) {
-        self.override_background_color(STATE_FLAG_NORMAL, &BLUE);
-        self.white_foreground();
-    }
-
-    /// Color the status bar in orange.
-    pub fn color_orange(&self) {
-        self.override_background_color(STATE_FLAG_NORMAL, &ORANGE);
-        self.white_foreground();
     }
 }
 */

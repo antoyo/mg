@@ -37,17 +37,13 @@
 #![feature(proc_macro)]
 
 extern crate gdk;
-extern crate gdk_sys;
 extern crate glib;
-extern crate glib_sys;
-extern crate gobject_sys;
 extern crate gtk;
-extern crate gtk_sys;
 extern crate libc;
 #[macro_use]
 extern crate log;
 extern crate mg_settings;
-extern crate pango_sys;
+extern crate pango;
 #[macro_use]
 extern crate relm;
 extern crate relm_attributes;
@@ -56,24 +52,20 @@ extern crate relm_derive;
 
 #[macro_use]
 mod gtk_timeout;
-//#[macro_use]
-//mod signal;
 mod app;
 pub mod completion;
-mod gobject;
-mod gtk_widgets;
 mod key_converter;
-mod scrolled_window;
-mod style_context;
 
 use std::char;
 use std::result;
 
+/// Map mode prefix (i.e. "i") to the mode name (i.e. "insert").
 pub type Modes = &'static [(&'static str, &'static str)];
-pub type Variables = &'static [(&'static str, fn() -> String)];
+/// Map variable names to a function returning the value of this variable.
+pub type Variables = &'static [(&'static str, fn() -> String)]; // TODO: probably needs to use a Box<Fn() -> String>.
 
 pub use app::{Mg, parse_config};
-pub use app::Msg::CustomCommand;
+pub use app::Msg::{CustomCommand, SettingChanged};
 //pub use app::dialog::{DialogBuilder, DialogResult};
 pub use app::settings::NoSettings;
 pub use app::status_bar::{StatusBar, StatusBarItem};

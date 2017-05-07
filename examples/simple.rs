@@ -41,6 +41,7 @@ use mg::{
     CustomCommand,
     Mg,
     Modes,
+    NoSettings,
     StatusBarItem,
     Variables,
 };
@@ -91,6 +92,7 @@ impl Widget for Win {
         match event {
             Command(command) => {
                 match command {
+                    // TODO: change that to an event connection like: Command(Insert) => SetMode("insert")?
                     Insert => self.mg.widget_mut().set_mode("insert"),
                     Normal => self.mg.widget_mut().set_mode("normal"),
                     Open(url) => self.model.text = format!("Opening URL {}", url),
@@ -102,7 +104,7 @@ impl Widget for Win {
 
     view! {
         #[name="mg"]
-        Mg<AppCommand>((MODES, "examples/main.conf")) {
+        Mg<AppCommand, NoSettings>((MODES, "examples/main.conf")) {
             dark_theme: true,
             title: "First Mg Program",
             variables: VARIABLES,

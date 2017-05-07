@@ -30,34 +30,24 @@ use std::char;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
-use std::mem;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use gdk;
 use gdk::enums::key::Key as GdkKey;
 use gdk::{EventKey, RGBA};
 use gdk::enums::key::{Escape, colon};
-use glib;
 use glib::translate::ToGlib;
 use gtk;
 use gtk::{
-    ContainerExt,
-    EditableSignals,
-    Grid,
+    BoxExt,
     Inhibit,
-    IsA,
     OrientableExt,
-    Overlay,
     PackType,
     Settings,
     TreeSelection,
     WidgetExt,
-    Window,
     WindowExt,
-    WindowType,
     STATE_FLAG_NORMAL,
 };
-use gtk::prelude::WidgetExtManual;
 use gtk::Orientation::Vertical;
 use mg_settings::{self, Config, EnumFromStr, EnumMetaData, Parser, SettingCompletion};
 use mg_settings::Command::{self, App, Custom, Map, Set, Unmap};
@@ -65,7 +55,6 @@ use mg_settings::error::{Error, Result};
 use mg_settings::error::ErrorType::{MissingArgument, NoCommand, Parse, UnknownCommand};
 use mg_settings::key::Key;
 use relm::{Relm, Widget};
-use relm::gtk_ext::BoxExtManual;
 use relm_attributes::widget;
 
 use app::shortcut::shortcut_to_string;
@@ -77,15 +66,12 @@ use completion::{
     DEFAULT_COMPLETER_IDENT,
     NO_COMPLETER_IDENT,
 };
-use gobject::ObjectExtManual;
 use self::ActivationType::{Current, Final};
-use self::settings::NoSettings;
 use self::ShortcutCommand::{Complete, Incomplete};
 use self::status_bar::StatusBar;
 use self::status_bar::Msg::*;
 use self::Msg::*;
 pub use self::status_bar::StatusBarItem;
-use style_context::StyleContextExtManual;
 use super::{Modes, NoSpecialCommands, SpecialCommand, Variables};
 
 #[derive(PartialEq)]
@@ -118,7 +104,10 @@ const COMPLETE_PREVIOUS_COMMAND: &str = "complete-previous";
 const INPUT_MODE: &str = "input";
 const NORMAL_MODE: &str = "normal";
 
-pub struct Model<COMM> {
+pub struct Model<COMM, SETT>
+    where COMM: Clone + EnumFromStr + EnumMetaData + 'static,
+          SETT: mg_settings::settings::Settings + EnumMetaData + SettingCompletion + 'static,
+{
     close_callback: Option<Box<Fn() + Send + Sync>>,
     completion_shown: bool,
     current_command_mode: char,
@@ -129,13 +118,18 @@ pub struct Model<COMM> {
     mappings: Mappings,
     mode_label: String,
     modes: ModesHash,
+    settings: Option<SETT>,
     settings_parser: Box<Parser<COMM>>,
     //special_command_callback: Option<Box<Fn(SPEC)>>,
     variables: HashMap<String, fn() -> String>,
 }
 
+#[allow(missing_docs)]
 #[derive(Msg)]
-pub enum Msg<COMM> {
+pub enum Msg<COMM, SETT>
+    where COMM: Clone + EnumFromStr + EnumMetaData + 'static,
+          SETT: mg_settings::settings::Settings + EnumMetaData + SettingCompletion + 'static,
+{
     CustomCommand(COMM),
     EnterCommandMode,
     EnterNormalMode,
@@ -143,12 +137,16 @@ pub enum Msg<COMM> {
     KeyPress(GdkKey),
     KeyRelease(GdkKey),
     Quit,
+    SettingChanged(SETT::Variant),
 }
 
 #[widget]
-impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Widget for Mg<COMM> {
+impl<COMM, SETT> Widget for Mg<COMM, SETT>
+    where COMM: Clone + EnumFromStr + EnumMetaData + 'static,
+          SETT: mg_settings::settings::Settings + EnumMetaData + SettingCompletion + 'static,
+{
     /// Handle the command entry activate event.
-    fn command_activate(&mut self, input: Option<String>) -> Option<Msg<COMM>> {
+    fn command_activate(&mut self, input: Option<String>) -> Option<Msg<COMM, SETT>> {
         let message =
         /*if self.current_mode == INPUT_MODE || self.current_mode == BLOCKING_INPUT_MODE {
             let mut should_reset = false;
@@ -173,7 +171,7 @@ impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Widget for Mg<COMM> {
 
     /// Handle the key press event for the command mode.
     #[allow(non_upper_case_globals)]
-    fn command_key_press(&mut self, key: &EventKey) -> (Option<Msg<COMM>>, Inhibit) {
+    fn command_key_press(&mut self, key: &EventKey) -> (Option<Msg<COMM, SETT>>, Inhibit) {
         match key.get_keyval() {
             Escape => {
                 // TODO: this should not call the callback (in update(EnterNormalMode)).
@@ -186,12 +184,12 @@ impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Widget for Mg<COMM> {
     fn default_completers() -> Completers {
         let mut completers: HashMap<_, Box<Completer>> = HashMap::new();
         completers.insert(DEFAULT_COMPLETER_IDENT.to_string(), Box::new(CommandCompleter::<COMM>::new()));
-        //completers.insert("set".to_string(), Box::new(SettingCompleter::<Sett>::new()));
+        completers.insert("set".to_string(), Box::new(SettingCompleter::<SETT>::new()));
         completers
     }
 
     /// Handle the command activate event.
-    fn handle_command(&mut self, command: Option<String>) -> Option<Msg<COMM>> {
+    fn handle_command(&mut self, command: Option<String>) -> Option<Msg<COMM, SETT>> {
         if let Some(command) = command {
             if self.model.current_command_mode == ':' {
                 let result = self.model.settings_parser.parse_line(&command);
@@ -228,7 +226,7 @@ impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Widget for Mg<COMM> {
 
     /// Handle the key press event for the input mode.
     #[allow(non_upper_case_globals)]
-    fn input_key_press(&mut self, key: &EventKey) -> (Option<Msg<COMM>>, Inhibit) {
+    fn input_key_press(&mut self, key: &EventKey) -> (Option<Msg<COMM, SETT>>, Inhibit) {
         match key.get_keyval() {
             Escape => {
                 (Some(EnterNormalModeAndReset), Inhibit(false))
@@ -249,7 +247,7 @@ impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Widget for Mg<COMM> {
     }
 
     /// Handle the key press event.
-    fn key_press(&mut self, key: &EventKey) -> (Option<Msg<COMM>>, Inhibit) {
+    fn key_press(&mut self, key: &EventKey) -> (Option<Msg<COMM, SETT>>, Inhibit) {
         match self.model.current_mode.as_ref() {
             NORMAL_MODE => self.normal_key_press(key),
             COMMAND_MODE => self.command_key_press(key),
@@ -259,7 +257,7 @@ impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Widget for Mg<COMM> {
     }
 
     // TODO: switch from a &'static str to a String.
-    fn model(relm: &Relm<Self>, (user_modes, settings_filename): (Modes, &'static str)) -> Model<COMM> {
+    fn model(_relm: &Relm<Self>, (user_modes, settings_filename): (Modes, &'static str)) -> Model<COMM, SETT> {
         // TODO: show the error instead of unwrapping.
         let (parser, mappings, modes) = parse_config(settings_filename, user_modes, None).unwrap();
         // TODO: use &'static str instead of String?
@@ -270,10 +268,11 @@ impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Widget for Mg<COMM> {
             current_mode: NORMAL_MODE.to_string(),
             current_shortcut: vec![],
             entry_shown: false,
-            foreground_color: unsafe { mem::zeroed() }, // TODO: switch to RGBA::white() or something.
+            foreground_color: RGBA::white(),
             mappings: mappings,
             mode_label: String::new(),
             modes: modes,
+            settings: None,
             settings_parser: Box::new(parser),
             //special_command_callback: None,
             variables: HashMap::new(),
@@ -282,7 +281,7 @@ impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Widget for Mg<COMM> {
 
     /// Handle the key press event for the normal mode.
     #[allow(non_upper_case_globals)]
-    fn normal_key_press(&mut self, key: &EventKey) -> (Option<Msg<COMM>>, Inhibit) {
+    fn normal_key_press(&mut self, key: &EventKey) -> (Option<Msg<COMM, SETT>>, Inhibit) {
         match key.get_keyval() {
             colon => (Some(EnterCommandMode), Inhibit(true)),
             Escape => {
@@ -347,7 +346,7 @@ impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Widget for Mg<COMM> {
         }*/
     }
 
-    fn update(&mut self, event: Msg<COMM>) {
+    fn update(&mut self, event: Msg<COMM, SETT>) {
         match event {
             // To be listened to by the user.
             CustomCommand(_) => {
@@ -372,6 +371,7 @@ impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Widget for Mg<COMM> {
                 self.clear_shortcut();
             },
             KeyPress(_) | KeyRelease(_) => (),
+            SettingChanged(setting) => (),
             Quit => {
                 if let Some(ref callback) = self.model.close_callback {
                     callback();
@@ -436,7 +436,10 @@ impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Widget for Mg<COMM> {
     }
 }
 
-impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Mg<COMM> {
+impl<COMM, SETT> Mg<COMM, SETT>
+    where COMM: Clone + EnumFromStr + EnumMetaData + 'static,
+          SETT: mg_settings::settings::Settings + EnumMetaData + SettingCompletion + 'static,
+{
     /// Convert an action String to a command String.
     fn action_to_command(&self, action: &str) -> ShortcutCommand {
         if let Some(':') = action.chars().next() {
@@ -476,20 +479,24 @@ impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Mg<COMM> {
     }
 
     /// Call the callback with the command or show an error if the command cannot be parsed.
-    fn call_command(&self, command: Result<Command<COMM>>) -> Option<Msg<COMM>> {
+    fn call_command(&mut self, command: Result<Command<COMM>>) -> Option<Msg<COMM, SETT>> {
         match command {
             Ok(command) => {
                 match command {
                     App(command) => self.app_command(&command),
                     Custom(command) => return Some(CustomCommand(command)),
                     Set(name, value) => {
-                        /*match Sett::to_variant(&name, value) {
-                            Ok(setting) => self.set_setting(setting),
+                        match SETT::to_variant(&name, value) {
+                            Ok(setting) => {
+                                self.return_to_normal_mode();
+                                return Some(self.set_setting(setting));
+                            },
                             Err(error) => {
                                 let message = format!("Error setting value: {}", error);
                                 self.error(&message);
                             },
-                        }*/
+                        }
+                        return Some(EnterNormalMode);
                     },
                     _ => unimplemented!(),
                 }
@@ -556,7 +563,7 @@ impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Mg<COMM> {
     }
 
     /// Handle the selection changed event.
-    fn selection_changed(&self, selection: &TreeSelection) -> Option<Msg<COMM>> {
+    fn selection_changed(&self, selection: &TreeSelection) -> Option<Msg<COMM, SETT>> {
         if let Some(completion) = self.completion_view.widget().complete_result(selection) {
             self.set_input(&completion);
             //return Some(SetInput(completion); // TODO
@@ -567,7 +574,7 @@ impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Mg<COMM> {
     /// Use the dark variant of the theme if available.
     pub fn set_dark_theme(&mut self, use_dark: bool) {
         let settings = Settings::get_default().unwrap();
-        settings.set_data("gtk-application-prefer-dark-theme", use_dark.to_glib());
+        settings.set_long_property("gtk-application-prefer-dark-theme", use_dark.to_glib() as _, "");
         self.model.foreground_color = self.get_foreground_color();
     }
 
@@ -575,7 +582,12 @@ impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Mg<COMM> {
         self.status_bar.widget().set_input(original_input);
     }
 
-    pub fn set_settings<P: AsRef<Path>>(&self, filename: P) {
+    /// Set a setting value.
+    pub fn set_setting(&mut self, setting: SETT::Variant) -> Msg<COMM, SETT> {
+        if let Some(ref mut settings) = self.model.settings {
+            settings.set_value(setting.clone());
+        }
+        SettingChanged(setting)
     }
 
     /// Set the window title.
@@ -583,6 +595,7 @@ impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Mg<COMM> {
         self.window.set_title(title);
     }
 
+    /// Set the variables that will be available in the settings.
     pub fn set_variables(&mut self, variables: Variables) {
         self.model.variables = variables.iter()
             .map(|&(string, func)| (string.to_string(), func))
@@ -596,7 +609,7 @@ impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Mg<COMM> {
         status_bar.show_entry();
     }
 
-    fn update_completions(&self, input: Option<String>) -> Option<Msg<COMM>> {
+    fn update_completions(&self, input: Option<String>) -> Option<Msg<COMM, SETT>> {
         let input = input.unwrap_or_default();
         self.completion_view.widget_mut().update_completions(&self.model.current_mode, &input);
         None
@@ -648,63 +661,11 @@ pub fn parse_config<P: AsRef<Path>, COMM: EnumFromStr>(filename: P, user_modes: 
 }
 
 /*
-/// Alias for an application builder without settings.
-pub type SimpleApplicationBuilder = ApplicationBuilder<NoSettings>;
-
-/// Application builder.
-pub struct ApplicationBuilder<Sett: mg_settings::settings::Settings> {
-    modes: Option<Modes>,
-    include_path: Option<PathBuf>,
-    settings: Option<Sett>,
-}
-
-impl<Sett: mg_settings::settings::Settings + 'static> ApplicationBuilder<Sett> {
-    /// Create a new application builder.
-    #[allow(new_without_default_derive)]
-    pub fn new() -> Self {
-        ApplicationBuilder {
-            modes: None,
-            include_path: None,
-            settings: None,
-        }
-    }
-
-    /// Create a new application with configuration and include path.
-    pub fn build<Spec, Comm>(self) -> Box<Application<Comm, Sett, Spec>>
-        where Spec: SpecialCommand + 'static,
-              Comm: EnumFromStr + EnumMetaData + 'static,
-              Sett: EnumMetaData + SettingCompletion,
-    {
-        Application::new(self)
-    }
-
-    /// Add a input completer.
-    pub fn completer<C: Completer + 'static>(mut self, name: &str, completer: C) -> Self {
-        self.completers.insert(name.to_string(), Box::new(completer));
-        self
-    }
-
     /// Set the include path of the configuration files.
     pub fn include_path<P: AsRef<Path>>(mut self, include_path: P) -> Self {
         self.include_path = Some(include_path.as_ref().to_path_buf());
         self
     }
-
-    /// Set the configuration of the application.
-    pub fn modes(mut self, mut modes: Modes) -> Self {
-        assert!(modes.insert("n".to_string(), NORMAL_MODE.to_string()).is_none(), "Duplicate mode prefix n.");
-        assert!(modes.insert("c".to_string(), COMMAND_MODE.to_string()).is_none(), "Duplicate mode prefix c.");
-        self.modes = Some(modes);
-        self
-    }
-
-    /// Set the default settings of the application.
-    pub fn settings(mut self, settings: Sett) -> Self {
-        self.settings = Some(settings);
-        self
-    }
-}
-
 /// Create a new MG application window.
 /// This window contains a status bar where the user can type a command and a central widget.
 pub struct Application<Comm, Sett: mg_settings::settings::Settings = NoSettings, Spec = NoSpecialCommands> {
@@ -722,7 +683,6 @@ pub struct Application<Comm, Sett: mg_settings::settings::Settings = NoSettings,
     message: StatusBarItem,
     mode_changed_callback: Option<Box<Fn(&str)>>,
     mode_label: StatusBarItem,
-    settings: Option<Sett>,
     settings_parser: Parser<Comm>,
     setting_change_callback: Option<Box<Fn(&Sett::Variant)>>,
     shortcuts: HashMap<Key, String>,
@@ -906,14 +866,6 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     /// Get the settings.
     pub fn settings(&self) -> &Sett {
         self.settings.as_ref().unwrap()
-    }
-
-    /// Set a setting value.
-    pub fn set_setting(&mut self, setting: Sett::Variant) {
-        self.call_setting_callback(&setting);
-        if let Some(ref mut settings) = self.settings {
-            settings.set_value(setting);
-        }
     }
 
     /// Set the answer to return to the caller of the dialog.

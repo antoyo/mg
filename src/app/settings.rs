@@ -29,6 +29,7 @@ use mg_settings::settings;
 pub struct NoSettings;
 
 #[doc(hidden)]
+#[derive(Clone)]
 pub enum NoSettingsVariant { }
 
 impl settings::Settings for NoSettings {

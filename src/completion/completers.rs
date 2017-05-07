@@ -111,7 +111,7 @@ impl<T: EnumMetaData + SettingCompletion> SettingCompleter<T> {
     }
 }
 
-impl<T: Clone> Completer for SettingCompleter<T> {
+impl<T> Completer for SettingCompleter<T> {
     fn complete_result(&self, value: &str) -> String {
         if let Some(ref name) = self.selected_name {
             format!("set {} = {}", name, value)

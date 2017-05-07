@@ -26,7 +26,7 @@ use mg_settings::{self, EnumFromStr, EnumMetaData, SettingCompletion};
 use mg_settings::key::Key;
 use relm::Widget;
 
-use app::{/*Application, */ Mg, Model, Msg, BLOCKING_INPUT_MODE, COMMAND_MODE, INPUT_MODE, NORMAL_MODE};
+use app::{Mg, Msg, BLOCKING_INPUT_MODE, COMMAND_MODE, INPUT_MODE, NORMAL_MODE};
 use app::ShortcutCommand::{Complete, Incomplete};
 use key_converter::gdk_key_to_key;
 use SpecialCommand;
@@ -37,7 +37,10 @@ pub fn shortcut_to_string(keys: &[Key]) -> String {
     strings.join("")
 }
 
-impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Mg<COMM> {
+impl<COMM, SETT> Mg<COMM, SETT>
+    where COMM: Clone + EnumFromStr + EnumMetaData + 'static,
+          SETT: mg_settings::settings::Settings + EnumMetaData + SettingCompletion + 'static,
+{
     /// Add the key to the current shortcut.
     pub fn add_to_shortcut(&mut self, key: Key) {
         self.model.current_shortcut.push(key);
@@ -51,7 +54,7 @@ impl<COMM: Clone + EnumFromStr + EnumMetaData + 'static> Mg<COMM> {
     }
 
     /// Handle a possible input of a shortcut.
-    pub fn handle_shortcut(&mut self, key: &EventKey) -> (Option<Msg<COMM>>, Inhibit) {
+    pub fn handle_shortcut(&mut self, key: &EventKey) -> (Option<Msg<COMM, SETT>>, Inhibit) {
         let keyval = key.get_keyval();
         let mut should_inhibit = self.model.current_mode == NORMAL_MODE ||
             (self.model.current_mode == COMMAND_MODE && (keyval == Tab || keyval == ISO_Left_Tab)) ||
