@@ -106,7 +106,7 @@ const NORMAL_MODE: &str = "normal";
 
 pub struct Model<COMM, SETT>
     where COMM: Clone + EnumFromStr + EnumMetaData + 'static,
-          SETT: mg_settings::settings::Settings + EnumMetaData + SettingCompletion + 'static,
+          SETT: Default + EnumMetaData + mg_settings::settings::Settings + SettingCompletion + 'static,
 {
     close_callback: Option<Box<Fn() + Send + Sync>>,
     completion_shown: bool,
@@ -118,7 +118,8 @@ pub struct Model<COMM, SETT>
     mappings: Mappings,
     mode_label: String,
     modes: ModesHash,
-    settings: Option<SETT>,
+    relm: Relm<Mg<COMM, SETT>>,
+    settings: SETT,
     settings_parser: Box<Parser<COMM>>,
     //special_command_callback: Option<Box<Fn(SPEC)>>,
     variables: HashMap<String, fn() -> String>,
@@ -136,6 +137,7 @@ pub enum Msg<COMM, SETT>
     EnterNormalModeAndReset,
     KeyPress(GdkKey),
     KeyRelease(GdkKey),
+    ModeChanged(String),
     Quit,
     SettingChanged(SETT::Variant),
 }
@@ -143,7 +145,7 @@ pub enum Msg<COMM, SETT>
 #[widget]
 impl<COMM, SETT> Widget for Mg<COMM, SETT>
     where COMM: Clone + EnumFromStr + EnumMetaData + 'static,
-          SETT: mg_settings::settings::Settings + EnumMetaData + SettingCompletion + 'static,
+          SETT: Default + EnumMetaData + mg_settings::settings::Settings + SettingCompletion + 'static,
 {
     /// Handle the command entry activate event.
     fn command_activate(&mut self, input: Option<String>) -> Option<Msg<COMM, SETT>> {
@@ -257,7 +259,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     }
 
     // TODO: switch from a &'static str to a String.
-    fn model(_relm: &Relm<Self>, (user_modes, settings_filename): (Modes, &'static str)) -> Model<COMM, SETT> {
+    fn model(relm: &Relm<Self>, (user_modes, settings_filename): (Modes, &'static str)) -> Model<COMM, SETT> {
         // TODO: show the error instead of unwrapping.
         let (parser, mappings, modes) = parse_config(settings_filename, user_modes, None).unwrap();
         // TODO: use &'static str instead of String?
@@ -272,7 +274,8 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             mappings: mappings,
             mode_label: String::new(),
             modes: modes,
-            settings: None,
+            relm: relm.clone(),
+            settings: SETT::default(),
             settings_parser: Box::new(parser),
             //special_command_callback: None,
             variables: HashMap::new(),
@@ -341,9 +344,12 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         else {
             self.model.mode_label = String::new();
         }
-        /*if let Some(ref callback) = self.mode_changed_callback {
-            callback(mode);
-        }*/
+        self.model.relm.stream().emit(ModeChanged(mode.to_string()));
+    }
+
+    /// Get the settings.
+    pub fn settings(&self) -> &SETT {
+        &self.model.settings
     }
 
     fn update(&mut self, event: Msg<COMM, SETT>) {
@@ -371,7 +377,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                 self.clear_shortcut();
             },
             KeyPress(_) | KeyRelease(_) => (),
-            SettingChanged(setting) => (),
+            ModeChanged(_) | SettingChanged(_) => (),
             Quit => {
                 if let Some(ref callback) = self.model.close_callback {
                     callback();
@@ -438,7 +444,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
 
 impl<COMM, SETT> Mg<COMM, SETT>
     where COMM: Clone + EnumFromStr + EnumMetaData + 'static,
-          SETT: mg_settings::settings::Settings + EnumMetaData + SettingCompletion + 'static,
+          SETT: Default + EnumMetaData + mg_settings::settings::Settings + SettingCompletion + 'static,
 {
     /// Convert an action String to a command String.
     fn action_to_command(&self, action: &str) -> ShortcutCommand {
@@ -488,8 +494,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
                     Set(name, value) => {
                         match SETT::to_variant(&name, value) {
                             Ok(setting) => {
-                                self.return_to_normal_mode();
-                                return Some(self.set_setting(setting));
+                                self.set_setting(setting);
                             },
                             Err(error) => {
                                 let message = format!("Error setting value: {}", error);
@@ -583,11 +588,9 @@ impl<COMM, SETT> Mg<COMM, SETT>
     }
 
     /// Set a setting value.
-    pub fn set_setting(&mut self, setting: SETT::Variant) -> Msg<COMM, SETT> {
-        if let Some(ref mut settings) = self.model.settings {
-            settings.set_value(setting.clone());
-        }
-        SettingChanged(setting)
+    pub fn set_setting(&mut self, setting: SETT::Variant) {
+        self.model.settings.set_value(setting.clone());
+        self.model.relm.stream().emit(SettingChanged(setting));
     }
 
     /// Set the window title.
@@ -861,11 +864,6 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
             gtk::main_quit();
         }
         Inhibit(true)
-    }
-
-    /// Get the settings.
-    pub fn settings(&self) -> &Sett {
-        self.settings.as_ref().unwrap()
     }
 
     /// Set the answer to return to the caller of the dialog.

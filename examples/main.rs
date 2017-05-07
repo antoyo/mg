@@ -38,6 +38,7 @@ use mg::{
     CustomCommand,
     Mg,
     Modes,
+    ModeChanged,
     SettingChanged,
     StatusBarItem,
     Variables,
@@ -59,6 +60,7 @@ pub struct Model {
 #[derive(Msg)]
 pub enum Msg {
     Command(AppCommand),
+    Mode(String),
     Setting(AppSettingsVariant),
 }
 
@@ -85,11 +87,12 @@ impl Widget for Win {
 
     fn mode_changed(&mut self, mode: &str) {
         if mode != "normal" {
-            /*{
-                let title = &self.app.settings().title;
+            {
+                let widget = self.mg.widget();
+                let title = &widget.settings().title;
                 self.model.text = format!("Title was: {}", title);
             }
-            self.app.set_setting(Title(mode.to_string()));*/
+            self.mg.widget_mut().set_setting(Title(mode.to_string()));
         }
     }
 
@@ -114,6 +117,7 @@ impl Widget for Win {
                     Quit => gtk::main_quit(),
                 }
             },
+            Mode(mode) => self.mode_changed(&mode),
             Setting(setting) => self.setting_changed(setting),
         }
     }
@@ -140,6 +144,7 @@ impl Widget for Win {
                 text: "Test",
             },
             CustomCommand(command) => Command(command),
+            ModeChanged(mode) => Mode(mode),
             SettingChanged(setting) => Setting(setting),
         }
     }
@@ -187,10 +192,7 @@ pub struct AppSettings {
 
 impl App {
     fn new() -> Box<Self> {
-        connect!(app.app, connect_mode_changed(mode), app, mode_changed(mode));
         connect!(app.app, connect_special_command(command), app, handle_special_command(command));
-
-        app
     }
 
     fn handle_special_command(&self, command: SpecialCommand) {

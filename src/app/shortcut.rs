@@ -39,7 +39,7 @@ pub fn shortcut_to_string(keys: &[Key]) -> String {
 
 impl<COMM, SETT> Mg<COMM, SETT>
     where COMM: Clone + EnumFromStr + EnumMetaData + 'static,
-          SETT: mg_settings::settings::Settings + EnumMetaData + SettingCompletion + 'static,
+          SETT: Default + EnumMetaData + mg_settings::settings::Settings + SettingCompletion + 'static,
 {
     /// Add the key to the current shortcut.
     pub fn add_to_shortcut(&mut self, key: Key) {
