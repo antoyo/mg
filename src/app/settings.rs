@@ -26,6 +26,7 @@ use mg_settings::error::SettingError;
 use mg_settings::settings;
 
 #[doc(hidden)]
+#[derive(Default)]
 pub struct NoSettings;
 
 #[doc(hidden)]

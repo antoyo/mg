@@ -89,6 +89,7 @@ pub struct Completion {
 
 impl Completion {
     /// Create a new completion widget.
+    #[allow(new_without_default_derive)]
     pub fn new() -> Self {
         Completion {
             completer_ident: String::new(),

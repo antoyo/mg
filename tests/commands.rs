@@ -33,7 +33,6 @@ use std::thread;
 
 use gtk::Label;
 use libxdo::XDo;
-use mg::{Application, ApplicationBuilder};
 
 use self::AppCommand::*;
 use utils::XDoExt;

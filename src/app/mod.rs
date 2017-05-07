@@ -672,7 +672,7 @@ pub fn parse_config<P: AsRef<Path>, COMM: EnumFromStr>(filename: P, user_modes: 
             //}
             //},
             Map { action, keys, mode } => {
-                let mode_mappings = mappings.entry(modes[mode.as_str()].clone()).or_insert_with(HashMap::new);
+                let mode_mappings = mappings.entry(modes[mode.as_str()]).or_insert_with(HashMap::new);
                 mode_mappings.insert(keys, action);
             },
             _ => (), // TODO: to remove.

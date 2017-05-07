@@ -174,7 +174,7 @@ impl CompletionView {
         // Disable the scrollbars so that commands without completion does not
         // show the completion view.
         self.disable_scrollbars();
-        let model = self.model.completion.filter(&command_entry_text);
+        let model = self.model.completion.filter(command_entry_text);
         if let Some(model) = model {
             self.adjust_policy(&model);
         }
