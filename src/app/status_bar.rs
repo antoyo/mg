@@ -172,6 +172,20 @@ impl StatusBar {
         }
     }
 
+    /// Go forward one word in the command entry.
+    pub fn next_word(&self) {
+        let pos = self.command_entry.get_position();
+        let text = self.get_command().unwrap_or_default();
+        let position = text.chars().enumerate()
+            .skip(pos as usize)
+            .skip_while(|&(_, c)| !c.is_alphanumeric())
+            .skip_while(|&(_, c)| c.is_alphanumeric())
+            .next()
+            .map(|(index, _)| index)
+            .unwrap_or_else(|| text.len());
+        self.command_entry.set_position(position as i32);
+    }
+
     /// Go back one character in the command entry.
     pub fn previous_char(&self) {
         let pos = self.command_entry.get_position();
@@ -183,18 +197,16 @@ impl StatusBar {
     /// Go back one word in the command entry.
     pub fn previous_word(&self) {
         let pos = self.command_entry.get_position();
-        if pos > 0 {
-            let text = self.get_command().unwrap_or_default();
-            let len = text.len();
-            let position = text.chars().rev().enumerate()
-                .skip(len - pos as usize)
-                .skip_while(|&(_, c)| !c.is_alphanumeric())
-                .skip_while(|&(_, c)| c.is_alphanumeric())
-                .next()
-                .map(|(index, c)| len - index)
-                .unwrap_or_default();
-            self.command_entry.set_position(position as i32);
-        }
+        let text = self.get_command().unwrap_or_default();
+        let len = text.len();
+        let position = text.chars().rev().enumerate()
+            .skip(len - pos as usize)
+            .skip_while(|&(_, c)| !c.is_alphanumeric())
+            .skip_while(|&(_, c)| c.is_alphanumeric())
+            .next()
+            .map(|(index, _)| len - index)
+            .unwrap_or_default();
+        self.command_entry.set_position(position as i32);
     }
 
     // TODO: merge with show_entry()?
