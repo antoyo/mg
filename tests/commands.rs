@@ -19,26 +19,40 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#![feature(proc_macro)]
+
 extern crate gtk;
 extern crate libxdo;
-#[macro_use]
 extern crate mg;
 extern crate mg_settings;
 #[macro_use]
 extern crate mg_settings_macros;
+#[macro_use]
+extern crate relm;
+extern crate relm_attributes;
+#[macro_use]
+extern crate relm_derive;
 
 mod utils;
 
 use std::thread;
 
-use gtk::Label;
+use gtk::WidgetExt;
 use libxdo::XDo;
+use mg::{
+    CustomCommand,
+    Mg,
+    Modes,
+};
+use relm::{Widget, init_test};
+use relm_attributes::widget;
 
 use self::AppCommand::*;
+use self::Msg::*;
 use utils::XDoExt;
 
 #[derive(Commands)]
-enum AppCommand {
+pub enum AppCommand {
     #[help(text="Show the text in the label")]
     Show(String),
     Quit,
@@ -49,35 +63,46 @@ pub struct AppSettings {
     boolean: bool,
 }
 
-struct App {
-    app: Box<Application<AppCommand, AppSettings>>,
-    label: Label,
+pub struct Model {
+    text: String,
 }
 
-impl App {
-    fn new() -> Box<Self> {
-        let app = ApplicationBuilder::new()
-            .settings(AppSettings::default())
-            .build();
+#[derive(Msg)]
+pub enum Msg {
+    Command(AppCommand),
+}
 
-        let label = Label::new(Some("Label"));
+static MODES: Modes = &[
+    ("i", "insert"),
+];
 
-        app.set_view(&label);
-
-        let mut app = Box::new(App {
-            app: app,
-            label: label,
-        });
-
-        connect!(app.app, connect_command(command), app, handle_command(command));
-
-        app
+#[widget]
+impl Widget for Win {
+    fn model() -> Model {
+        Model {
+            text: "Label".to_string(),
+        }
     }
 
-    fn handle_command(&self, command: AppCommand) {
-        match command {
-            Show(text) => self.label.set_text(&format!("Showing text: {}", text)),
-            Quit => gtk::main_quit(),
+    fn update(&mut self, event: Msg) {
+        match event {
+            Command(command) => {
+                match command {
+                    Show(text) => self.model.text = format!("Showing text: {}", text),
+                    Quit => gtk::main_quit(),
+                }
+            },
+        }
+    }
+
+    view! {
+        #[name="mg"]
+        Mg<AppCommand, AppSettings>((MODES, "examples/main.conf")) {
+            #[name="label"]
+            gtk::Label {
+                text: &self.model.text,
+            },
+            CustomCommand(command) => Command(command),
         }
     }
 }
@@ -86,9 +111,9 @@ impl App {
 fn test_basic_command() {
     gtk::init().unwrap();
 
-    let app = App::new();
+    let win = init_test::<Win>(()).unwrap();
 
-    assert_eq!(Some("Label".to_string()), app.label.get_text());
+    assert_eq!(Some("Label".to_string()), win.widget().label.get_text());
 
     thread::spawn(|| {
         let xdo = XDo::new(None).unwrap();
@@ -98,5 +123,5 @@ fn test_basic_command() {
 
     gtk::main();
 
-    assert_eq!(Some("Showing text: test".to_string()), app.label.get_text());
+    assert_eq!(Some("Showing text: test".to_string()), win.widget().label.get_text());
 }
