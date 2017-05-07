@@ -95,7 +95,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
                     match self.action_to_command(&action) {
                         Complete(command) => {
                             let command = format!("{} {}", command, prefix);
-                            return (self.handle_command(Some(command)), Inhibit(should_inhibit));
+                            return (self.handle_command(Some(command), false), Inhibit(should_inhibit));
                         },
                         Incomplete(command) => {
                             self.input_command(&command);

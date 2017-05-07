@@ -121,6 +121,7 @@ impl Widget for Win {
                             gtk::main_quit();
                         }
                     },
+                    DeleteEntry => self.mg.widget().delete_current_completion_item(),
                     Echo(answer) => self.model.text = format!("You said: {}", answer.unwrap_or("Nothing".to_string())),
                     Follow => (),
                     Insert | Normal => (),
@@ -207,6 +208,8 @@ pub enum AppCommand {
     BackwardSearch(String),
     #[completion(hidden)]
     CheckQuit(Option<String>),
+    #[completion(hidden)]
+    DeleteEntry,
     #[completion(hidden)]
     Echo(Option<String>),
     #[completion(hidden)]

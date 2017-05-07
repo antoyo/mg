@@ -187,9 +187,8 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                 }
             }
             else {
-                self.handle_command(input)
+                self.handle_command(input, true)
             };
-        //self.return_to_normal_mode();
         message
     }
 
@@ -281,11 +280,11 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     }
 
     /// Handle the command activate event.
-    fn handle_command(&mut self, command: Option<String>) -> Option<Msg<COMM, SETT>> {
+    fn handle_command(&mut self, command: Option<String>, activated: bool) -> Option<Msg<COMM, SETT>> {
         if let Some(command) = command {
             if self.model.current_command_mode == ':' {
                 let result = self.model.settings_parser.parse_line(&command);
-                self.call_command(result)
+                self.call_command(result, activated)
             }
             else {
                 self.handle_special_command(Final, &command)
@@ -632,13 +631,15 @@ impl<COMM, SETT> Mg<COMM, SETT>
     }
 
     /// Call the callback with the command or show an error if the command cannot be parsed.
-    fn call_command(&mut self, command: Result<Command<COMM>>) -> Option<Msg<COMM, SETT>> {
+    fn call_command(&mut self, command: Result<Command<COMM>>, activated: bool) -> Option<Msg<COMM, SETT>> {
         match command {
             Ok(command) => {
                 match command {
                     App(command) => self.app_command(&command),
                     Custom(command) => {
-                        self.return_to_normal_mode();
+                        if activated {
+                            self.return_to_normal_mode();
+                        }
                         return Some(CustomCommand(command));
                     },
                     Set(name, value) => {
@@ -676,6 +677,11 @@ impl<COMM, SETT> Mg<COMM, SETT>
     /// Connect the close event to the specified callback.
     pub fn connect_close<F: Fn() + Send + Sync + 'static>(&mut self, callback: F) {
         self.model.close_callback = Some(Box::new(callback));
+    }
+
+    /// Delete the current completion item.
+    pub fn delete_current_completion_item(&self) {
+        self.completion_view.widget().delete_current_completion_item();
     }
 
     /// Get the color of the text.
@@ -826,11 +832,6 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     /// Add a callback to the window key press event.
     pub fn connect_key_press_event<F: Fn(&Window, &EventKey) -> Inhibit + 'static>(&self, callback: F) {
         self.window.connect_key_press_event(callback);
-    }
-
-    /// Delete the current completion item.
-    pub fn delete_current_completion_item(&self) {
-        //self.status_bar.delete_current_completion_item();
     }
 
     /// Get the text of the status bar command entry.
