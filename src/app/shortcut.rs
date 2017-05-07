@@ -55,12 +55,11 @@ impl<COMM, SETT> Mg<COMM, SETT>
     /// Handle a possible input of a shortcut.
     pub fn handle_shortcut(&mut self, key: &EventKey) -> (Option<Msg<COMM, SETT>>, Inhibit) {
         let keyval = key.get_keyval();
-        // TODO: refactor this to only inhibit shortcuts found in the config file.
         let alt_pressed = key.get_state() & MOD1_MASK == MOD1_MASK;
         let control_pressed = key.get_state() & CONTROL_MASK == CONTROL_MASK;
         let mut should_inhibit = self.model.current_mode == NORMAL_MODE ||
-            (self.model.current_mode == COMMAND_MODE && (keyval == Tab || keyval == ISO_Left_Tab || control_pressed)) ||
-            key.get_keyval() == Escape;
+            (self.model.current_mode == COMMAND_MODE && (keyval == Tab || keyval == ISO_Left_Tab)) ||
+            self.inhibit_command_shortcut(key) || key.get_keyval() == Escape;
         if !self.model.entry_shown || alt_pressed || control_pressed || keyval == Tab || keyval == ISO_Left_Tab {
             if let Some(key) = gdk_key_to_key(key) {
                 self.add_to_shortcut(key);
@@ -98,6 +97,22 @@ impl<COMM, SETT> Mg<COMM, SETT>
             }
         }
         (None, Inhibit(should_inhibit))
+    }
+
+    /// Check if the current key is in the config file.
+    fn inhibit_command_shortcut(&self, key: &EventKey) -> bool {
+        if let Some(mappings) = self.model.mappings.get(COMMAND_MODE) {
+            if let Some(typed_key) = gdk_key_to_key(key) {
+                for keys in mappings.keys() {
+                    for key in keys {
+                        if *key == typed_key {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        false
     }
 
     /// Check if there are no possible shortcuts.
