@@ -123,9 +123,28 @@ impl StatusBar {
         self.command_entry.connect_activate(move |entry| callback(entry.get_text()));
     }
 
+    /// Delete the character after the cursor.
+    pub fn delete_next_char(&self) {
+        if self.command_entry.get_selection_bounds().is_some() {
+            let _lock = self.model.relm.stream().lock();
+            self.command_entry.delete_selection();
+        }
+        else if let Some(text) = self.get_command() {
+            if !text.is_empty() {
+                let pos = self.command_entry.get_position();
+                let len = text.len();
+                if pos < len as i32 {
+                    let _lock = self.model.relm.stream().lock();
+                    self.command_entry.delete_text(pos, pos + 1);
+                }
+            }
+        }
+    }
+
     /// Delete the word before the cursor.
     pub fn delete_previous_word(&self) {
         if self.command_entry.get_selection_bounds().is_some() {
+            let _lock = self.model.relm.stream().lock();
             self.command_entry.delete_selection();
         }
         else if let Some(text) = self.get_command() {
