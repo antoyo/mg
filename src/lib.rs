@@ -20,11 +20,11 @@
  */
 
 /*
+ * TODO: generate async gtk methods as returning futures.
  * TODO: change all unneeded &mut self to &self.
  * TODO: set the size of the status bar according to the size of the font.
  * TODO: different event for activate event of special commands.
  * TODO: use the gtk::Statusbar widget?
- * TODO: support shortcuts with number like "50G".
  * TODO: Associate a color with modes.
  */
 

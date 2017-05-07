@@ -23,7 +23,7 @@ use gdk::{EventKey, CONTROL_MASK, MOD1_MASK};
 use gdk::enums::key::{Escape, Tab, ISO_Left_Tab};
 use gtk::Inhibit;
 use mg_settings::{self, EnumFromStr, EnumMetaData, SettingCompletion, SpecialCommand};
-use mg_settings::key::Key;
+use mg_settings::key::Key::{self, Char};
 use relm::Widget;
 
 use app::{Mg, Msg, BLOCKING_INPUT_MODE, COMMAND_MODE, INPUT_MODE, NORMAL_MODE};
@@ -70,16 +70,20 @@ impl<COMM, SETT> Mg<COMM, SETT>
                         current_mode = COMMAND_MODE.to_string();
                     }
                     self.model.mappings.get(&current_mode.as_ref())
-                        .and_then(|mappings| mappings.get(&self.model.current_shortcut).cloned())
+                        .and_then(|mappings| mappings.get(self.shortcut_without_prefix()).cloned())
                 };
                 if let Some(action) = action {
+                    let prefix = self.shortcut_prefix();
                     // FIXME: this is copied a couple of lines below.
                     if !self.model.entry_shown {
                         self.reset();
                     }
                     self.clear_shortcut();
                     match self.action_to_command(&action) {
-                        Complete(command) => return (self.handle_command(Some(command)), Inhibit(should_inhibit)),
+                        Complete(command) => {
+                            let command = format!("{} {}", command, prefix);
+                            return (self.handle_command(Some(command)), Inhibit(should_inhibit));
+                        },
                         Incomplete(command) => {
                             self.input_command(&command);
                             //self.status_bar.show_completion();
@@ -118,13 +122,48 @@ impl<COMM, SETT> Mg<COMM, SETT>
     /// Check if there are no possible shortcuts.
     fn no_possible_shortcut(&self) -> bool {
         if let Some(mappings) = self.model.mappings.get(&self.model.current_mode.as_ref()) {
+            let shortcut = self.shortcut_without_prefix();
             for key in mappings.keys() {
-                if key.starts_with(&self.model.current_shortcut) {
+                if key.starts_with(shortcut) {
                     return false;
                 }
             }
         }
         true
+    }
+
+    fn shortcut_prefix(&self) -> String {
+        let prefix: String = self.model.current_shortcut.iter()
+            .take_while(|key| !digit_predicate(key))
+            .map(|key| {
+                if let Char(c) = *key {
+                    if let Some(digit) = c.to_digit(10) {
+                        return (digit as u8 + '0' as u8) as char;
+                    }
+                }
+                unreachable!()
+            })
+            .collect();
+        if prefix.is_empty() {
+            "1".to_string()
+        }
+        else {
+            prefix
+        }
+    }
+
+    fn shortcut_without_prefix(&self) -> &[Key] {
+        let first = self.model.current_shortcut.first().map(Clone::clone).unwrap_or(Char('0'));
+        let start =
+            if first == Char('0') {
+                0
+            }
+            else {
+                self.model.current_shortcut.iter()
+                    .position(digit_predicate)
+                    .unwrap_or_else(|| self.model.current_shortcut.len())
+            };
+        &self.model.current_shortcut[start..]
     }
 
     // TODO: remove this when updating the model in methods outside the trait will update the view.
@@ -154,3 +193,17 @@ impl<COMM, SETT> Mg<COMM, SETT>
         false
     }
 }*/
+
+fn digit_predicate(key: &Key) -> bool {
+    if let Char(c) = *key {
+        if let Some(digit) = c.to_digit(10) {
+            false
+        }
+        else {
+            true
+        }
+    }
+    else {
+        true
+    }
+}

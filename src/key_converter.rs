@@ -20,8 +20,12 @@
  */
 
 use gdk::{EventKey, CONTROL_MASK, MOD1_MASK};
-use gdk::enums::key::{self, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Return, S, T, U, V, W, X, Y, Z, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z};
-use mg_settings::key::Key::{self, Alt, Backspace, Char, Control, Down, Enter, Escape, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12, Left, Right, Shift, Space, Tab, Up};
+use gdk::enums::key::{self, A,
+    _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, B, C, D, E, F, G, H, I, J, K, KP_0, KP_1, KP_2, KP_3,
+    KP_4, KP_5, KP_6, KP_7, KP_8, KP_9, L, M, N, O, P, Q, R, Return, S, T, U, V, W, X, Y, Z, a, b,
+    c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z};
+use mg_settings::key::Key::{self, Alt, Backspace, Char, Control, Down, Enter, Escape, F1, F2, F3, F4, F5, F6, F7, F8,
+    F9, F10, F11, F12, Left, Right, Shift, Space, Tab, Up};
 
 /// Convert a GDK key to an MG Key.
 #[allow(non_upper_case_globals)]
@@ -31,6 +35,16 @@ pub fn gdk_key_to_key(key: &EventKey) -> Option<Key> {
     let key =
         match key.get_keyval() {
             A => Char('A'),
+            _0 | KP_0 => Char('0'),
+            _1 | KP_1 => Char('1'),
+            _2 | KP_2 => Char('2'),
+            _3 | KP_3 => Char('3'),
+            _4 | KP_4 => Char('4'),
+            _5 | KP_5 => Char('5'),
+            _6 | KP_6 => Char('6'),
+            _7 | KP_7 => Char('7'),
+            _8 | KP_8 => Char('8'),
+            _9 | KP_9 => Char('9'),
             B => Char('B'),
             C => Char('C'),
             D => Char('D'),

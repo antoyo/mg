@@ -115,6 +115,7 @@ impl Widget for Win {
                     Open(url) => self.model.text = format!("Opening URL {}", url),
                     Quit => gtk::main_quit(),
                     Search(input) => println!("Searching for {}", input),
+                    ShowCount(count) => println!("Count: {}", count),
                     WinOpen(url) => self.model.text = format!("Opening URL {} in new window", url),
                 }
             },
@@ -176,6 +177,8 @@ pub enum AppCommand {
     Quit,
     #[special_command(incremental, identifier="/")]
     Search(String),
+    #[count]
+    ShowCount(i32),
     #[help(text="Open the url in a new window")]
     WinOpen(String),
 }
