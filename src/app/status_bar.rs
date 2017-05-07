@@ -190,6 +190,27 @@ impl StatusBar {
         self.command_entry.grab_focus();
     }
 
+    /// Go to the beginning of the command entry.
+    /// If the cursor is already at the beginning, go after the spaces after the command name.
+    pub fn smart_home(&self) {
+        let pos = self.command_entry.get_position();
+        if pos == 0 {
+            let text = self.command_entry.get_text().unwrap_or_default();
+            let mut maybe_pos: Vec<_> = text.chars().enumerate()
+                .skip_while(|&(_, c)| c.is_whitespace())
+                .skip_while(|&(_, c)| !c.is_whitespace())
+                .skip_while(|&(_, c)| c.is_whitespace())
+                .take(1)
+                .map(|(index, _)| index)
+                .collect();
+            let position = maybe_pos.pop().unwrap_or_default();
+            self.command_entry.set_position(position as i32);
+        }
+        else {
+            self.command_entry.set_position(0);
+        }
+    }
+
     /// Set the foreground (text) color to white.
     pub fn white_foreground(&self) {
         self.root().override_color(STATE_FLAG_NORMAL, &RGBA::white());

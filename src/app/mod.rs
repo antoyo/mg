@@ -102,6 +102,7 @@ pub const COMMAND_MODE: &str = "command";
 const COMPLETE_NEXT_COMMAND: &str = "complete-next";
 const COMPLETE_PREVIOUS_COMMAND: &str = "complete-previous";
 const ENTRY_DELETE_PREVIOUS_WORD: &str = "entry-delete-previous-word";
+const ENTRY_SMART_HOME: &str = "entry-smart-home";
 const INPUT_MODE: &str = "input";
 const NORMAL_MODE: &str = "normal";
 
@@ -497,6 +498,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
                 }
             },
             ENTRY_DELETE_PREVIOUS_WORD => self.status_bar.widget().delete_previous_word(),
+            ENTRY_SMART_HOME => self.status_bar.widget().smart_home(),
             _ => unreachable!(),
         }
     }
@@ -656,7 +658,8 @@ pub fn parse_config<P: AsRef<Path>, COMM: EnumFromStr>(filename: P, user_modes: 
     assert!(modes.insert("n", NORMAL_MODE).is_none(), "Duplicate mode prefix n.");
     assert!(modes.insert("c", COMMAND_MODE).is_none(), "Duplicate mode prefix c.");
     let config = Config {
-        application_commands: vec![COMPLETE_NEXT_COMMAND, COMPLETE_PREVIOUS_COMMAND, ENTRY_DELETE_PREVIOUS_WORD],
+        application_commands: vec![COMPLETE_NEXT_COMMAND, COMPLETE_PREVIOUS_COMMAND, ENTRY_DELETE_PREVIOUS_WORD,
+            ENTRY_SMART_HOME],
         mapping_modes: modes.keys().cloned().collect(),
     };
     let mut parser = Parser::new_with_config(config);
