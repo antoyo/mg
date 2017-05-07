@@ -147,6 +147,12 @@ impl StatusBar {
         }
     }
 
+    /// Go to the end of the command entry.
+    pub fn end(&self) {
+        let text = self.get_command().unwrap_or_default();
+        self.command_entry.set_position(text.len() as i32);
+    }
+
     /// Get the text of the command entry.
     pub fn get_command(&self) -> Option<String> {
         self.command_entry.get_text()
