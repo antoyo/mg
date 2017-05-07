@@ -141,6 +141,28 @@ impl StatusBar {
         }
     }
 
+    /// Delete the word after the cursor.
+    pub fn delete_next_word(&self) {
+        if self.command_entry.get_selection_bounds().is_some() {
+            let _lock = self.model.relm.stream().lock();
+            self.command_entry.delete_selection();
+        }
+        else if let Some(text) = self.get_command() {
+            if !text.is_empty() {
+                let pos = self.command_entry.get_position();
+                let end = text.chars().enumerate()
+                    .skip(pos as usize)
+                    .skip_while(|&(_, c)| !c.is_alphanumeric())
+                    .skip_while(|&(_, c)| c.is_alphanumeric())
+                    .map(|(index, _)| index)
+                    .next()
+                    .unwrap_or_else(|| text.len());
+                let _lock = self.model.relm.stream().lock();
+                self.command_entry.delete_text(pos, end as i32);
+            }
+        }
+    }
+
     /// Delete the word before the cursor.
     pub fn delete_previous_word(&self) {
         if self.command_entry.get_selection_bounds().is_some() {
@@ -151,17 +173,15 @@ impl StatusBar {
             if !text.is_empty() {
                 let pos = self.command_entry.get_position();
                 let len = text.len();
-                if pos > 0 {
-                    let start = text.chars().rev().enumerate()
-                        .skip(len - pos as usize)
-                        .skip_while(|&(_, c)| !c.is_alphanumeric())
-                        .skip_while(|&(_, c)| c.is_alphanumeric())
-                        .map(|(index, _)| len - index)
-                        .next()
-                        .unwrap_or_default();
-                    let _lock = self.model.relm.stream().lock();
-                    self.command_entry.delete_text(start as i32, pos);
-                }
+                let start = text.chars().rev().enumerate()
+                    .skip(len - pos as usize)
+                    .skip_while(|&(_, c)| !c.is_alphanumeric())
+                    .skip_while(|&(_, c)| c.is_alphanumeric())
+                    .map(|(index, _)| len - index)
+                    .next()
+                    .unwrap_or_default();
+                let _lock = self.model.relm.stream().lock();
+                self.command_entry.delete_text(start as i32, pos);
             }
         }
     }

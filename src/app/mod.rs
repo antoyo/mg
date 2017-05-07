@@ -102,6 +102,7 @@ pub const COMMAND_MODE: &str = "command";
 const COMPLETE_NEXT_COMMAND: &str = "complete-next";
 const COMPLETE_PREVIOUS_COMMAND: &str = "complete-previous";
 const ENTRY_DELETE_NEXT_CHAR: &str = "entry-delete-next-char";
+const ENTRY_DELETE_NEXT_WORD: &str = "entry-delete-next-word";
 const ENTRY_DELETE_PREVIOUS_WORD: &str = "entry-delete-previous-word";
 const ENTRY_END: &str = "entry-end";
 const ENTRY_NEXT_CHAR: &str = "entry-next-char";
@@ -507,6 +508,10 @@ impl<COMM, SETT> Mg<COMM, SETT>
                 self.status_bar.widget().delete_next_char();
                 self.update_completions(self.status_bar.widget().get_command());
             },
+            ENTRY_DELETE_NEXT_WORD => {
+                self.status_bar.widget().delete_next_word();
+                self.update_completions(self.status_bar.widget().get_command());
+            },
             ENTRY_DELETE_PREVIOUS_WORD => {
                 self.status_bar.widget().delete_previous_word();
                 self.update_completions(self.status_bar.widget().get_command());
@@ -677,8 +682,8 @@ pub fn parse_config<P: AsRef<Path>, COMM: EnumFromStr>(filename: P, user_modes: 
     assert!(modes.insert("c", COMMAND_MODE).is_none(), "Duplicate mode prefix c.");
     let config = Config {
         application_commands: vec![COMPLETE_NEXT_COMMAND, COMPLETE_PREVIOUS_COMMAND, ENTRY_DELETE_NEXT_CHAR,
-            ENTRY_DELETE_PREVIOUS_WORD, ENTRY_END, ENTRY_NEXT_CHAR, ENTRY_NEXT_WORD, ENTRY_PREVIOUS_CHAR,
-            ENTRY_PREVIOUS_WORD, ENTRY_SMART_HOME],
+            ENTRY_DELETE_NEXT_WORD, ENTRY_DELETE_PREVIOUS_WORD, ENTRY_END, ENTRY_NEXT_CHAR, ENTRY_NEXT_WORD,
+            ENTRY_PREVIOUS_CHAR, ENTRY_PREVIOUS_WORD, ENTRY_SMART_HOME],
         mapping_modes: modes.keys().cloned().collect(),
     };
     let mut parser = Parser::new_with_config(config);
