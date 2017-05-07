@@ -79,7 +79,7 @@ static VARIABLES: Variables = &[
 
 #[widget]
 impl Widget for Win {
-    fn init_view(&self) {
+    fn init_view(&mut self) {
         self.entry.grab_focus();
     }
 

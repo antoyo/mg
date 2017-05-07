@@ -128,6 +128,7 @@ pub struct Model<COMM, SETT>
     current_shortcut: Vec<Key>,
     entry_shown: bool,
     foreground_color: RGBA,
+    initial_error: Option<Error>,
     input_callback: Option<Box<Fn(Option<String>)>>,
     mappings: Mappings,
     message: String,
@@ -314,6 +315,12 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         self.model.entry_shown = false;
     }
 
+    fn init_view(&mut self) {
+        if let Some(error) = self.model.initial_error.take() {
+            self.show_parse_error(error);
+        }
+    }
+
     /// Handle the key press event for the input mode.
     #[allow(non_upper_case_globals)]
     fn input_key_press(&mut self, key: &EventKey) -> (Option<Msg<COMM, SETT>>, Inhibit) {
@@ -360,9 +367,21 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
 
     // TODO: switch from a &'static str to a String.
     fn model(relm: &Relm<Self>, (user_modes, settings_filename): (Modes, &'static str)) -> Model<COMM, SETT> {
-        // TODO: show the error instead of unwrapping.
         // TODO: support non-None include path.
-        let (parser, mappings, modes) = parse_config(settings_filename, user_modes, None).unwrap();
+        let mut settings_parser = Box::new(Parser::new());
+        let mut mappings = HashMap::new();
+        let mut modes = HashMap::new();
+        let mut initial_error = None;
+        match parse_config(settings_filename, user_modes, None) {
+            Ok((parser, initial_mappings, initial_modes)) => {
+                settings_parser = Box::new(parser);
+                mappings = initial_mappings;
+                modes = initial_modes;
+            },
+            Err(error) => {
+                initial_error = Some(error);
+            }
+        }
         // TODO: use &'static str instead of String?
         Model {
             answer: None,
@@ -374,14 +393,15 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             current_shortcut: vec![],
             entry_shown: false,
             foreground_color: RGBA::white(),
+            initial_error,
             input_callback: None,
-            mappings: mappings,
+            mappings,
             message: String::new(),
             mode_label: String::new(),
-            modes: modes,
+            modes,
             relm: relm.clone(),
             settings: SETT::default(),
-            settings_parser: Box::new(parser),
+            settings_parser,
             shortcuts: HashMap::new(),
             shortcut_pressed: false,
             variables: HashMap::new(),
@@ -657,19 +677,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
                     _ => unimplemented!(),
                 }
             },
-            Err(error) => {
-                if let Error::Parse(error) = error {
-                    let message =
-                        match error.typ {
-                            MissingArgument => "Argument required".to_string(),
-                            NoCommand => return None,
-                            Parse => format!("Parse error: unexpected {}, expecting: {}", error.unexpected, error.expected),
-                            UnknownCommand => format!("Not a command: {}", error.unexpected),
-                        };
-                    self.error(&message);
-                    return Some(EnterNormalMode);
-                }
-            },
+            Err(error) => return self.show_parse_error(error),
         }
         None
     }
@@ -770,6 +778,21 @@ impl<COMM, SETT> Mg<COMM, SETT>
         status_bar.show_entry();
     }
 
+    fn show_parse_error(&mut self, error: Error) -> Option<Msg<COMM, SETT>> {
+        if let Error::Parse(error) = error {
+            let message =
+                match error.typ {
+                    MissingArgument => "Argument required".to_string(),
+                    NoCommand => return None,
+                    Parse => format!("Parse error: unexpected {}, expecting: {}", error.unexpected, error.expected),
+                    UnknownCommand => format!("Not a command: {}", error.unexpected),
+                };
+            self.error(&message);
+            return Some(EnterNormalMode);
+        }
+        None
+    }
+
     fn update_completions(&self, input: Option<String>) -> Option<Msg<COMM, SETT>> {
         let input = input.unwrap_or_default();
         self.completion_view.widget_mut().update_completions(&self.model.current_mode, &input);
@@ -817,32 +840,8 @@ pub fn parse_config<P: AsRef<Path>, COMM: EnumFromStr>(filename: P, user_modes: 
             },
             _ => (), // TODO: to remove.
             //Set(name, value) => self.set_setting(Sett::to_variant(&name, value)?),
-            //Unmap { .. } => panic!("not yet implemented"), // TODO
+            Unmap { .. } => panic!("not yet implemented"), // TODO
         }
     }
     Ok((parser, mappings, modes))
 }
-
-/*
-impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
-    where Spec: SpecialCommand + 'static,
-          Comm: EnumFromStr + EnumMetaData + 'static,
-          Sett: mg_settings::settings::Settings + EnumMetaData + SettingCompletion + 'static,
-{
-    /// Add a callback to the window key press event.
-    pub fn connect_key_press_event<F: Fn(&Window, &EventKey) -> Inhibit + 'static>(&self, callback: F) {
-        self.window.connect_key_press_event(callback);
-    }
-
-    /// Get the text of the status bar command entry.
-    pub fn get_command(&self) -> String {
-        String::new() // TODO: remove
-        //self.status_bar.get_command().unwrap_or_default()
-    }
-
-    /// Get the current mode.
-    pub fn get_mode(&self) -> &str {
-        &self.current_mode
-    }
-}
-*/

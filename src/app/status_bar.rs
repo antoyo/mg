@@ -54,7 +54,7 @@ pub struct Model {
 
 #[widget]
 impl Widget for StatusBar {
-    fn init_view(&self) {
+    fn init_view(&mut self) {
         // Adjust the look of the entry.
         let style_context = self.command_entry.get_style_context().unwrap();
         // TODO: remove the next line when relm supports css.
@@ -338,18 +338,3 @@ impl StatusBarItem {
         self.label.set_text(text);
     }
 }
-
-/*
-impl StatusBar {
-    /// Add an item.
-    pub fn add_item(&self, item: &StatusBarItem) {
-        item.label.show();
-        if item.left {
-            self.hbox.pack_start(&**item, false, false, 3);
-        }
-        else {
-            self.hbox.pack_end(&**item, false, false, 3);
-        }
-    }
-}
-*/
