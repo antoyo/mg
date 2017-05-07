@@ -58,7 +58,7 @@ pub type Modes = &'static [(&'static str, &'static str)];
 pub type Variables = &'static [(&'static str, fn() -> String)]; // TODO: probably needs to use a Box<Fn() -> String>.
 
 pub use app::{Mg, parse_config};
-pub use app::Msg::{CustomCommand, ModeChanged, SettingChanged};
+pub use app::Msg::{CustomCommand, ModeChanged, SetMode, SettingChanged};
 pub use app::dialog::{DialogBuilder, DialogResult};
 pub use app::settings::NoSettings;
 pub use app::status_bar::{StatusBar, StatusBarItem};

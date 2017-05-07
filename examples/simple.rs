@@ -42,6 +42,7 @@ use mg::{
     Mg,
     Modes,
     NoSettings,
+    SetMode,
     StatusBarItem,
     Variables,
 };
@@ -92,9 +93,7 @@ impl Widget for Win {
         match event {
             Command(command) => {
                 match command {
-                    // TODO: change that to an event connection like: Command(Insert) => SetMode("insert")?
-                    Insert => self.mg.widget_mut().set_mode("insert"),
-                    Normal => self.mg.widget_mut().set_mode("normal"),
+                    Insert | Normal => (),
                     Open(url) => self.model.text = format!("Opening URL {}", url),
                     Quit => gtk::main_quit(),
                 }
@@ -123,6 +122,8 @@ impl Widget for Win {
             StatusBarItem {
                 text: "Test",
             },
+            CustomCommand(Insert) => mg@SetMode("insert"),
+            CustomCommand(Normal) => mg@SetMode("normal"),
             CustomCommand(command) => Command(command),
         }
     }

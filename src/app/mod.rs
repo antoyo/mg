@@ -156,6 +156,7 @@ pub enum Msg<COMM, SETT>
     KeyPress(GdkKey),
     KeyRelease(GdkKey),
     ModeChanged(String),
+    SetMode(&'static str),
     Quit,
     SettingChanged(SETT::Variant),
 }
@@ -505,6 +506,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             HideInfo(message) => self.hide_info(&message),
             KeyPress(_) | KeyRelease(_) => (),
             ModeChanged(_) | SettingChanged(_) => (),
+            SetMode(mode) => self.set_mode(mode),
             Quit => {
                 if let Some(ref callback) = self.model.close_callback {
                     callback();

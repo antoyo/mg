@@ -16,10 +16,24 @@ Add the following line to the dependencies section of your `Cargo.toml`:
 [source,bash]
 ----
 mg = "0.0.1"
+relm = "0.9.6"
+relm-attributes = "0.9.0"
+relm-derive = "0.9.2"
 ----
 
 == Usage
 
-Create a new `Application` to create an MG window.
-Set the main widget with `Application::set_view`.
-Add a callback to react to commands entered by the user with `Application::connect_command`.
+In the `view!` macro, use the `Mg` widget:
+
+[source,rust]
+----
+view! {
+    Mg<AppCommand, NoSettings>((MODES, "examples/main.conf")) {
+        // Place your main widget here.
+        gtk::Box {
+        }
+        // Connect a signal to react to commands entered by the user.
+        CustomCommand(command) => Command(command),
+    }
+}
+----
