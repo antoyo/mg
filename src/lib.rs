@@ -20,8 +20,7 @@
  */
 
 /*
- * TODO: smart home (with Ctrl-A) in the command text entry.
- * TODO: <C-b>, <A-b>, <C-f>, <A-f>, <C-d>, <A-d>.
+ * TODO: <A-b>, <A-f>, <C-d>, <A-d>.
  *
  * TODO: change all unneeded &mut self to &self.
  * TODO: set the size of the status bar according to the size of the font.

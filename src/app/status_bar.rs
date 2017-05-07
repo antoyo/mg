@@ -163,6 +163,23 @@ impl StatusBar {
         self.set_entry_shown(false);
     }
 
+    /// Go forward one character in the command entry.
+    pub fn next_char(&self) {
+        let pos = self.command_entry.get_position();
+        let text = self.command_entry.get_text().unwrap_or_default();
+        if pos < text.len() as i32 {
+            self.command_entry.set_position(pos + 1);
+        }
+    }
+
+    /// Go back one character in the command entry.
+    pub fn previous_char(&self) {
+        let pos = self.command_entry.get_position();
+        if pos > 0 {
+            self.command_entry.set_position(pos - 1);
+        }
+    }
+
     // TODO: merge with show_entry()?
     /// Set whether the entry is visible or not.
     pub fn set_entry_shown(&self, visible: bool) {
