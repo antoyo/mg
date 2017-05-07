@@ -123,6 +123,36 @@ impl StatusBar {
         self.command_entry.connect_activate(move |entry| callback(entry.get_text()));
     }
 
+    /// Delete the word before the cursor.
+    pub fn delete_previous_word(&self) {
+        if self.command_entry.get_selection_bounds().is_some() {
+            self.command_entry.delete_selection();
+        }
+        else if let Some(text) = self.command_entry.get_text() {
+            if !text.is_empty() {
+                let pos = self.command_entry.get_position();
+                let upos = pos as usize;
+                let mut end = upos;
+                if end > 0 {
+                    end -= 1;
+                    let text: Vec<char> = text.chars().collect();
+                    while text[end].is_whitespace() && end > 0 {
+                        end -= 1;
+                    }
+                    let mut start = end;
+                    while !text[start].is_whitespace() && start > 0 {
+                        start -= 1;
+                    }
+                    if text[start].is_whitespace() && start >= upos {
+                        start += 1;
+                    }
+                    let _lock = self.model.relm.stream().lock();
+                    self.command_entry.delete_text(start as i32, pos);
+                }
+            }
+        }
+    }
+
     /// Get the text of the command entry.
     pub fn get_command(&self) -> Option<String> {
         self.command_entry.get_text()
