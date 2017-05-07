@@ -129,6 +129,7 @@ pub struct Model<COMM, SETT>
     entry_shown: bool,
     foreground_color: RGBA,
     initial_error: Option<Error>,
+    initial_commands: Vec<Command<COMM>>,
     input_callback: Option<Box<Fn(Option<String>)>>,
     mappings: Mappings,
     message: String,
@@ -316,6 +317,10 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     }
 
     fn init_view(&mut self) {
+        let commands: Vec<_> = self.model.initial_commands.drain(..).collect();
+        for command in commands {
+            self.call_command(Ok(command), false);
+        }
         if let Some(error) = self.model.initial_error.take() {
             self.show_parse_error(error);
         }
@@ -365,18 +370,18 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         }
     }
 
-    // TODO: switch from a &'static str to a String.
+    // TODO: switch from a &'static str to a String?
     fn model(relm: &Relm<Self>, (user_modes, settings_filename, include_path): (Modes, &'static str, Option<String>))
         -> Model<COMM, SETT>
     {
         let mut settings_parser = Box::new(Parser::new());
-        let mut mappings = HashMap::new();
+        let mut initial_commands = vec![];
         let mut modes = HashMap::new();
         let mut initial_error = None;
         match parse_config(settings_filename, user_modes, include_path.as_ref().map(String::as_str)) {
-            Ok((parser, initial_mappings, initial_modes)) => {
+            Ok((parser, commands, initial_modes)) => {
                 settings_parser = Box::new(parser);
-                mappings = initial_mappings;
+                initial_commands = commands;
                 modes = initial_modes;
             },
             Err(error) => {
@@ -395,8 +400,9 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             entry_shown: false,
             foreground_color: RGBA::white(),
             initial_error,
+            initial_commands,
             input_callback: None,
-            mappings,
+            mappings: HashMap::new(),
             message: String::new(),
             mode_label: String::new(),
             modes,
@@ -663,6 +669,11 @@ impl<COMM, SETT> Mg<COMM, SETT>
                         }
                         return Some(CustomCommand(command));
                     },
+                    Map { action, keys, mode } => {
+                        let mode_mappings = self.model.mappings.entry(self.model.modes[mode.as_str()])
+                            .or_insert_with(HashMap::new);
+                        mode_mappings.insert(keys, action);
+                    },
                     Set(name, value) => {
                         match SETT::to_variant(&name, value) {
                             Ok(setting) => {
@@ -675,7 +686,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
                         }
                         return Some(EnterNormalMode);
                     },
-                    _ => unimplemented!(),
+                    Unmap { .. } => panic!("not yet implemented"), // TODO
                 }
             },
             Err(error) => {
@@ -807,9 +818,8 @@ impl<COMM, SETT> Mg<COMM, SETT>
 
 /// Parse a configuration file.
 pub fn parse_config<P: AsRef<Path>, COMM: EnumFromStr>(filename: P, user_modes: Modes, include_path: Option<&str>)
-    -> Result<(Parser<COMM>, Mappings, ModesHash)>
+    -> Result<(Parser<COMM>, Vec<Command<COMM>>, ModesHash)>
 {
-    let mut mappings = HashMap::new();
     let file = File::open(filename)?;
     let buf_reader = BufReader::new(file);
 
@@ -831,22 +841,5 @@ pub fn parse_config<P: AsRef<Path>, COMM: EnumFromStr>(filename: P, user_modes: 
     }
 
     let commands = parser.parse(buf_reader)?;
-    for command in commands {
-        match command {
-            //App(command) => self.app_command(&command),
-            //Custom(command) => {
-            //if let Some(ref callback) = self.command_callback {
-            //callback(command);
-            //}
-            //},
-            Map { action, keys, mode } => {
-                let mode_mappings = mappings.entry(modes[mode.as_str()]).or_insert_with(HashMap::new);
-                mode_mappings.insert(keys, action);
-            },
-            _ => (), // TODO: to remove.
-            //Set(name, value) => self.set_setting(Sett::to_variant(&name, value)?),
-            Unmap { .. } => panic!("not yet implemented"), // TODO
-        }
-    }
-    Ok((parser, mappings, modes))
+    Ok((parser, commands, modes))
 }
