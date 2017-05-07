@@ -48,6 +48,7 @@ pub enum Msg {
 
 pub struct Model {
     identifier_label: &'static str,
+    identifier_visible: bool,
     relm: Relm<StatusBar>,
 }
 
@@ -66,8 +67,23 @@ impl Widget for StatusBar {
     fn model(relm: &Relm<Self>, _: ()) -> Model {
         Model {
             identifier_label: ":",
+            identifier_visible: false,
             relm: relm.clone(),
         }
+    }
+
+    // TODO: merge with show_entry()?
+    /// Set whether the entry is visible or not.
+    pub fn set_entry_shown(&mut self, visible: bool) {
+        let _lock = self.model.relm.stream().lock();
+        self.command_entry.set_text("");
+        self.model.identifier_visible = visible;
+        self.command_entry.set_visible(visible);
+    }
+
+    /// Show the identifier.
+    pub fn show_identifier(&mut self) {
+        self.model.identifier_visible = true;
     }
 
     fn update(&mut self, _msg: Msg) {
@@ -81,6 +97,7 @@ impl Widget for StatusBar {
             #[name="identifier_label"]
             gtk::Label {
                 text: self.model.identifier_label,
+                visible: self.model.identifier_visible,
             },
             #[name="command_entry"]
             gtk::Entry {
@@ -198,7 +215,7 @@ impl StatusBar {
     }
 
     /// Hide the entry.
-    pub fn hide_entry(&self) {
+    pub fn hide_entry(&mut self) {
         self.set_entry_shown(false);
     }
 
@@ -246,15 +263,6 @@ impl StatusBar {
             .map(|(index, _)| len - index)
             .unwrap_or_default();
         self.command_entry.set_position(position as i32);
-    }
-
-    // TODO: merge with show_entry()?
-    /// Set whether the entry is visible or not.
-    pub fn set_entry_shown(&self, visible: bool) {
-        let _lock = self.model.relm.stream().lock();
-        self.command_entry.set_text("");
-        self.identifier_label.set_visible(visible);
-        self.command_entry.set_visible(visible);
     }
 
     /// Seth the prefix identifier shown at the left of the command entry.

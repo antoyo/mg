@@ -24,20 +24,20 @@
 use std::collections::HashMap;
 
 use gtk;
-use mg_settings::{EnumFromStr, EnumMetaData, SettingCompletion};
+use mg_settings::{EnumFromStr, EnumMetaData, SettingCompletion, SpecialCommand};
 use mg_settings::key::Key;
 use mg_settings::settings;
 
-use app::{Application, BLOCKING_INPUT_MODE, INPUT_MODE};
+use app::{Mg, BLOCKING_INPUT_MODE, INPUT_MODE};
+use app::Msg::CustomCommand;
 use self::DialogResult::{Answer, Shortcut};
-use SpecialCommand;
 
 /// Builder to create a new dialog.
-pub struct DialogBuilder {
+pub struct DialogBuilder<COMM> {
     /// Whether the dialog should block the calling function.
     blocking: bool,
     /// The callback function to call for an asynchronous input dialog.
-    callback: Option<Box<Fn(Option<&str>) + 'static>>,
+    callback: Option<Box<Fn(Option<String>) -> COMM + 'static>>,
     /// The available choices to the question.
     choices: Vec<char>,
     /// The text completer identifier for the input.
@@ -50,7 +50,7 @@ pub struct DialogBuilder {
     shortcuts: HashMap<Key, String>,
 }
 
-impl DialogBuilder {
+impl<COMM> DialogBuilder<COMM> {
     /// Create a new dialog builder.
     #[allow(new_without_default_derive)]
     pub fn new() -> Self {
@@ -72,7 +72,7 @@ impl DialogBuilder {
     }
 
     /// Set a callback for an asynchronous dialog.
-    pub fn callback<F: Fn(Option<&str>) + 'static>(mut self, callback: F) -> Self {
+    pub fn callback<F: Fn(Option<String>) -> COMM + 'static>(mut self, callback: F) -> Self {
         self.callback = Some(Box::new(callback));
         self
     }
@@ -118,10 +118,9 @@ pub enum DialogResult {
     Shortcut(String),
 }
 
-impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
-    where Spec: SpecialCommand + 'static,
-          Comm: EnumFromStr + EnumMetaData + 'static,
-          Sett: settings::Settings + EnumMetaData + SettingCompletion + 'static,
+impl<COMM, SETT> Mg<COMM, SETT>
+    where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
+          SETT: Default + EnumMetaData + settings::Settings + SettingCompletion + 'static,
 {
     /// Ask a question to the user and block until the user provides it (or cancel).
     pub fn blocking_input(&mut self, message: &str, default_answer: &str) -> Option<String> {
@@ -151,7 +150,7 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
     }
 
     /// Ask a question to the user.
-    pub fn input<F: Fn(Option<&str>) + 'static>(&mut self, message: &str, default_answer: &str, callback: F) {
+    pub fn input<F: Fn(Option<String>) -> COMM + 'static>(&mut self, message: &str, default_answer: &str, callback: F) {
         let builder = DialogBuilder::new()
             .callback(callback)
             .default_answer(default_answer)
@@ -160,7 +159,7 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
     }
 
     /// Ask a multiple-choice question to the user.
-    pub fn question<F: Fn(Option<&str>) + 'static>(&mut self, message: &str, choices: &[char], callback: F) {
+    pub fn question<F: Fn(Option<String>) -> COMM + 'static>(&mut self, message: &str, choices: &[char], callback: F) {
         let builder = DialogBuilder::new()
             .callback(callback)
             .message(message)
@@ -169,37 +168,37 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
     }
 
     /// Show a dialog created with a `DialogBuilder`.
-    pub fn show_dialog(&mut self, mut dialog_builder: DialogBuilder) -> DialogResult {
-        self.shortcut_pressed = false;
+    pub fn show_dialog(&mut self, mut dialog_builder: DialogBuilder<COMM>) -> DialogResult {
+        self.model.shortcut_pressed = false;
         {
-            self.shortcuts.clear();
+            self.model.shortcuts.clear();
             for (key, value) in dialog_builder.shortcuts {
-                self.shortcuts.insert(key, value);
+                self.model.shortcuts.insert(key, value);
             }
         }
 
         let choices = dialog_builder.choices.clone();
         if !choices.is_empty() {
-            self.choices.clear();
-            self.choices.append(&mut dialog_builder.choices);
+            self.model.choices.clear();
+            self.model.choices.append(&mut dialog_builder.choices);
             let choices: Vec<_> = choices.iter().map(|c| c.to_string()).collect();
             let choices = choices.join("/");
-            //self.status_bar.set_identifier(&format!("{} ({}) ", dialog_builder.message, choices));
-            //self.status_bar.show_identifier();
+            self.status_bar.widget().set_identifier(&format!("{} ({}) ", dialog_builder.message, choices));
+            self.status_bar.widget_mut().show_identifier();
         }
         else {
-            //self.status_bar.set_identifier(&format!("{} ", dialog_builder.message));
-            //self.status_bar.show_entry();
-            //self.status_bar.set_input(&dialog_builder.default_answer);
+            self.status_bar.widget().set_identifier(&format!("{} ", dialog_builder.message));
+            self.show_entry();
+            self.set_input(&dialog_builder.default_answer);
         }
 
         if let Some(completer) = dialog_builder.completer {
-            //self.status_bar.set_completer(&completer);
-            //self.status_bar.set_original_input(&dialog_builder.default_answer);
-            //self.status_bar.show_completion();
+            self.set_completer(&completer);
+            self.completion_view.widget_mut().set_original_input(&dialog_builder.default_answer);
+            self.completion_view.widget_mut().show_completion();
         }
 
-        self.answer = None;
+        self.model.answer = None;
         if dialog_builder.blocking {
             self.model.input_callback = Some(Box::new(|_| {
                 gtk::main_quit();
@@ -210,21 +209,23 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
         }
         else {
             if let Some(callback) = dialog_builder.callback {
+                let stream = self.model.relm.stream().clone();
                 self.model.input_callback = Some(Box::new(move |answer| {
-                    callback(answer.as_ref().map(String::as_ref));
+                    let msg = callback(answer);
+                    stream.emit(CustomCommand(msg));
                 }));
             }
             self.set_mode(INPUT_MODE);
 
         }
-        //self.status_bar.color_blue();
+        self.status_bar.widget().color_blue();
         if dialog_builder.blocking {
             gtk::main();
             self.reset();
             self.return_to_normal_mode();
-            self.choices.clear();
-            if self.shortcut_pressed {
-                if let Some(answer) = self.answer.clone() {
+            self.model.choices.clear();
+            if self.model.shortcut_pressed {
+                if let Some(answer) = self.model.answer.clone() {
                     Shortcut(answer)
                 }
                 else {
@@ -232,7 +233,7 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
                 }
             }
             else {
-                Answer(self.answer.clone())
+                Answer(self.model.answer.clone())
             }
         }
         else {
@@ -241,7 +242,7 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
     }
 
     /// Show a dialog created with a `DialogBuilder` which does not contain shortcut.
-    pub fn show_dialog_without_shortcuts(&mut self, dialog_builder: DialogBuilder) -> Option<String> {
+    pub fn show_dialog_without_shortcuts(&mut self, dialog_builder: DialogBuilder<COMM>) -> Option<String> {
         match self.show_dialog(dialog_builder) {
             Answer(answer) => answer,
             Shortcut(_) => panic!("cannot return a shortcut in show_dialog_without_shortcuts()"),

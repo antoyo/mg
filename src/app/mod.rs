@@ -19,7 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-//pub mod dialog;
+pub mod dialog;
 pub mod settings;
 mod shortcut;
 pub mod status_bar;
@@ -176,12 +176,14 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                     callback(input);
                     should_reset = true;
                 }
-                if should_reset {
-                    self.reset();
-                }
                 self.model.input_callback = None;
                 self.model.choices.clear();
-                None
+                if should_reset {
+                    Some(EnterNormalModeAndReset)
+                }
+                else {
+                    None
+                }
             }
             else {
                 self.handle_command(input)
@@ -195,7 +197,6 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     fn command_key_press(&mut self, key: &EventKey) -> (Option<Msg<COMM, SETT>>, Inhibit) {
         match key.get_keyval() {
             Escape => {
-                // TODO: this should not call the callback (in update(EnterNormalMode)).
                 (Some(EnterNormalModeAndReset), Inhibit(false))
             },
             _ => self.handle_shortcut(key),
@@ -231,7 +232,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     pub fn error(&mut self, error: &str) {
         error!("{}", error);
         self.model.message = error.to_string();
-        self.status_bar.widget().hide_entry();
+        self.status_bar.widget_mut().hide_entry();
         self.status_bar.widget().color_red();
     }
 
@@ -318,6 +319,10 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     fn input_key_press(&mut self, key: &EventKey) -> (Option<Msg<COMM, SETT>>, Inhibit) {
         match key.get_keyval() {
             Escape => {
+                if let Some(ref callback) = self.model.input_callback {
+                    callback(None);
+                }
+                self.model.input_callback = None;
                 (Some(EnterNormalModeAndReset), Inhibit(false))
             },
             keyval => {
@@ -326,8 +331,8 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                 }
                 else if let Some(character) = char::from_u32(keyval) {
                     if self.model.choices.contains(&character) {
-                        self.set_dialog_answer(&character.to_string());
-                        return (None, Inhibit(true));
+                        let msg = self.set_dialog_answer(&character.to_string());
+                        return (msg, Inhibit(true));
                     }
                 }
                 self.handle_shortcut(key)
@@ -423,10 +428,11 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         self.hide_entry_and_completion();
         self.set_mode(NORMAL_MODE);
         self.set_current_identifier(':');
-        if let Some(ref callback) = self.model.input_callback {
-            callback(None);
-        }
-        self.model.input_callback = None;
+    }
+
+    fn set_completer(&self, completer: &str) {
+        let command_entry_text = self.status_bar.widget().get_command().unwrap_or_default();
+        self.completion_view.widget_mut().set_completer(completer, &command_entry_text);
     }
 
     /// Set the current (special) command identifier.
@@ -435,7 +441,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     }
 
     /// Set the answer to return to the caller of the dialog.
-    fn set_dialog_answer(&mut self, answer: &str) {
+    fn set_dialog_answer(&mut self, answer: &str) -> Option<Msg<COMM, SETT>> {
         let mut should_reset = false;
         if self.model.current_mode == BLOCKING_INPUT_MODE {
             self.model.answer = Some(answer.to_string());
@@ -446,11 +452,13 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             self.model.choices.clear();
             should_reset = true;
         }
-        if should_reset {
-            self.return_to_normal_mode();
-            self.reset();
-        }
         self.model.input_callback = None;
+        if should_reset {
+            Some(EnterNormalModeAndReset)
+        }
+        else {
+            None
+        }
     }
 
     /// Set the current mode.
@@ -477,8 +485,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             // To be listened to by the user.
             CustomCommand(_) => (),
             EnterCommandMode => {
-                let command_entry_text = self.status_bar.widget().get_command().unwrap_or_default();
-                self.completion_view.widget_mut().set_completer(DEFAULT_COMPLETER_IDENT, &command_entry_text);
+                self.set_completer(DEFAULT_COMPLETER_IDENT);
                 self.set_current_identifier(':');
                 self.set_mode(COMMAND_MODE);
                 self.reset();
@@ -750,7 +757,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
 
     fn show_entry(&mut self) {
         self.model.entry_shown = true;
-        let status_bar = self.status_bar.widget();
+        let mut status_bar = self.status_bar.widget_mut();
         status_bar.set_entry_shown(true);
         status_bar.show_entry();
     }

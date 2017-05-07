@@ -61,7 +61,9 @@ pub enum Msg {
     Alert,
     Command(AppCommand),
     Info,
+    Input,
     Mode(String),
+    Question,
     Setting(AppSettingsVariant),
     Warning,
 }
@@ -113,6 +115,12 @@ impl Widget for Win {
             Command(command) => {
                 match command {
                     BackwardSearch(input) => println!("Searching backward for {}", input),
+                    CheckQuit(answer) => {
+                        if answer == Some("y".to_string()) {
+                            gtk::main_quit();
+                        }
+                    },
+                    Echo(answer) => self.model.text = format!("You said: {}", answer.unwrap_or("Nothing".to_string())),
                     Follow => (),
                     Insert => self.mg.widget_mut().set_mode("insert"),
                     Normal => self.mg.widget_mut().set_mode("normal"),
@@ -124,7 +132,9 @@ impl Widget for Win {
                 }
             },
             Info => self.mg.widget_mut().info("Info"),
+            Input => self.mg.widget_mut().input("Say something", "Oh yeah?", Echo),
             Mode(mode) => self.mode_changed(&mode),
+            Question => self.mg.widget_mut().question("Do you want to quit?", &['y', 'n'], CheckQuit),
             Setting(setting) => self.setting_changed(setting),
             Warning => self.mg.widget_mut().warning("Warning"),
         }
@@ -156,6 +166,14 @@ impl Widget for Win {
                     label: "Warning",
                     clicked => Warning,
                 },
+                gtk::Button {
+                    label: "Question",
+                    clicked => Question,
+                },
+                gtk::Button {
+                    label: "Input",
+                    clicked => Input,
+                },
             },
             StatusBarItem {
                 text: "Rightmost",
@@ -185,6 +203,10 @@ pub enum CustomSetting {
 pub enum AppCommand {
     #[special_command(identifier="?")]
     BackwardSearch(String),
+    #[completion(hidden)]
+    CheckQuit(Option<String>),
+    #[completion(hidden)]
+    Echo(Option<String>),
     #[completion(hidden)]
     Follow,
     Insert,
