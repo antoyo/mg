@@ -24,7 +24,6 @@
  * TODO: set the size of the status bar according to the size of the font.
  * TODO: supports shortcuts like <C-a> and <C-w> in the command entry.
  * TODO: smart home (with Ctrl-A) in the command text entry.
- * TODO: support non-"always" in special commands.
  * TODO: different event for activate event of special commands.
  * TODO: use the gtk::Statusbar widget?
  * TODO: support shortcuts with number like "50G".
@@ -56,9 +55,6 @@ mod app;
 pub mod completion;
 mod key_converter;
 
-use std::char;
-use std::result;
-
 /// Map mode prefix (i.e. "i") to the mode name (i.e. "insert").
 pub type Modes = &'static [(&'static str, &'static str)];
 /// Map variable names to a function returning the value of this variable.
@@ -69,79 +65,3 @@ pub use app::Msg::{CustomCommand, ModeChanged, SettingChanged};
 //pub use app::dialog::{DialogBuilder, DialogResult};
 pub use app::settings::NoSettings;
 pub use app::status_bar::{StatusBar, StatusBarItem};
-
-#[macro_export]
-macro_rules! hash {
-    ($($key:expr => $value:expr),* $(,)*) => {{
-        let mut hashmap = ::std::collections::HashMap::new();
-        $(hashmap.insert($key.into(), $value.into());)*
-        hashmap
-    }};
-}
-
-#[macro_export]
-macro_rules! special_commands {
-    ($enum_name:ident { $( $command:ident ( $identifier:expr , always ),)* } ) => {
-        pub enum $enum_name {
-            $( $command(String), )*
-        }
-
-        impl $crate::SpecialCommand for $enum_name {
-            fn identifier_to_command(identifier: char, input: &str) -> ::std::result::Result<Self, String> {
-                match identifier {
-                    $( $identifier => Ok($enum_name::$command(input.to_string())), )*
-                    _ => Err(format!("unknown identifier {}", identifier)),
-                }
-            }
-
-            fn is_always(identifier: char) -> bool {
-                match identifier {
-                    $( $identifier )|* => true,
-                    _ => false,
-                }
-            }
-
-            fn is_identifier(character: char) -> bool {
-                match character {
-                    $( $identifier )|* => true,
-                    _ => false,
-                }
-            }
-        }
-    };
-}
-
-/// Trait for converting an identifier like "/" to a special command.
-pub trait SpecialCommand
-    where Self: Sized
-{
-    /// Convert an identifier like "/" to a special command.
-    fn identifier_to_command(identifier: char, input: &str) -> result::Result<Self, String>;
-
-    /// Check if the identifier is declared `always`.
-    /// The always option means that the command is activated every time a character is typed (like
-    /// incremental search).
-    fn is_always(identifier: char) -> bool;
-
-    /// Check if a character is a special command identifier.
-    fn is_identifier(character: char) -> bool;
-}
-
-// TODO: remove when special commands are merge with commands.
-#[doc(hidden)]
-pub struct NoSpecialCommands {
-}
-
-impl SpecialCommand for NoSpecialCommands {
-    fn identifier_to_command(_identifier: char, _input: &str) -> result::Result<Self, String> {
-        Err(String::new())
-    }
-
-    fn is_always(_identifier: char) -> bool {
-        false
-    }
-
-    fn is_identifier(_character: char) -> bool {
-        false
-    }
-}

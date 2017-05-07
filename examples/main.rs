@@ -47,7 +47,6 @@ use relm::Widget;
 use relm_attributes::widget;
 
 use AppSettingsVariant::*;
-//use SpecialCommand::*;
 
 use AppCommand::*;
 use Msg::*;
@@ -109,12 +108,14 @@ impl Widget for Win {
         match event {
             Command(command) => {
                 match command {
+                    BackwardSearch(input) => println!("Searching backward for {}", input),
                     Follow => (),
                     Insert => self.mg.widget_mut().set_mode("insert"),
                     Normal => self.mg.widget_mut().set_mode("normal"),
                     Open(url) => self.model.text = format!("Opening URL {}", url),
-                    WinOpen(url) => self.model.text = format!("Opening URL {} in new window", url),
                     Quit => gtk::main_quit(),
+                    Search(input) => println!("Searching for {}", input),
+                    WinOpen(url) => self.model.text = format!("Opening URL {} in new window", url),
                 }
             },
             Mode(mode) => self.mode_changed(&mode),
@@ -163,6 +164,8 @@ pub enum CustomSetting {
 
 #[derive(Commands)]
 pub enum AppCommand {
+    #[special_command(identifier="?")]
+    BackwardSearch(String),
     #[completion(hidden)]
     Follow,
     Insert,
@@ -171,6 +174,8 @@ pub enum AppCommand {
     Open(String),
     #[help(text="Quit the application")]
     Quit,
+    #[special_command(incremental, identifier="/")]
+    Search(String),
     #[help(text="Open the url in a new window")]
     WinOpen(String),
 }
@@ -184,21 +189,3 @@ pub struct AppSettings {
     title_len: i64,
     width: i64,
 }
-
-/*special_commands!(SpecialCommand {
-    BackwardSearch('?', always),
-    Search('/', always),
-});
-
-impl App {
-    fn new() -> Box<Self> {
-        connect!(app.app, connect_special_command(command), app, handle_special_command(command));
-    }
-
-    fn handle_special_command(&self, command: SpecialCommand) {
-        match command {
-            BackwardSearch(input) => println!("Searching backward for {}", input),
-            Search(input) => println!("Searching for {}", input),
-        }
-    }
-}*/

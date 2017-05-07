@@ -22,14 +22,13 @@
 use gdk::{EventKey, CONTROL_MASK};
 use gdk::enums::key::{Escape, Tab, ISO_Left_Tab};
 use gtk::Inhibit;
-use mg_settings::{self, EnumFromStr, EnumMetaData, SettingCompletion};
+use mg_settings::{self, EnumFromStr, EnumMetaData, SettingCompletion, SpecialCommand};
 use mg_settings::key::Key;
 use relm::Widget;
 
 use app::{Mg, Msg, BLOCKING_INPUT_MODE, COMMAND_MODE, INPUT_MODE, NORMAL_MODE};
 use app::ShortcutCommand::{Complete, Incomplete};
 use key_converter::gdk_key_to_key;
-use SpecialCommand;
 
 /// Convert a shortcut of keys to a `String`.
 pub fn shortcut_to_string(keys: &[Key]) -> String {
@@ -38,7 +37,7 @@ pub fn shortcut_to_string(keys: &[Key]) -> String {
 }
 
 impl<COMM, SETT> Mg<COMM, SETT>
-    where COMM: Clone + EnumFromStr + EnumMetaData + 'static,
+    where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
           SETT: Default + EnumMetaData + mg_settings::settings::Settings + SettingCompletion + 'static,
 {
     /// Add the key to the current shortcut.

@@ -49,7 +49,7 @@ use gtk::{
     STATE_FLAG_NORMAL,
 };
 use gtk::Orientation::Vertical;
-use mg_settings::{self, Config, EnumFromStr, EnumMetaData, Parser, SettingCompletion};
+use mg_settings::{self, Config, EnumFromStr, EnumMetaData, Parser, SettingCompletion, SpecialCommand};
 use mg_settings::Command::{self, App, Custom, Map, Set, Unmap};
 use mg_settings::error::{Error, Result};
 use mg_settings::error::ErrorType::{MissingArgument, NoCommand, Parse, UnknownCommand};
@@ -72,7 +72,7 @@ use self::status_bar::StatusBar;
 use self::status_bar::Msg::*;
 use self::Msg::*;
 pub use self::status_bar::StatusBarItem;
-use super::{Modes, NoSpecialCommands, SpecialCommand, Variables};
+use super::{Modes, Variables};
 
 #[derive(PartialEq)]
 enum ActivationType {
@@ -105,7 +105,7 @@ const INPUT_MODE: &str = "input";
 const NORMAL_MODE: &str = "normal";
 
 pub struct Model<COMM, SETT>
-    where COMM: Clone + EnumFromStr + EnumMetaData + 'static,
+    where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
           SETT: Default + EnumMetaData + mg_settings::settings::Settings + SettingCompletion + 'static,
 {
     close_callback: Option<Box<Fn() + Send + Sync>>,
@@ -121,14 +121,13 @@ pub struct Model<COMM, SETT>
     relm: Relm<Mg<COMM, SETT>>,
     settings: SETT,
     settings_parser: Box<Parser<COMM>>,
-    //special_command_callback: Option<Box<Fn(SPEC)>>,
     variables: HashMap<String, fn() -> String>,
 }
 
 #[allow(missing_docs)]
 #[derive(Msg)]
 pub enum Msg<COMM, SETT>
-    where COMM: Clone + EnumFromStr + EnumMetaData + 'static,
+    where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
           SETT: mg_settings::settings::Settings + EnumMetaData + SettingCompletion + 'static,
 {
     CustomCommand(COMM),
@@ -144,7 +143,7 @@ pub enum Msg<COMM, SETT>
 
 #[widget]
 impl<COMM, SETT> Widget for Mg<COMM, SETT>
-    where COMM: Clone + EnumFromStr + EnumMetaData + 'static,
+    where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
           SETT: Default + EnumMetaData + mg_settings::settings::Settings + SettingCompletion + 'static,
 {
     /// Handle the command entry activate event.
@@ -183,6 +182,18 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         }
     }
 
+    /// Handle the key release event for the command mode.
+    fn command_key_release(&mut self, _key: &EventKey) -> (Option<Msg<COMM, SETT>>, Inhibit) {
+        if self.model.current_command_mode != ':' && COMM::is_incremental(self.model.current_command_mode) {
+            let command = self.status_bar.widget().get_command();
+            if let Some(command) = command {
+                let msg = self.handle_special_command(Current, &command);
+                return (msg, Inhibit(false));
+            }
+        }
+        (None, Inhibit(false))
+    }
+
     fn default_completers() -> Completers {
         let mut completers: HashMap<_, Box<Completer>> = HashMap::new();
         completers.insert(DEFAULT_COMPLETER_IDENT.to_string(), Box::new(CommandCompleter::<COMM>::new()));
@@ -195,28 +206,27 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         if let Some(command) = command {
             if self.model.current_command_mode == ':' {
                 let result = self.model.settings_parser.parse_line(&command);
-                return self.call_command(result);
+                self.call_command(result)
             }
             else {
-                self.handle_special_command(Final, &command);
+                self.handle_special_command(Final, &command)
             }
         }
-        None
+        else {
+            None
+        }
     }
 
     /// Handle a special command activate or key press event.
-    fn handle_special_command(&mut self, activation_type: ActivationType, command: &str) {
-        let mut update_identifier = false;
-        /*if let Some(ref callback) = self.model.special_command_callback {
-            if let Ok(special_command) = Spec::identifier_to_command(self.model.current_command_mode, command) {
-                callback(special_command);
-                if activation_type == Final {
-                    update_identifier = true;
-                }
+    fn handle_special_command(&mut self, activation_type: ActivationType, command: &str) -> Option<Msg<COMM, SETT>> {
+        if let Ok(special_command) = COMM::identifier_to_command(self.model.current_command_mode, command) {
+            if activation_type == Final {
+                self.return_to_normal_mode();
             }
-        }*/
-        if update_identifier {
-            self.set_current_identifier(':');
+            Some(CustomCommand(special_command))
+        }
+        else {
+            None
         }
     }
 
@@ -258,6 +268,14 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         }
     }
 
+    /// Handle the key release event.
+    fn key_release(&mut self, key: &EventKey) -> (Option<Msg<COMM, SETT>>, Inhibit) {
+        match self.model.current_mode.as_ref() {
+            COMMAND_MODE => self.command_key_release(key),
+            _ => (None, Inhibit(false)),
+        }
+    }
+
     // TODO: switch from a &'static str to a String.
     fn model(relm: &Relm<Self>, (user_modes, settings_filename): (Modes, &'static str)) -> Model<COMM, SETT> {
         // TODO: show the error instead of unwrapping.
@@ -277,7 +295,6 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             relm: relm.clone(),
             settings: SETT::default(),
             settings_parser: Box::new(parser),
-            //special_command_callback: None,
             variables: HashMap::new(),
         }
     }
@@ -294,18 +311,18 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             },
             keyval => {
                 let character = keyval as u8 as char;
-                /*if Spec::is_identifier(character) {
-                    //self.status_bar.set_completer(NO_COMPLETER_IDENT);
+                if COMM::is_identifier(character) {
+                    self.completion_view.widget_mut().set_completer(NO_COMPLETER_IDENT, "");
                     self.set_current_identifier(character);
                     self.set_mode(COMMAND_MODE);
                     self.reset();
                     self.clear_shortcut();
                     self.show_entry();
-                    Inhibit(true)
+                    (None, Inhibit(true))
                 }
-                else {*/
+                else {
                     self.handle_shortcut(key)
-                //}
+                }
             },
         }
     }
@@ -355,9 +372,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     fn update(&mut self, event: Msg<COMM, SETT>) {
         match event {
             // To be listened to by the user.
-            CustomCommand(_) => {
-                self.return_to_normal_mode();
-            },
+            CustomCommand(_) => (),
             EnterCommandMode => {
                 let command_entry_text = self.status_bar.widget().get_command().unwrap_or_default();
                 self.completion_view.widget_mut().set_completer(DEFAULT_COMPLETER_IDENT, &command_entry_text);
@@ -436,14 +451,14 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                 },
             },
             key_press_event(_, key) => return self.key_press(&key),
-            key_release_event(_, key) => (KeyRelease(key.get_keyval()), Inhibit(false)),
+            key_release_event(_, key) => return self.key_release(&key),
             delete_event(_, _) => (Quit, Inhibit(false)),
         },
     }
 }
 
 impl<COMM, SETT> Mg<COMM, SETT>
-    where COMM: Clone + EnumFromStr + EnumMetaData + 'static,
+    where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
           SETT: Default + EnumMetaData + mg_settings::settings::Settings + SettingCompletion + 'static,
 {
     /// Convert an action String to a command String.
@@ -490,7 +505,10 @@ impl<COMM, SETT> Mg<COMM, SETT>
             Ok(command) => {
                 match command {
                     App(command) => self.app_command(&command),
-                    Custom(command) => return Some(CustomCommand(command)),
+                    Custom(command) => {
+                        self.return_to_normal_mode();
+                        return Some(CustomCommand(command));
+                    },
                     Set(name, value) => {
                         match SETT::to_variant(&name, value) {
                             Ok(setting) => {
@@ -599,6 +617,8 @@ impl<COMM, SETT> Mg<COMM, SETT>
     }
 
     /// Set the variables that will be available in the settings.
+    /// A variable can be used in mappings.
+    /// The placeholder will be replaced by the value returned by the function.
     pub fn set_variables(&mut self, variables: Variables) {
         self.model.variables = variables.iter()
             .map(|&(string, func)| (string.to_string(), func))
@@ -756,73 +776,11 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
             variables: HashMap::new(),
             window: window,
         });
-
-        //app.status_bar.add_item(&app.shortcut_label);
-        //app.status_bar.add_item(&app.mode_label);
-        //app.status_bar.add_item(&app.message);
-
-        //connect!(app.window, connect_delete_event(_, _), app, quit);
-        //connect!(app.status_bar, connect_activate(input), app, command_activate(input));
-        //connect!(app.window, connect_key_press_event(_, key), app, key_press(key));
-        //connect!(app.window, connect_key_release_event(_, key), app, key_release(key));
-        //connect!(app.status_bar.entry, connect_changed(_), app, update_completions);
-
-        app
-    }
-
-    /// Create a new status bar item.
-    pub fn add_statusbar_item(&self) -> StatusBarItem {
-        let item = StatusBarItem::new();
-        //self.status_bar.add_item(&item);
-        item
-    }
-
-    /// Add a variable that can be used in mappings.
-    /// The placeholder will be replaced by the value return by the function.
-    pub fn add_variable<F: Fn() -> String + 'static>(&mut self, variable_name: &str, function: F) {
-        self.variables.insert(variable_name.to_string(), Box::new(function));
-    }
-
-    /// Call the setting changed callback.
-    fn call_setting_callback(&self, setting: &Sett::Variant) {
-        if let Some(ref callback) = self.setting_change_callback {
-            callback(setting);
-        }
-    }
-
-    /// Handle the key release event for the command mode.
-    fn command_key_release(&mut self, _key: &EventKey) -> Inhibit {
-        /*if self.current_command_mode != ':' && Spec::is_always(self.current_command_mode) {
-            if let Some(command) = self.status_bar.get_command() {
-                self.handle_special_command(Current, &command);
-            }
-        }*/
-        Inhibit(false)
-    }
-
-    /// Connect the close event to the specified callback.
-    pub fn connect_close<F: Fn() + 'static>(&mut self, callback: F) {
-        self.close_callback = Some(Box::new(callback));
-    }
-
-    /// Add a callback to the command event.
-    pub fn connect_command<F: Fn(Comm) + 'static>(&mut self, callback: F) {
-        self.command_callback = Some(Box::new(callback));
     }
 
     /// Add a callback to the window key press event.
     pub fn connect_key_press_event<F: Fn(&Window, &EventKey) -> Inhibit + 'static>(&self, callback: F) {
         self.window.connect_key_press_event(callback);
-    }
-
-    /// Add a callback to change mode event.
-    pub fn connect_mode_changed<F: Fn(&str) + 'static>(&mut self, callback: F) {
-        self.mode_changed_callback = Some(Box::new(callback));
-    }
-
-    /// Add a callback to setting changed event.
-    pub fn connect_setting_changed<F: Fn(&Sett::Variant) + 'static>(&mut self, callback: F) {
-        self.setting_change_callback = Some(Box::new(callback));
     }
 
     /// Add a callback to the special command event.
@@ -846,26 +804,6 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
         &self.current_mode
     }
 
-    /// Handle the key release event.
-    fn key_release(&mut self, key: &EventKey) -> Inhibit {
-        match self.current_mode.as_ref() {
-            COMMAND_MODE => self.command_key_release(key),
-            _ => Inhibit(false),
-        }
-    }
-
-    /// Call the callback added by the user.
-    /// Otherwise, exit the main loop.
-    fn quit(&self) -> Inhibit {
-        if let Some(ref callback) = self.close_callback {
-            callback();
-        }
-        else {
-            gtk::main_quit();
-        }
-        Inhibit(true)
-    }
-
     /// Set the answer to return to the caller of the dialog.
     fn set_dialog_answer(&mut self, answer: &str) {
         let mut should_reset = false;
@@ -883,24 +821,6 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
             self.reset();
         }
         self.input_callback = None;
-    }
-
-    /// Set the main widget.
-    pub fn set_view<W: IsA<gtk::Widget> + WidgetExt>(&self, view: &W) {
-        view.set_hexpand(true);
-        view.set_vexpand(true);
-        view.show_all();
-        self.view.add(view);
-    }
-
-    /// Set the window title.
-    pub fn set_window_title(&self, title: &str) {
-        self.window.set_title(title);
-    }
-
-    /// Update the completions of the status bar.
-    fn update_completions(&mut self) {
-        //self.status_bar.update_completions(&self.current_mode);
     }
 
     /// Get the application window.

@@ -22,18 +22,17 @@
 //! Non-modal message dialogs.
 
 use gtk::Continue;
-use mg_settings::{EnumFromStr, EnumMetaData, SettingCompletion};
+use mg_settings::{EnumFromStr, EnumMetaData, SettingCompletion, SpecialCommand};
 use mg_settings::settings;
 use relm::Widget;
 
 //use app::Application;
 use app::Mg;
-use SpecialCommand;
 
 const INFO_MESSAGE_DURATION: u32 = 5000;
 
 impl<COMM, SETT> Mg<COMM, SETT>
-    where COMM: Clone + EnumFromStr + EnumMetaData + 'static,
+    where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
           SETT: Default + EnumMetaData + settings::Settings + SettingCompletion + 'static,
 {
     /// Show an error to the user.
