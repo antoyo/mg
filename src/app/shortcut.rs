@@ -19,7 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-use gdk::{EventKey, CONTROL_MASK};
+use gdk::{EventKey, CONTROL_MASK, MOD1_MASK};
 use gdk::enums::key::{Escape, Tab, ISO_Left_Tab};
 use gtk::Inhibit;
 use mg_settings::{self, EnumFromStr, EnumMetaData, SettingCompletion, SpecialCommand};
@@ -56,12 +56,13 @@ impl<COMM, SETT> Mg<COMM, SETT>
     pub fn handle_shortcut(&mut self, key: &EventKey) -> (Option<Msg<COMM, SETT>>, Inhibit) {
         let keyval = key.get_keyval();
         // TODO: refactor this to only inhibit shortcuts found in the config file.
+        let alt_pressed = key.get_state() & MOD1_MASK == MOD1_MASK;
         let control_pressed = key.get_state() & CONTROL_MASK == CONTROL_MASK;
         let mut should_inhibit = self.model.current_mode == NORMAL_MODE ||
             (self.model.current_mode == COMMAND_MODE && (keyval == Tab || keyval == ISO_Left_Tab || control_pressed)) ||
             key.get_keyval() == Escape;
-        if !self.model.entry_shown || control_pressed || keyval == Tab || keyval == ISO_Left_Tab {
-            if let Some(key) = gdk_key_to_key(keyval, control_pressed) {
+        if !self.model.entry_shown || alt_pressed || control_pressed || keyval == Tab || keyval == ISO_Left_Tab {
+            if let Some(key) = gdk_key_to_key(key) {
                 self.add_to_shortcut(key);
                 let action = {
                     let mut current_mode = self.model.current_mode.clone();

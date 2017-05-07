@@ -128,14 +128,16 @@ impl StatusBar {
         if self.command_entry.get_selection_bounds().is_some() {
             self.command_entry.delete_selection();
         }
-        else if let Some(text) = self.command_entry.get_text() {
+        else if let Some(text) = self.get_command() {
             if !text.is_empty() {
                 let pos = self.command_entry.get_position();
+                let len = text.len();
                 if pos > 0 {
                     let start = text.chars().rev().enumerate()
+                        .skip(len - pos as usize)
                         .skip_while(|&(_, c)| !c.is_alphanumeric())
                         .skip_while(|&(_, c)| c.is_alphanumeric())
-                        .map(|(index, _)| text.len() - index)
+                        .map(|(index, _)| len - index)
                         .next()
                         .unwrap_or_default();
                     let _lock = self.model.relm.stream().lock();
@@ -158,7 +160,7 @@ impl StatusBar {
     /// Go forward one character in the command entry.
     pub fn next_char(&self) {
         let pos = self.command_entry.get_position();
-        let text = self.command_entry.get_text().unwrap_or_default();
+        let text = self.get_command().unwrap_or_default();
         if pos < text.len() as i32 {
             self.command_entry.set_position(pos + 1);
         }
@@ -169,6 +171,23 @@ impl StatusBar {
         let pos = self.command_entry.get_position();
         if pos > 0 {
             self.command_entry.set_position(pos - 1);
+        }
+    }
+
+    /// Go back one word in the command entry.
+    pub fn previous_word(&self) {
+        let pos = self.command_entry.get_position();
+        if pos > 0 {
+            let text = self.get_command().unwrap_or_default();
+            let len = text.len();
+            let position = text.chars().rev().enumerate()
+                .skip(len - pos as usize)
+                .skip_while(|&(_, c)| !c.is_alphanumeric())
+                .skip_while(|&(_, c)| c.is_alphanumeric())
+                .next()
+                .map(|(index, c)| len - index)
+                .unwrap_or_default();
+            self.command_entry.set_position(position as i32);
         }
     }
 
@@ -204,7 +223,7 @@ impl StatusBar {
     pub fn smart_home(&self) {
         let pos = self.command_entry.get_position();
         if pos == 0 {
-            let text = self.command_entry.get_text().unwrap_or_default();
+            let text = self.get_command().unwrap_or_default();
             let position = text.chars().enumerate()
                 .skip_while(|&(_, c)| c.is_whitespace())
                 .skip_while(|&(_, c)| !c.is_whitespace())

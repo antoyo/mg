@@ -19,14 +19,17 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+use gdk::{EventKey, CONTROL_MASK, MOD1_MASK};
 use gdk::enums::key::{self, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, Return, S, T, U, V, W, X, Y, Z, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z};
-use mg_settings::key::Key::{self, Backspace, Char, Control, Down, Enter, Escape, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12, Left, Right, Shift, Space, Tab, Up};
+use mg_settings::key::Key::{self, Alt, Backspace, Char, Control, Down, Enter, Escape, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12, Left, Right, Shift, Space, Tab, Up};
 
 /// Convert a GDK key to an MG Key.
 #[allow(non_upper_case_globals)]
-pub fn gdk_key_to_key(key: key::Key, control_pressed: bool) -> Option<Key> {
+pub fn gdk_key_to_key(key: &EventKey) -> Option<Key> {
+    let alt_pressed = key.get_state() & MOD1_MASK == MOD1_MASK;
+    let control_pressed = key.get_state() & CONTROL_MASK == CONTROL_MASK;
     let key =
-        match key {
+        match key.get_keyval() {
             A => Char('A'),
             B => Char('B'),
             C => Char('C'),
@@ -140,10 +143,22 @@ pub fn gdk_key_to_key(key: key::Key, control_pressed: bool) -> Option<Key> {
             key::Up => Up,
             _ => return None,
         };
-    if control_pressed {
-        Some(Control(Box::new(key)))
-    }
-    else {
-        Some(key)
-    }
+    let key =
+        if control_pressed {
+            if alt_pressed {
+                Control(Box::new(Alt(Box::new(key))))
+            }
+            else {
+                Control(Box::new(key))
+            }
+        }
+        else {
+            if alt_pressed {
+                Alt(Box::new(key))
+            }
+            else {
+                key
+            }
+        };
+    Some(key)
 }
