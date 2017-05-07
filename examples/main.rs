@@ -32,7 +32,7 @@ extern crate relm_attributes;
 #[macro_use]
 extern crate relm_derive;
 
-use gtk::{OrientableExt, WidgetExt};
+use gtk::{ButtonExt, OrientableExt, WidgetExt};
 use gtk::Orientation::Vertical;
 use mg::{
     CustomCommand,
@@ -58,9 +58,12 @@ pub struct Model {
 
 #[derive(Msg)]
 pub enum Msg {
+    Alert,
     Command(AppCommand),
+    Info,
     Mode(String),
     Setting(AppSettingsVariant),
+    Warning,
 }
 
 static MODES: Modes = &[
@@ -106,6 +109,7 @@ impl Widget for Win {
 
     fn update(&mut self, event: Msg) {
         match event {
+            Alert => self.mg.widget_mut().alert("Blue Alert"),
             Command(command) => {
                 match command {
                     BackwardSearch(input) => println!("Searching backward for {}", input),
@@ -119,8 +123,10 @@ impl Widget for Win {
                     WinOpen(url) => self.model.text = format!("Opening URL {} in new window", url),
                 }
             },
+            Info => self.mg.widget_mut().info("Info"),
             Mode(mode) => self.mode_changed(&mode),
             Setting(setting) => self.setting_changed(setting),
+            Warning => self.mg.widget_mut().warning("Warning"),
         }
     }
 
@@ -137,6 +143,18 @@ impl Widget for Win {
                 },
                 #[name="entry"]
                 gtk::Entry {
+                },
+                gtk::Button {
+                    label: "Alert",
+                    clicked => Alert,
+                },
+                gtk::Button {
+                    label: "Info",
+                    clicked => Info,
+                },
+                gtk::Button {
+                    label: "Warning",
+                    clicked => Warning,
                 },
             },
             StatusBarItem {

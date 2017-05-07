@@ -52,6 +52,19 @@ impl<COMM, SETT> Mg<COMM, SETT>
         self.update_shortcut_label();
     }
 
+    /// Handle a shortcut in input mode.
+    pub fn handle_input_shortcut(&mut self, key: &EventKey) -> bool {
+        if let Some(key) = gdk_key_to_key(key) {
+            if self.model.shortcuts.contains_key(&key) {
+                let answer = &self.model.shortcuts[&key].clone();
+                self.set_dialog_answer(answer);
+                self.model.shortcut_pressed = true;
+                return true;
+            }
+        }
+        false
+    }
+
     /// Handle a possible input of a shortcut.
     pub fn handle_shortcut(&mut self, key: &EventKey) -> (Option<Msg<COMM, SETT>>, Inhibit) {
         let keyval = key.get_keyval();
@@ -173,30 +186,9 @@ impl<COMM, SETT> Mg<COMM, SETT>
     }
 }
 
-/*impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
-    where Spec: SpecialCommand + 'static,
-          Comm: EnumFromStr + EnumMetaData + 'static,
-          Sett: mg_settings::settings::Settings + EnumMetaData + SettingCompletion + 'static,
-{
-    /// Handle a shortcut in input mode.
-    pub fn handle_input_shortcut(&mut self, key: &EventKey) -> bool {
-        let keyval = key.get_keyval();
-        let control_pressed = key.get_state() & CONTROL_MASK == CONTROL_MASK;
-        if let Some(key) = gdk_key_to_key(keyval, control_pressed) {
-            if self.shortcuts.contains_key(&key) {
-                let answer = &self.shortcuts[&key].clone();
-                self.set_dialog_answer(answer);
-                self.shortcut_pressed = true;
-                return true;
-            }
-        }
-        false
-    }
-}*/
-
 fn digit_predicate(key: &Key) -> bool {
     if let Char(c) = *key {
-        if let Some(digit) = c.to_digit(10) {
+        if let Some(_) = c.to_digit(10) {
             false
         }
         else {

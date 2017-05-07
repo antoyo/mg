@@ -31,8 +31,9 @@
 //! Minimal UI library based on GTK+.
 
 #![warn(missing_docs)]
-#![feature(proc_macro)]
+#![feature(fn_traits, proc_macro, unboxed_closures)]
 
+extern crate futures_glib;
 extern crate gdk;
 extern crate glib;
 extern crate gtk;
@@ -47,8 +48,6 @@ extern crate relm_attributes;
 #[macro_use]
 extern crate relm_derive;
 
-#[macro_use]
-mod gtk_timeout;
 mod app;
 pub mod completion;
 mod key_converter;

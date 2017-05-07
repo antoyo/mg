@@ -201,7 +201,7 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
 
         self.answer = None;
         if dialog_builder.blocking {
-            self.input_callback = Some(Box::new(|_| {
+            self.model.input_callback = Some(Box::new(|_| {
                 gtk::main_quit();
             }));
         }
@@ -210,7 +210,7 @@ impl<Comm, Sett, Spec> Application<Comm, Sett, Spec>
         }
         else {
             if let Some(callback) = dialog_builder.callback {
-                self.input_callback = Some(Box::new(move |answer| {
+                self.model.input_callback = Some(Box::new(move |answer| {
                     callback(answer.as_ref().map(String::as_ref));
                 }));
             }

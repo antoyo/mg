@@ -20,7 +20,6 @@
  */
 
 //pub mod dialog;
-mod message;
 pub mod settings;
 mod shortcut;
 pub mod status_bar;
@@ -31,7 +30,9 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
+use std::time::Duration;
 
+use futures_glib::Timeout;
 use gdk::enums::key::Key as GdkKey;
 use gdk::{EventKey, RGBA};
 use gdk::enums::key::{Escape, colon};
@@ -110,6 +111,7 @@ const ENTRY_NEXT_WORD: &str = "entry-next-word";
 const ENTRY_PREVIOUS_CHAR: &str = "entry-previous-char";
 const ENTRY_PREVIOUS_WORD: &str = "entry-previous-word";
 const ENTRY_SMART_HOME: &str = "entry-smart-home";
+const INFO_MESSAGE_DURATION: u64 = 5;
 const INPUT_MODE: &str = "input";
 const NORMAL_MODE: &str = "normal";
 
@@ -117,6 +119,8 @@ pub struct Model<COMM, SETT>
     where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
           SETT: Default + EnumMetaData + mg_settings::settings::Settings + SettingCompletion + 'static,
 {
+    answer: Option<String>,
+    choices: Vec<char>,
     close_callback: Option<Box<Fn() + Send + Sync>>,
     completion_shown: bool,
     current_command_mode: char,
@@ -124,17 +128,21 @@ pub struct Model<COMM, SETT>
     current_shortcut: Vec<Key>,
     entry_shown: bool,
     foreground_color: RGBA,
+    input_callback: Option<Box<Fn(Option<String>)>>,
     mappings: Mappings,
+    message: String,
     mode_label: String,
     modes: ModesHash,
     relm: Relm<Mg<COMM, SETT>>,
     settings: SETT,
     settings_parser: Box<Parser<COMM>>,
+    shortcuts: HashMap<Key, String>,
+    shortcut_pressed: bool,
     variables: HashMap<String, fn() -> String>,
 }
 
 #[allow(missing_docs)]
-#[derive(Msg)]
+#[derive(SimpleMsg)]
 pub enum Msg<COMM, SETT>
     where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
           SETT: mg_settings::settings::Settings + EnumMetaData + SettingCompletion + 'static,
@@ -143,6 +151,8 @@ pub enum Msg<COMM, SETT>
     EnterCommandMode,
     EnterNormalMode,
     EnterNormalModeAndReset,
+    HideColoredMessage(String),
+    HideInfo(String),
     KeyPress(GdkKey),
     KeyRelease(GdkKey),
     ModeChanged(String),
@@ -150,6 +160,7 @@ pub enum Msg<COMM, SETT>
     SettingChanged(SETT::Variant),
 }
 
+/// An Mg application window contains a status bar where the user can type a command and a central widget.
 #[widget]
 impl<COMM, SETT> Widget for Mg<COMM, SETT>
     where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
@@ -158,23 +169,23 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     /// Handle the command entry activate event.
     fn command_activate(&mut self, input: Option<String>) -> Option<Msg<COMM, SETT>> {
         let message =
-        /*if self.current_mode == INPUT_MODE || self.current_mode == BLOCKING_INPUT_MODE {
-            let mut should_reset = false;
-            if let Some(ref callback) = self.input_callback {
-                self.answer = input.clone();
-                callback(input);
-                should_reset = true;
+            if self.model.current_mode == INPUT_MODE || self.model.current_mode == BLOCKING_INPUT_MODE {
+                let mut should_reset = false;
+                if let Some(ref callback) = self.model.input_callback {
+                    self.model.answer = input.clone();
+                    callback(input);
+                    should_reset = true;
+                }
+                if should_reset {
+                    self.reset();
+                }
+                self.model.input_callback = None;
+                self.model.choices.clear();
+                None
             }
-            if should_reset {
-                self.reset();
-            }
-            self.input_callback = None;
-            self.choices.clear();
-        }
-        else {*/
-            self.handle_command(input)
-        //}
-        ;
+            else {
+                self.handle_command(input)
+            };
         //self.return_to_normal_mode();
         message
     }
@@ -208,6 +219,63 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         completers.insert(DEFAULT_COMPLETER_IDENT.to_string(), Box::new(CommandCompleter::<COMM>::new()));
         completers.insert("set".to_string(), Box::new(SettingCompleter::<SETT>::new()));
         completers
+    }
+
+    /// Show an alert message to the user.
+    pub fn alert(&mut self, message: &str) {
+        self.model.message = message.to_string();
+        self.status_bar.widget().color_blue();
+    }
+
+    /// Show an error to the user.
+    pub fn error(&mut self, error: &str) {
+        error!("{}", error);
+        self.model.message = error.to_string();
+        self.status_bar.widget().hide_entry();
+        self.status_bar.widget().color_red();
+    }
+
+    /// Hide the information message.
+    fn hide_colored_message(&mut self, message: &str) {
+        if self.model.message == message {
+            self.model.message = String::new();
+            self.reset_colors();
+        }
+    }
+
+    /// Hide the information message.
+    fn hide_info(&mut self, message: &str) {
+        if self.model.message == message {
+            self.model.message = String::new();
+        }
+    }
+
+    /// Show an information message to the user for 5 seconds.
+    pub fn info(&mut self, message: &str) {
+        info!("{}", message);
+        let message = message.to_string();
+        self.model.message = message.clone();
+        self.reset_colors();
+
+        let timeout = Timeout::new(Duration::from_secs(INFO_MESSAGE_DURATION));
+        self.model.relm.connect_exec_ignore_err(timeout, HideInfo(message));
+    }
+
+    /// Show a message to the user.
+    pub fn message(&mut self, message: &str) {
+        self.reset_colors();
+        self.model.message = message.to_string();
+    }
+
+    /// Show a warning message to the user for 5 seconds.
+    pub fn warning(&mut self, message: &str) {
+        warn!("{}", message);
+        let message = message.to_string();
+        self.model.message = message.clone();
+        self.status_bar.widget().color_orange();
+
+        let timeout = Timeout::new(Duration::from_secs(INFO_MESSAGE_DURATION));
+        self.model.relm.connect_exec_ignore_err(timeout, HideColoredMessage(message));
     }
 
     /// Handle the command activate event.
@@ -253,15 +321,15 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                 (Some(EnterNormalModeAndReset), Inhibit(false))
             },
             keyval => {
-                /*if self.handle_input_shortcut(key) {
+                if self.handle_input_shortcut(key) {
                     return (None, Inhibit(true));
                 }
                 else if let Some(character) = char::from_u32(keyval) {
-                    if self.choices.contains(&character) {
+                    if self.model.choices.contains(&character) {
                         self.set_dialog_answer(&character.to_string());
                         return (None, Inhibit(true));
                     }
-                }*/
+                }
                 self.handle_shortcut(key)
             },
         }
@@ -288,9 +356,12 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     // TODO: switch from a &'static str to a String.
     fn model(relm: &Relm<Self>, (user_modes, settings_filename): (Modes, &'static str)) -> Model<COMM, SETT> {
         // TODO: show the error instead of unwrapping.
+        // TODO: support non-None include path.
         let (parser, mappings, modes) = parse_config(settings_filename, user_modes, None).unwrap();
         // TODO: use &'static str instead of String?
         Model {
+            answer: None,
+            choices: vec![],
             close_callback: None,
             completion_shown: false,
             current_command_mode: ':',
@@ -298,12 +369,16 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             current_shortcut: vec![],
             entry_shown: false,
             foreground_color: RGBA::white(),
+            input_callback: None,
             mappings: mappings,
+            message: String::new(),
             mode_label: String::new(),
             modes: modes,
             relm: relm.clone(),
             settings: SETT::default(),
             settings_parser: Box::new(parser),
+            shortcuts: HashMap::new(),
+            shortcut_pressed: false,
             variables: HashMap::new(),
         }
     }
@@ -340,7 +415,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     fn reset(&mut self) {
         self.reset_colors();
         self.hide_entry_and_completion();
-        self.message.widget().root().set_text("");
+        self.model.message = String::new();
         self.clear_shortcut();
     }
 
@@ -348,15 +423,34 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         self.hide_entry_and_completion();
         self.set_mode(NORMAL_MODE);
         self.set_current_identifier(':');
-        /*if let Some(ref callback) = self.input_callback {
-          callback(None);
-                }
-                self.input_callback = None;*/
+        if let Some(ref callback) = self.model.input_callback {
+            callback(None);
+        }
+        self.model.input_callback = None;
     }
 
     /// Set the current (special) command identifier.
     fn set_current_identifier(&mut self, identifier: char) {
         self.model.current_command_mode = identifier;
+    }
+
+    /// Set the answer to return to the caller of the dialog.
+    fn set_dialog_answer(&mut self, answer: &str) {
+        let mut should_reset = false;
+        if self.model.current_mode == BLOCKING_INPUT_MODE {
+            self.model.answer = Some(answer.to_string());
+            gtk::main_quit();
+        }
+        else if let Some(ref callback) = self.model.input_callback {
+            callback(Some(answer.to_string()));
+            self.model.choices.clear();
+            should_reset = true;
+        }
+        if should_reset {
+            self.return_to_normal_mode();
+            self.reset();
+        }
+        self.model.input_callback = None;
     }
 
     /// Set the current mode.
@@ -400,6 +494,8 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                 self.reset();
                 self.clear_shortcut();
             },
+            HideColoredMessage(message) => self.hide_colored_message(&message),
+            HideInfo(message) => self.hide_info(&message),
             KeyPress(_) | KeyRelease(_) => (),
             ModeChanged(_) | SettingChanged(_) => (),
             Quit => {
@@ -429,7 +525,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                     },
                     #[name="message"]
                     StatusBarItem {
-                        text: "", // TODO: bind to a model field.
+                        text: &self.model.message,
                         packing: {
                             pack_type: PackType::Start,
                         },
@@ -713,108 +809,14 @@ pub fn parse_config<P: AsRef<Path>, COMM: EnumFromStr>(filename: P, user_modes: 
 }
 
 /*
-    /// Set the include path of the configuration files.
-    pub fn include_path<P: AsRef<Path>>(mut self, include_path: P) -> Self {
-        self.include_path = Some(include_path.as_ref().to_path_buf());
-        self
-    }
-/// Create a new MG application window.
-/// This window contains a status bar where the user can type a command and a central widget.
-pub struct Application<Comm, Sett: mg_settings::settings::Settings = NoSettings, Spec = NoSpecialCommands> {
-    answer: Option<String>,
-    command_callback: Option<Box<Fn(Comm)>>,
-    choices: Vec<char>,
-    close_callback: Option<Box<Fn()>>,
-    current_command_mode: char,
-    current_mode: String,
-    current_shortcut: Vec<Key>,
-    foreground_color: RGBA,
-    input_callback: Option<Box<Fn(Option<String>)>>,
-    mappings: HashMap<String, HashMap<Vec<Key>, String>>,
-    modes: Modes,
-    message: StatusBarItem,
-    mode_changed_callback: Option<Box<Fn(&str)>>,
-    mode_label: StatusBarItem,
-    settings_parser: Parser<Comm>,
-    setting_change_callback: Option<Box<Fn(&Sett::Variant)>>,
-    shortcuts: HashMap<Key, String>,
-    shortcut_label: StatusBarItem,
-    shortcut_pressed: bool,
-    special_command_callback: Option<Box<Fn(Spec)>>,
-    status_bar: Box<StatusBar>,
-    view: Overlay,
-    variables: HashMap<String, Box<Fn() -> String>>,
-    window: Window,
-}
-
 impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     where Spec: SpecialCommand + 'static,
           Comm: EnumFromStr + EnumMetaData + 'static,
           Sett: mg_settings::settings::Settings + EnumMetaData + SettingCompletion + 'static,
 {
-    fn new(builder: ApplicationBuilder<Sett>) -> Box<Self> {
-        let modes = builder.modes.unwrap_or_default();
-        let config = Config {
-            application_commands: vec![COMPLETE_NEXT_COMMAND.to_string(), COMPLETE_PREVIOUS_COMMAND.to_string()],
-            mapping_modes: modes.keys().cloned().collect(),
-        };
-
-        let view = Overlay::new();
-        grid.attach(&view, 0, 0, 1, 1);
-
-        let completion_view = CompletionView::new();
-        view.add_overlay(&**completion_view);
-
-        let mut status_bar = StatusBar::new(completion_view, completers);
-        grid.attach(&**status_bar, 0, 2, 1, 1);
-        window.show_all();
-        status_bar.hide_widgets();
-        status_bar.hide_completion();
-
-        let foreground_color = Application::<Comm, Sett, Spec>::get_foreground_color(&window);
-
-        let mut parser = Parser::new_with_config(config);
-        if let Some(include_path) = builder.include_path {
-            parser.set_include_path(include_path);
-        }
-
-        let mut app = Box::new(Application {
-            answer: None,
-            command_callback: None,
-            choices: vec![],
-            close_callback: None,
-            current_command_mode: ':',
-            current_mode: current_mode,
-            current_shortcut: vec![],
-            foreground_color: foreground_color,
-            input_callback: None,
-            mappings: HashMap::new(),
-            modes: modes,
-            message: StatusBarItem::new().left(),
-            mode_changed_callback: None,
-            mode_label: StatusBarItem::new().left(),
-            settings: builder.settings,
-            settings_parser: parser,
-            setting_change_callback: None,
-            shortcuts: HashMap::new(),
-            shortcut_label: StatusBarItem::new(),
-            shortcut_pressed: false,
-            special_command_callback: None,
-            //status_bar: status_bar,
-            view: view,
-            variables: HashMap::new(),
-            window: window,
-        });
-    }
-
     /// Add a callback to the window key press event.
     pub fn connect_key_press_event<F: Fn(&Window, &EventKey) -> Inhibit + 'static>(&self, callback: F) {
         self.window.connect_key_press_event(callback);
-    }
-
-    /// Add a callback to the special command event.
-    pub fn connect_special_command<F: Fn(Spec) + 'static>(&mut self, callback: F) {
-        self.special_command_callback = Some(Box::new(callback));
     }
 
     /// Delete the current completion item.
@@ -831,30 +833,6 @@ impl<Spec, Comm, Sett> Application<Comm, Sett, Spec>
     /// Get the current mode.
     pub fn get_mode(&self) -> &str {
         &self.current_mode
-    }
-
-    /// Set the answer to return to the caller of the dialog.
-    fn set_dialog_answer(&mut self, answer: &str) {
-        let mut should_reset = false;
-        if self.current_mode == BLOCKING_INPUT_MODE {
-            self.answer = Some(answer.to_string());
-            gtk::main_quit();
-        }
-        else if let Some(ref callback) = self.input_callback {
-            callback(Some(answer.to_string()));
-            self.choices.clear();
-            should_reset = true;
-        }
-        if should_reset {
-            self.return_to_normal_mode();
-            self.reset();
-        }
-        self.input_callback = None;
-    }
-
-    /// Get the application window.
-    pub fn window(&self) -> &Window {
-        &self.window
     }
 }
 */
