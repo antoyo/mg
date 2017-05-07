@@ -1,6 +1,6 @@
 = Mg
 
-Minimal UI library based on GTK+.
+Minimal UI library based on https://github.com/antoyo/relm[relm] (GTK+), written in Rust.
 
 image:https://img.shields.io/travis/antoyo/mg.svg[link="https://travis-ci.org/antoyo/mg"]
 image:https://img.shields.io/coveralls/antoyo/mg.svg[link="https://coveralls.io/github/antoyo/mg"]
