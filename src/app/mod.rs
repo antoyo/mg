@@ -686,7 +686,11 @@ impl<COMM, SETT> Mg<COMM, SETT>
                         }
                         return Some(EnterNormalMode);
                     },
-                    Unmap { .. } => panic!("not yet implemented"), // TODO
+                    Unmap { keys, mode } => {
+                        let mode_mappings = self.model.mappings.entry(self.model.modes[mode.as_str()])
+                            .or_insert_with(HashMap::new);
+                        mode_mappings.remove(&keys);
+                    },
                 }
             },
             Err(error) => {
