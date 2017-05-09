@@ -167,6 +167,7 @@ impl CompletionView {
             if let Ok(model) = model.downcast::<ListStore>() {
                 self.select_next();
                 model.remove(&iter);
+                self.adjust_policy(&model);
             }
         }
     }
