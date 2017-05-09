@@ -45,6 +45,9 @@ pub const DEFAULT_COMPLETER_IDENT: &str = "__mg_default";
 /// The identifier of the null completer.
 pub const NO_COMPLETER_IDENT: &str = "__mg_no_completer";
 
+#[doc(hidden)]
+pub type Completers = HashMap<&'static str, Box<Completer>>;
+
 /// The type of a column.
 #[derive(Clone, Copy, PartialEq)]
 pub enum Column {
@@ -84,7 +87,7 @@ pub trait Completer {
 /// Completion to use with a text Entry.
 pub struct Completion {
     completer_ident: String,
-    completers: HashMap<String, Box<Completer>>,
+    completers: Completers,
 }
 
 impl Completion {
@@ -127,12 +130,12 @@ impl Completion {
 
     /// Get the current completer.
     pub fn current_completer(&self) -> Option<&Box<Completer>> {
-        self.completers.get(&self.completer_ident)
+        self.completers.get(self.completer_ident.as_str())
     }
 
     /// Get the current completer.
     pub fn current_completer_mut(&mut self) -> Option<&mut Box<Completer>> {
-        self.completers.get_mut(&self.completer_ident)
+        self.completers.get_mut(self.completer_ident.as_str())
     }
 
     /// Get the current completer ident.
@@ -171,8 +174,8 @@ impl Completion {
     }
 
     /// Set all the completers.
-    pub fn set_completers(&mut self, mut completers: HashMap<String, Box<Completer>>) {
-        completers.insert(NO_COMPLETER_IDENT.to_string(), Box::new(NoCompleter::new()));
+    pub fn set_completers(&mut self, mut completers: Completers) {
+        completers.insert(NO_COMPLETER_IDENT, Box::new(NoCompleter::new()));
         self.completers = completers;
     }
 }

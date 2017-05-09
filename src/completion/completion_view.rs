@@ -20,7 +20,6 @@
  */
 
 use std::cmp::max;
-use std::collections::HashMap;
 
 use glib::{Cast, Object};
 use gtk;
@@ -45,6 +44,7 @@ use relm::{Relm, Widget};
 use relm_attributes::widget;
 
 use app::COMMAND_MODE;
+use completion::Completers;
 use completion::Column::{self, Expand};
 use super::{Completer, Completion, DEFAULT_COMPLETER_IDENT, NO_COMPLETER_IDENT};
 
@@ -302,7 +302,7 @@ impl CompletionView {
     }
 
     /// Set all the completers.
-    pub fn set_completers(&mut self, completers: HashMap<String, Box<Completer>>) {
+    pub fn set_completers(&mut self, completers: Completers) {
         self.model.completion.set_completers(completers);
     }
 

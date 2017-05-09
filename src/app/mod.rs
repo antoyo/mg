@@ -64,6 +64,7 @@ use app::shortcut::shortcut_to_string;
 use completion::{
     CommandCompleter,
     Completer,
+    Completers,
     CompletionView,
     SettingCompleter,
     DEFAULT_COMPLETER_IDENT,
@@ -83,7 +84,6 @@ enum ActivationType {
     Final,
 }
 
-type Completers = HashMap<String, Box<Completer>>;
 type Mappings = HashMap<&'static str, HashMap<Vec<Key>, String>>;
 type ModesHash = HashMap<&'static str, &'static str>;
 
@@ -218,9 +218,8 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
 
     fn default_completers() -> Completers {
         let mut completers: HashMap<_, Box<Completer>> = HashMap::new();
-        completers.insert(DEFAULT_COMPLETER_IDENT.to_string(), Box::new(CommandCompleter::<COMM>::new()));
-        // TODO: use &'static str instead of String?
-        completers.insert("set".to_string(), Box::new(SettingCompleter::<SETT>::new()));
+        completers.insert(DEFAULT_COMPLETER_IDENT, Box::new(CommandCompleter::<COMM>::new()));
+        completers.insert("set", Box::new(SettingCompleter::<SETT>::new()));
         completers
     }
 
