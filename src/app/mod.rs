@@ -337,6 +337,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     }
 
     fn init_view(&mut self) {
+        self.model.foreground_color = self.get_foreground_color();
         let parse_result = self.model.initial_parse_result.take().expect("initial parse result");
         self.execute_commands(parse_result, false);
     }
@@ -753,7 +754,6 @@ impl<COMM, SETT> Mg<COMM, SETT>
     pub fn set_dark_theme(&mut self, use_dark: bool) {
         let settings = Settings::get_default().unwrap();
         settings.set_long_property("gtk-application-prefer-dark-theme", use_dark.to_glib() as _, "");
-        // TODO: this line should probably go into init_view() as well.
         self.model.foreground_color = self.get_foreground_color();
     }
 
