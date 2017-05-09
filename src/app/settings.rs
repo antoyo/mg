@@ -22,7 +22,7 @@
 use std::collections::HashMap;
 
 use mg_settings::{EnumMetaData, MetaData, SettingCompletion, Value};
-use mg_settings::error::SettingError;
+use mg_settings::errors::{ErrorKind, Result, SettingError};
 use mg_settings::settings;
 
 #[doc(hidden)]
@@ -36,8 +36,8 @@ pub enum NoSettingsVariant { }
 impl settings::Settings for NoSettings {
     type Variant = NoSettingsVariant;
 
-    fn to_variant(name: &str, _value: Value) -> Result<Self::Variant, SettingError> {
-        Err(SettingError::UnknownSetting(name.to_string()))
+    fn to_variant(name: &str, _value: Value) -> Result<Self::Variant> {
+        bail!(ErrorKind::Setting(SettingError::UnknownSetting(name.to_string())))
     }
 
     fn set_value(&mut self, _value: Self::Variant) {

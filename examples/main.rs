@@ -26,6 +26,7 @@ extern crate mg;
 extern crate mg_settings;
 #[macro_use]
 extern crate mg_settings_macros;
+extern crate pretty_env_logger;
 #[macro_use]
 extern crate relm;
 extern crate relm_attributes;
@@ -192,6 +193,7 @@ impl Widget for Win {
 }
 
 fn main() {
+    pretty_env_logger::init().unwrap();
     Win::run(()).unwrap();
 }
 

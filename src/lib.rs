@@ -33,6 +33,8 @@
 #![warn(missing_docs)]
 #![feature(fn_traits, proc_macro, unboxed_closures)]
 
+#[macro_use]
+extern crate error_chain;
 extern crate futures_glib;
 extern crate gdk;
 extern crate glib;
@@ -40,6 +42,7 @@ extern crate gtk;
 extern crate libc;
 #[macro_use]
 extern crate log;
+#[macro_use]
 extern crate mg_settings;
 extern crate pango;
 #[macro_use]

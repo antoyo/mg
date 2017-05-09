@@ -32,6 +32,7 @@ use std::io::BufReader;
 use std::path::Path;
 use std::time::Duration;
 
+use error_chain::ChainedError;
 use futures_glib::Timeout;
 use gdk::enums::key::Key as GdkKey;
 use gdk::{EventKey, RGBA};
@@ -52,8 +53,9 @@ use gtk::{
 use gtk::Orientation::Vertical;
 use mg_settings::{self, Config, EnumFromStr, EnumMetaData, Parser, SettingCompletion, SpecialCommand};
 use mg_settings::Command::{self, App, Custom, Map, Set, Unmap};
-use mg_settings::error::{Error, Result};
-use mg_settings::error::ErrorType::{MissingArgument, NoCommand, Parse, UnknownCommand};
+use mg_settings::ParseResult;
+use mg_settings::errors::{Error, ErrorKind, ResultExt};
+use mg_settings::errors::ErrorType::{MissingArgument, NoCommand, Parse, UnknownCommand};
 use mg_settings::key::Key;
 use relm::{Relm, Widget};
 use relm_attributes::widget;
@@ -128,8 +130,7 @@ pub struct Model<COMM, SETT>
     current_shortcut: Vec<Key>,
     entry_shown: bool,
     foreground_color: RGBA,
-    initial_error: Option<Error>,
-    initial_commands: Vec<Command<COMM>>,
+    initial_parse_result: Option<ParseResult<COMM>>,
     input_callback: Option<Box<Fn(Option<String>)>>,
     mappings: Mappings,
     message: String,
@@ -231,9 +232,19 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     }
 
     /// Show an error to the user.
-    pub fn error(&mut self, error: &str) {
-        error!("{}", error);
-        self.model.message = error.to_string();
+    pub fn error(&mut self, error: Error) {
+        let mut message = String::new();
+        let error_str = error.to_string();
+        message.push_str(&error_str);
+        for cause in error.iter().skip(1) {
+            message.push_str(&format!("\n    caused by: {}", cause));
+        }
+        error!("{}", message);
+        if let Some(backtrace) = error.backtrace() {
+            trace!("{:?}", backtrace);
+        }
+
+        self.model.message = error_str;
         self.status_bar.widget_mut().hide_entry();
         self.status_bar.widget().color_red();
     }
@@ -281,20 +292,30 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         self.model.relm.connect_exec_ignore_err(timeout, HideColoredMessage(message));
     }
 
+    fn execute_commands(&mut self, mut parse_result: ParseResult<COMM>, activated: bool) {
+        for command in parse_result.commands.drain(..) {
+            self.call_command(command);
+        }
+        for error in parse_result.errors.drain(..) {
+            self.show_parse_error(error);
+        }
+        if activated {
+            self.return_to_normal_mode();
+        }
+    }
+
     /// Handle the command activate event.
     fn handle_command(&mut self, command: Option<String>, activated: bool) -> Option<Msg<COMM, SETT>> {
         if let Some(command) = command {
             if self.model.current_command_mode == ':' {
-                let result = self.model.settings_parser.parse_line(&command);
-                self.call_command(result, activated)
+                let parse_result = self.model.settings_parser.parse_line(&command);
+                self.execute_commands(parse_result, activated);
             }
             else {
-                self.handle_special_command(Final, &command)
+                return self.handle_special_command(Final, &command);
             }
         }
-        else {
-            None
-        }
+        None
     }
 
     /// Handle a special command activate or key press event.
@@ -317,13 +338,8 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     }
 
     fn init_view(&mut self) {
-        let commands: Vec<_> = self.model.initial_commands.drain(..).collect();
-        for command in commands {
-            self.call_command(Ok(command), false);
-        }
-        if let Some(error) = self.model.initial_error.take() {
-            self.show_parse_error(error);
-        }
+        let parse_result = self.model.initial_parse_result.take().expect("initial parse result");
+        self.execute_commands(parse_result, false);
     }
 
     /// Handle the key press event for the input mode.
@@ -374,20 +390,9 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     fn model(relm: &Relm<Self>, (user_modes, settings_filename, include_path): (Modes, &'static str, Option<String>))
         -> Model<COMM, SETT>
     {
-        let mut settings_parser = Box::new(Parser::new());
-        let mut initial_commands = vec![];
-        let mut modes = HashMap::new();
-        let mut initial_error = None;
-        match parse_config(settings_filename, user_modes, include_path.as_ref().map(String::as_str)) {
-            Ok((parser, commands, initial_modes)) => {
-                settings_parser = Box::new(parser);
-                initial_commands = commands;
-                modes = initial_modes;
-            },
-            Err(error) => {
-                initial_error = Some(error);
-            }
-        }
+        let (parser, parse_result, modes) = parse_config(settings_filename, user_modes,
+            include_path.as_ref().map(String::as_str));
+        let settings_parser = Box::new(parser);
         // TODO: use &'static str instead of String?
         Model {
             answer: None,
@@ -399,8 +404,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             current_shortcut: vec![],
             entry_shown: false,
             foreground_color: RGBA::white(),
-            initial_error,
-            initial_commands,
+            initial_parse_result: Some(parse_result),
             input_callback: None,
             mappings: HashMap::new(),
             message: String::new(),
@@ -658,47 +662,35 @@ impl<COMM, SETT> Mg<COMM, SETT>
     }
 
     /// Call the callback with the command or show an error if the command cannot be parsed.
-    fn call_command(&mut self, command: Result<Command<COMM>>, activated: bool) -> Option<Msg<COMM, SETT>> {
+    fn call_command(&mut self, command: Command<COMM>) {
         match command {
-            Ok(command) => {
-                match command {
-                    App(command) => self.app_command(&command),
-                    Custom(command) => {
-                        if activated {
-                            self.return_to_normal_mode();
-                        }
-                        return Some(CustomCommand(command));
+            App(command) => self.app_command(&command),
+            Custom(command) => {
+                self.model.relm.stream().emit(CustomCommand(command));
+            },
+            Map { action, keys, mode } => {
+                let mode_mappings = self.model.mappings.entry(self.model.modes[mode.as_str()])
+                    .or_insert_with(HashMap::new);
+                mode_mappings.insert(keys, action);
+            },
+            Set(name, value) => {
+                match SETT::to_variant(&name, value) {
+                    Ok(setting) => {
+                        self.set_setting(setting);
                     },
-                    Map { action, keys, mode } => {
-                        let mode_mappings = self.model.mappings.entry(self.model.modes[mode.as_str()])
-                            .or_insert_with(HashMap::new);
-                        mode_mappings.insert(keys, action);
-                    },
-                    Set(name, value) => {
-                        match SETT::to_variant(&name, value) {
-                            Ok(setting) => {
-                                self.set_setting(setting);
-                            },
-                            Err(error) => {
-                                let message = format!("Error setting value: {}", error);
-                                self.error(&message);
-                            },
-                        }
-                        return Some(EnterNormalMode);
-                    },
-                    Unmap { keys, mode } => {
-                        let mode_mappings = self.model.mappings.entry(self.model.modes[mode.as_str()])
-                            .or_insert_with(HashMap::new);
-                        mode_mappings.remove(&keys);
+                    Err(error) => {
+                        let msg = ErrorKind::Msg("Error setting value".to_string());
+                        self.error(ChainedError::with_chain(error, msg));
                     },
                 }
+                self.return_to_normal_mode();
             },
-            Err(error) => {
-                self.show_parse_error(error);
-                return Some(EnterNormalMode);
+            Unmap { keys, mode } => {
+                let mode_mappings = self.model.mappings.entry(self.model.modes[mode.as_str()])
+                    .or_insert_with(HashMap::new);
+                mode_mappings.remove(&keys);
             },
         }
-        None
     }
 
     /// Connect the close event to the specified callback.
@@ -798,19 +790,28 @@ impl<COMM, SETT> Mg<COMM, SETT>
     }
 
     fn show_parse_error(&mut self, error: Error) {
-        match error {
-            Error::Parse(error) => {
-                let message =
-                    match error.typ {
+        let message =
+            match error {
+                Error(ErrorKind::Parse(ref parse_error), _) => {
+                    Some(match parse_error.typ {
                         MissingArgument => "Argument required".to_string(),
                         NoCommand => return,
-                        Parse => format!("Parse error: unexpected {}, expecting: {}", error.unexpected, error.expected),
-                        UnknownCommand => format!("Not a command: {}", error.unexpected),
-                    };
-                self.error(&message);
-            },
-            Error::Io(error) => self.error(&format!("{}", error)),
-        }
+                        Parse => format!("Parse error: unexpected {}, expecting: {}", parse_error.unexpected,
+                                         parse_error.expected),
+                        UnknownCommand => format!("Not a command: {}", parse_error.unexpected),
+                    })
+                },
+                _ => None,
+            };
+        let error =
+            if let Some(message) = message {
+                ChainedError::with_chain(error, ErrorKind::Msg(message))
+            }
+            else {
+                error
+            };
+
+        self.error(error);
     }
 
     fn update_completions(&self, input: Option<String>) -> Option<Msg<COMM, SETT>> {
@@ -822,10 +823,9 @@ impl<COMM, SETT> Mg<COMM, SETT>
 
 /// Parse a configuration file.
 pub fn parse_config<P: AsRef<Path>, COMM: EnumFromStr>(filename: P, user_modes: Modes, include_path: Option<&str>)
-    -> Result<(Parser<COMM>, Vec<Command<COMM>>, ModesHash)>
+    -> (Parser<COMM>, ParseResult<COMM>, ModesHash)
 {
-    let file = File::open(filename)?;
-    let buf_reader = BufReader::new(file);
+    let mut parse_result = ParseResult::new();
 
     let mut modes = HashMap::new();
     for &(key, value) in user_modes {
@@ -844,6 +844,10 @@ pub fn parse_config<P: AsRef<Path>, COMM: EnumFromStr>(filename: P, user_modes: 
         parser.set_include_path(include_path);
     }
 
-    let commands = parser.parse(buf_reader)?;
-    Ok((parser, commands, modes))
+    let file = File::open(&filename)
+        .chain_err(|| format!("failed to open settings file `{}`", filename.as_ref().to_string_lossy()));
+    let file = rtry_no_return!(parse_result, file, { return (parser, parse_result, modes); });
+    let buf_reader = BufReader::new(file);
+    let parse_result = parser.parse(buf_reader);
+    (parser, parse_result, modes)
 }
