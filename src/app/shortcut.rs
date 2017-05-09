@@ -99,8 +99,8 @@ impl<COMM, SETT> Mg<COMM, SETT>
                         },
                         Incomplete(command) => {
                             self.input_command(&command);
-                            //self.status_bar.show_completion();
-                            //self.update_completions();
+                            self.completion_view.widget_mut().show_completion();
+                            self.update_completions();
                             should_inhibit = true;
                         },
                     }

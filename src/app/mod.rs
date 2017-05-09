@@ -87,8 +87,6 @@ type Completers = HashMap<String, Box<Completer>>;
 type Mappings = HashMap<&'static str, HashMap<Vec<Key>, String>>;
 type ModesHash = HashMap<&'static str, &'static str>;
 
-//type Modes = HashMap<String, String>;
-
 /// A command from a map command.
 #[derive(Debug)]
 enum ShortcutCommand {
@@ -221,6 +219,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     fn default_completers() -> Completers {
         let mut completers: HashMap<_, Box<Completer>> = HashMap::new();
         completers.insert(DEFAULT_COMPLETER_IDENT.to_string(), Box::new(CommandCompleter::<COMM>::new()));
+        // TODO: use &'static str instead of String?
         completers.insert("set".to_string(), Box::new(SettingCompleter::<SETT>::new()));
         completers
     }
@@ -393,7 +392,6 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         let (parser, parse_result, modes) = parse_config(settings_filename, user_modes,
             include_path.as_ref().map(String::as_str));
         let settings_parser = Box::new(parser);
-        // TODO: use &'static str instead of String?
         Model {
             answer: None,
             choices: vec![],
@@ -581,7 +579,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                         text: &shortcut_to_string(&self.model.current_shortcut),
                     },
                     EntryActivate(input) => self.command_activate(input),
-                    EntryChanged(input) => self.update_completions(input),
+                    EntryChanged(_) => self.update_completions(),
                 },
                 gtk::Overlay {
                     packing: {
@@ -641,15 +639,15 @@ impl<COMM, SETT> Mg<COMM, SETT>
             },
             ENTRY_DELETE_NEXT_CHAR => {
                 self.status_bar.widget().delete_next_char();
-                self.update_completions(self.status_bar.widget().get_command());
+                self.update_completions();
             },
             ENTRY_DELETE_NEXT_WORD => {
                 self.status_bar.widget().delete_next_word();
-                self.update_completions(self.status_bar.widget().get_command());
+                self.update_completions();
             },
             ENTRY_DELETE_PREVIOUS_WORD => {
                 self.status_bar.widget().delete_previous_word();
-                self.update_completions(self.status_bar.widget().get_command());
+                self.update_completions();
             },
             ENTRY_END => self.status_bar.widget().end(),
             ENTRY_NEXT_CHAR => self.status_bar.widget().next_char(),
@@ -755,6 +753,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
     pub fn set_dark_theme(&mut self, use_dark: bool) {
         let settings = Settings::get_default().unwrap();
         settings.set_long_property("gtk-application-prefer-dark-theme", use_dark.to_glib() as _, "");
+        // TODO: this line should probably go into init_view() as well.
         self.model.foreground_color = self.get_foreground_color();
     }
 
@@ -814,8 +813,8 @@ impl<COMM, SETT> Mg<COMM, SETT>
         self.error(error);
     }
 
-    fn update_completions(&self, input: Option<String>) -> Option<Msg<COMM, SETT>> {
-        let input = input.unwrap_or_default();
+    fn update_completions(&self) -> Option<Msg<COMM, SETT>> {
+        let input = self.status_bar.widget().get_command().unwrap_or_default();
         self.completion_view.widget_mut().update_completions(&self.model.current_mode, &input);
         None
     }

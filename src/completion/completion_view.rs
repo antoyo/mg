@@ -77,6 +77,13 @@ impl Widget for CompletionView {
         self.model.visible = visible;
     }
 
+    /// Show the completion view.
+    pub fn show_completion(&mut self) {
+        self.unselect();
+        self.scroll_to_first();
+        self.model.visible = true;
+    }
+
     fn update(&mut self, _event: ()) {
     }
 
@@ -301,13 +308,6 @@ impl CompletionView {
     /// Set the original input.
     pub fn set_original_input(&mut self, input: &str) {
         self.model.original_input = input.to_string();
-    }
-
-    /// Show the completion view.
-    pub fn show_completion(&mut self) {
-        self.unselect();
-        self.scroll_to_first();
-        self.model.visible = true;
     }
 
     /// Unselect the item.

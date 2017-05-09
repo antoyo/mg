@@ -28,7 +28,7 @@ In the `view!` macro, use the `Mg` widget:
 [source,rust]
 ----
 view! {
-    Mg<AppCommand, NoSettings>((MODES, "examples/main.conf")) {
+    Mg<AppCommand, NoSettings>((MODES, "examples/main.conf", None)) {
         // Place your main widget here.
         gtk::Box {
         }
