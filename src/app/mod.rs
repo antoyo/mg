@@ -29,7 +29,7 @@ use std::char;
 use std::collections::HashMap;
 use std::fs::{File, create_dir_all};
 use std::io::{self, BufReader, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use error_chain::ChainedError;
@@ -129,6 +129,7 @@ pub struct Model<COMM, SETT>
     current_shortcut: Vec<Key>,
     entry_shown: bool,
     foreground_color: RGBA,
+    initial_errors: Vec<Error>,
     initial_parse_result: Option<ParseResult<COMM>>,
     input_callback: Option<Box<Fn(Option<String>)>>,
     mappings: Mappings,
@@ -164,6 +165,7 @@ pub enum Msg<COMM, SETT>
 }
 
 /// An Mg application window contains a status bar where the user can type a command and a central widget.
+
 #[widget]
 impl<COMM, SETT> Widget for Mg<COMM, SETT>
     where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
@@ -340,6 +342,10 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         self.model.foreground_color = self.get_foreground_color();
         let parse_result = self.model.initial_parse_result.take().expect("initial parse result");
         self.execute_commands(parse_result, false);
+        let errors: Vec<_> = self.model.initial_errors.drain(..).collect();
+        for error in errors {
+            self.error(error);
+        }
     }
 
     /// Handle the key press event for the input mode.
@@ -386,14 +392,24 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         }
     }
 
-    // TODO: switch from a &'static str to a String?
     fn model(relm: &Relm<Self>, (user_modes, settings_filename, include_path, default_config):
-             (Modes, &'static str, Option<String>, Vec<DefaultConfig>)) -> Model<COMM, SETT>
+             (Modes, io::Result<PathBuf>, Option<PathBuf>, Vec<DefaultConfig>)) -> Model<COMM, SETT>
     {
-        create_default_config(default_config);
-        let (parser, parse_result, modes) = parse_config(settings_filename, user_modes,
-            include_path.as_ref().map(String::as_str));
-        let settings_parser = Box::new(parser);
+        let mut initial_errors = vec![];
+        if let Err(error) = create_default_config(default_config) {
+            initial_errors.push(error.into());
+        }
+        let (settings_parser, initial_parse_result, modes) =
+            match settings_filename {
+                Ok(settings_filename) => {
+                    let (parser, parse_result, modes) = parse_config(settings_filename, user_modes, include_path);
+                    (Box::new(parser), Some(parse_result), modes)
+                },
+                Err(error) => {
+                    initial_errors.push(error.into());
+                    (Box::new(Parser::<COMM>::new()), None, HashMap::new())
+                },
+            };
         Model {
             answer: None,
             choices: vec![],
@@ -404,7 +420,8 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             current_shortcut: vec![],
             entry_shown: false,
             foreground_color: RGBA::white(),
-            initial_parse_result: Some(parse_result),
+            initial_errors,
+            initial_parse_result,
             input_callback: None,
             mappings: HashMap::new(),
             message: String::new(),
@@ -852,7 +869,7 @@ fn create_default_config_file(path: &Path, content: &'static str) -> Result<(), 
 }
 
 /// Parse a configuration file.
-pub fn parse_config<P: AsRef<Path>, COMM: EnumFromStr>(filename: P, user_modes: Modes, include_path: Option<&str>)
+pub fn parse_config<P: AsRef<Path>, COMM: EnumFromStr>(filename: P, user_modes: Modes, include_path: Option<PathBuf>)
     -> (Parser<COMM>, ParseResult<COMM>, ModesHash)
 {
     let mut parse_result = ParseResult::new();

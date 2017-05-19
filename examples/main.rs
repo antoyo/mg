@@ -144,7 +144,7 @@ impl Widget for Win {
 
     view! {
         #[name="mg"]
-        Mg<AppCommand, AppSettings>((MODES, "examples/main.conf", Some("/home/bouanto".to_string()))) {
+        Mg<AppCommand, AppSettings>((MODES, Ok("examples/main.conf".into()), Some("/home/bouanto".into()), vec![])) {
             dark_theme: true,
             title: &self.model.title,
             variables: VARIABLES,
