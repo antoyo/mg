@@ -20,6 +20,10 @@
  */
 
 /*
+ * TODO: show a warning when components are destroyed after the end of call to Widget::view().
+ * TODO: smart selection (select all on first time, select all except the prefix on the second).
+ * TODO: shortcut to move the cursor at the other end of the selection.
+ * TODO: thread example (using a oneshot).
  * TODO: generate async gtk methods as returning futures.
  * TODO: change all unneeded &mut self to &self.
  * TODO: set the size of the status bar according to the size of the font.
@@ -63,5 +67,5 @@ pub type Variables = &'static [(&'static str, fn() -> String)]; // TODO: probabl
 pub use app::{Mg, parse_config};
 pub use app::Msg::{CustomCommand, ModeChanged, SetMode, SettingChanged};
 pub use app::dialog::{DialogBuilder, DialogResult};
-pub use app::settings::NoSettings;
+pub use app::settings::{DefaultConfig, NoSettings};
 pub use app::status_bar::{StatusBar, StatusBarItem};

@@ -20,10 +20,20 @@
  */
 
 use std::collections::HashMap;
+use std::io;
+use std::path::PathBuf;
 
 use mg_settings::{EnumMetaData, MetaData, SettingCompletion, Value};
 use mg_settings::errors::{ErrorKind, Result, SettingError};
 use mg_settings::settings;
+
+/// A directory or a file to create if it does not exist.
+pub enum DefaultConfig {
+    /// A config directory.
+    Dir(io::Result<PathBuf>),
+    /// A config file with its content.
+    File(io::Result<PathBuf>, &'static str),
+}
 
 #[doc(hidden)]
 #[derive(Default)]

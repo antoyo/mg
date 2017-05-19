@@ -27,8 +27,8 @@ pub mod status_bar;
 use std::borrow::Cow;
 use std::char;
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::BufReader;
+use std::fs::{File, create_dir_all};
+use std::io::{self, BufReader, Write};
 use std::path::Path;
 use std::time::Duration;
 
@@ -60,6 +60,7 @@ use mg_settings::key::Key;
 use relm::{Relm, Widget};
 use relm_attributes::widget;
 
+use app::settings::DefaultConfig;
 use app::shortcut::shortcut_to_string;
 use completion::{
     CommandCompleter,
@@ -386,9 +387,10 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     }
 
     // TODO: switch from a &'static str to a String?
-    fn model(relm: &Relm<Self>, (user_modes, settings_filename, include_path): (Modes, &'static str, Option<String>))
-        -> Model<COMM, SETT>
+    fn model(relm: &Relm<Self>, (user_modes, settings_filename, include_path, default_config):
+             (Modes, &'static str, Option<String>, Vec<DefaultConfig>)) -> Model<COMM, SETT>
     {
+        create_default_config(default_config);
         let (parser, parse_result, modes) = parse_config(settings_filename, user_modes,
             include_path.as_ref().map(String::as_str));
         let settings_parser = Box::new(parser);
@@ -701,10 +703,20 @@ impl<COMM, SETT> Mg<COMM, SETT>
         self.completion_view.widget().delete_current_completion_item();
     }
 
+    /// Get the command from the status bar entry.
+    pub fn get_command(&self) -> Option<String> {
+        self.status_bar.widget().get_command()
+    }
+
     /// Get the color of the text.
     fn get_foreground_color(&self) -> RGBA {
         let style_context = self.window.get_style_context().unwrap();
         style_context.get_color(STATE_FLAG_NORMAL)
+    }
+
+    /// Get the current mode.
+    pub fn get_mode(&self) -> String {
+        self.model.current_mode.clone()
     }
 
     /// Handle the unselect event.
@@ -817,6 +829,26 @@ impl<COMM, SETT> Mg<COMM, SETT>
         self.completion_view.widget_mut().update_completions(&self.model.current_mode, &input);
         None
     }
+}
+
+/// Create the default config directories and files.
+fn create_default_config(default_config: Vec<DefaultConfig>) -> Result<(), io::Error> {
+    for config_item in default_config {
+        match config_item {
+            DefaultConfig::Dir(directory) => create_dir_all(directory?)?,
+            DefaultConfig::File(name, content) => create_default_config_file(&name?, content)?,
+        }
+    }
+    Ok(())
+}
+
+/// Create the config file with its default content if it does not exist.
+fn create_default_config_file(path: &Path, content: &'static str) -> Result<(), io::Error> {
+    if !path.exists() {
+        let mut file = File::create(path)?;
+        write!(file, "{}", content)?;
+    }
+    Ok(())
 }
 
 /// Parse a configuration file.
