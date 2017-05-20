@@ -38,6 +38,7 @@ use gtk::{
 };
 use gtk::Orientation::Vertical;
 use mg::{
+    AppClose,
     CustomCommand,
     Mg,
     Modes,
@@ -122,6 +123,7 @@ impl Widget for Win {
             StatusBarItem {
                 text: "Test",
             },
+            AppClose => Command(Quit),
             CustomCommand(Insert) => mg@SetMode("insert"),
             CustomCommand(Normal) => mg@SetMode("normal"),
             CustomCommand(command) => Command(command),

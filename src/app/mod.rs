@@ -34,7 +34,6 @@ use std::time::Duration;
 
 use error_chain::ChainedError;
 use futures_glib::Timeout;
-use gdk::enums::key::Key as GdkKey;
 use gdk::{EventKey, RGBA};
 use gdk::enums::key::{Escape, colon};
 use glib::translate::ToGlib;
@@ -122,7 +121,6 @@ pub struct Model<COMM, SETT>
 {
     answer: Option<String>,
     choices: Vec<char>,
-    close_callback: Option<Box<Fn() + Send + Sync>>,
     completion_shown: bool,
     current_command_mode: char,
     current_mode: String,
@@ -150,17 +148,15 @@ pub enum Msg<COMM, SETT>
     where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
           SETT: mg_settings::settings::Settings + EnumMetaData + SettingCompletion + 'static,
 {
+    AppClose,
     CustomCommand(COMM),
     EnterCommandMode,
     EnterNormalMode,
     EnterNormalModeAndReset,
     HideColoredMessage(String),
     HideInfo(String),
-    KeyPress(GdkKey),
-    KeyRelease(GdkKey),
     ModeChanged(String),
     SetMode(&'static str),
-    Quit,
     SettingChanged(SETT::Variant),
 }
 
@@ -413,7 +409,6 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         Model {
             answer: None,
             choices: vec![],
-            close_callback: None,
             completion_shown: false,
             current_command_mode: ':',
             current_mode: NORMAL_MODE.to_string(),
@@ -531,6 +526,8 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     fn update(&mut self, event: Msg<COMM, SETT>) {
         match event {
             // To be listened to by the user.
+            AppClose => (),
+            // To be listened to by the user.
             CustomCommand(_) => (),
             EnterCommandMode => {
                 self.set_completer(DEFAULT_COMPLETER_IDENT);
@@ -551,17 +548,8 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             },
             HideColoredMessage(message) => self.hide_colored_message(&message),
             HideInfo(message) => self.hide_info(&message),
-            KeyPress(_) | KeyRelease(_) => (),
             ModeChanged(_) | SettingChanged(_) => (),
             SetMode(mode) => self.set_mode(mode),
-            Quit => {
-                if let Some(ref callback) = self.model.close_callback {
-                    callback();
-                }
-                else {
-                    gtk::main_quit();
-                }
-            },
         }
     }
 
@@ -613,7 +601,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             },
             key_press_event(_, key) => return self.key_press(&key),
             key_release_event(_, key) => return self.key_release(&key),
-            delete_event(_, _) => (Quit, Inhibit(false)),
+            delete_event(_, _) => (AppClose, Inhibit(true)),
         },
     }
 }
@@ -708,11 +696,6 @@ impl<COMM, SETT> Mg<COMM, SETT>
                 mode_mappings.remove(&keys);
             },
         }
-    }
-
-    /// Connect the close event to the specified callback.
-    pub fn connect_close<F: Fn() + Send + Sync + 'static>(&mut self, callback: F) {
-        self.model.close_callback = Some(Box::new(callback));
     }
 
     /// Delete the current completion item.
