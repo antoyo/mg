@@ -46,7 +46,7 @@ use mg::{
     StatusBarItem,
     Variables,
 };
-use relm::Widget;
+use relm::{Relm, Widget};
 use relm_attributes::widget;
 
 use AppSettingsVariant::*;
@@ -55,6 +55,7 @@ use AppCommand::*;
 use Msg::*;
 
 pub struct Model {
+    relm: Relm<Win>,
     text: String,
     title: String,
 }
@@ -62,7 +63,9 @@ pub struct Model {
 #[derive(Msg)]
 pub enum Msg {
     Alert,
+    CheckQuit(Option<String>),
     Command(AppCommand),
+    Echo(Option<String>),
     Info,
     Input,
     Mode(String),
@@ -85,8 +88,9 @@ impl Widget for Win {
         self.entry.grab_focus();
     }
 
-    fn model() -> Model {
+    fn model(relm: &Relm<Self>, _model: ()) -> Model {
         Model {
+            relm: relm.clone(),
             text: "Mg App".to_string(),
             title: "First Mg Program".to_string(),
         }
@@ -115,16 +119,15 @@ impl Widget for Win {
     fn update(&mut self, event: Msg) {
         match event {
             Alert => self.mg.widget_mut().alert("Blue Alert"),
+            CheckQuit(answer) => {
+                if answer == Some("y".to_string()) {
+                    gtk::main_quit();
+                }
+            },
             Command(command) => {
                 match command {
                     BackwardSearch(input) => println!("Searching backward for {}", input),
-                    CheckQuit(answer) => {
-                        if answer == Some("y".to_string()) {
-                            gtk::main_quit();
-                        }
-                    },
                     DeleteEntry => self.mg.widget().delete_current_completion_item(),
-                    Echo(answer) => self.model.text = format!("You said: {}", answer.unwrap_or("Nothing".to_string())),
                     Follow => (),
                     Insert | Normal => (),
                     Open(url) => self.model.text = format!("Opening URL {}", url),
@@ -134,10 +137,11 @@ impl Widget for Win {
                     WinOpen(url) => self.model.text = format!("Opening URL {} in new window", url),
                 }
             },
+            Echo(answer) => self.model.text = format!("You said: {}", answer.unwrap_or("Nothing".to_string())),
             Info => self.mg.widget_mut().info("Info"),
-            Input => self.mg.widget_mut().input("Say something", "Oh yeah?", Echo),
+            Input => self.mg.widget_mut().input(&self.model.relm, "Say something", "Oh yeah?", Echo),
             Mode(mode) => self.mode_changed(&mode),
-            Question => self.mg.widget_mut().question("Do you want to quit?", &['y', 'n'], CheckQuit),
+            Question => self.mg.widget_mut().question(&self.model.relm, "Do you want to quit?", &['y', 'n'], CheckQuit),
             Setting(setting) => self.setting_changed(setting),
             Warning => self.mg.widget_mut().warning("Warning"),
         }
@@ -211,11 +215,7 @@ pub enum AppCommand {
     #[special_command(identifier="?")]
     BackwardSearch(String),
     #[completion(hidden)]
-    CheckQuit(Option<String>),
-    #[completion(hidden)]
     DeleteEntry,
-    #[completion(hidden)]
-    Echo(Option<String>),
     #[completion(hidden)]
     Follow,
     Insert,

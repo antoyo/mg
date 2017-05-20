@@ -27,9 +27,9 @@ use gtk;
 use mg_settings::{EnumFromStr, EnumMetaData, SettingCompletion, SpecialCommand};
 use mg_settings::key::Key;
 use mg_settings::settings;
+use relm::{Relm, Widget};
 
 use app::{Mg, BLOCKING_INPUT_MODE, INPUT_MODE};
-use app::Msg::CustomCommand;
 use self::DialogResult::{Answer, Shortcut};
 
 /// Builder to create a new dialog.
@@ -123,52 +123,72 @@ impl<COMM, SETT> Mg<COMM, SETT>
           SETT: Default + EnumMetaData + settings::Settings + SettingCompletion + 'static,
 {
     /// Ask a question to the user and block until the user provides it (or cancel).
-    pub fn blocking_input(&mut self, message: &str, default_answer: &str) -> Option<String> {
+    pub fn blocking_input<W>(&mut self, relm: &Relm<W>, message: &str, default_answer: &str) -> Option<String>
+        where W: Widget,
+              W::Msg: 'static,
+    {
         let builder = DialogBuilder::new()
             .blocking(true)
             .default_answer(default_answer)
             .message(message);
-        self.show_dialog_without_shortcuts(builder)
+        self.show_dialog_without_shortcuts(relm, builder)
     }
 
     /// Ask a multiple-choice question to the user and block until the user provides it (or cancel).
-    pub fn blocking_question(&mut self, message: &str, choices: &[char]) -> Option<String> {
+    pub fn blocking_question<W>(&mut self, relm: &Relm<W>, message: &str, choices: &[char]) -> Option<String>
+        where W: Widget,
+              W::Msg: 'static,
+    {
         let builder = DialogBuilder::new()
             .blocking(true)
             .message(message)
             .choices(choices);
-        self.show_dialog_without_shortcuts(builder)
+        self.show_dialog_without_shortcuts(relm, builder)
     }
 
     /// Show a blocking yes/no question.
-    pub fn blocking_yes_no_question(&mut self, message: &str) -> bool {
+    pub fn blocking_yes_no_question<W>(&mut self, relm: &Relm<W>, message: &str) -> bool
+        where W: Widget,
+              W::Msg: 'static,
+    {
         let builder = DialogBuilder::new()
             .blocking(true)
             .message(message)
             .choices(&['y', 'n']);
-        self.show_dialog_without_shortcuts(builder) == Some("y".to_string())
+        self.show_dialog_without_shortcuts(relm, builder) == Some("y".to_string())
     }
 
     /// Ask a question to the user.
-    pub fn input<F: Fn(Option<String>) -> COMM + 'static>(&mut self, message: &str, default_answer: &str, callback: F) {
+    pub fn input<F, W>(&mut self, relm: &Relm<W>, message: &str, default_answer: &str, callback: F)
+        where F: Fn(Option<String>) -> W::Msg + 'static,
+              W: Widget,
+              W::Msg: 'static,
+    {
         let builder = DialogBuilder::new()
             .callback(callback)
             .default_answer(default_answer)
             .message(message);
-        self.show_dialog(builder);
+        self.show_dialog(relm, builder);
     }
 
     /// Ask a multiple-choice question to the user.
-    pub fn question<F: Fn(Option<String>) -> COMM + 'static>(&mut self, message: &str, choices: &[char], callback: F) {
+    pub fn question<F, W>(&mut self, relm: &Relm<W>, message: &str, choices: &[char], callback: F)
+        where F: Fn(Option<String>) -> W::Msg + 'static,
+              W: Widget,
+              W::Msg: 'static,
+    {
         let builder = DialogBuilder::new()
             .callback(callback)
             .message(message)
             .choices(choices);
-        self.show_dialog(builder);
+        self.show_dialog(relm, builder);
     }
 
     /// Show a dialog created with a `DialogBuilder`.
-    pub fn show_dialog(&mut self, mut dialog_builder: DialogBuilder<COMM>) -> DialogResult {
+    pub fn show_dialog<W>(&mut self, relm: &Relm<W>, mut dialog_builder: DialogBuilder<W::Msg>) -> DialogResult
+        where W: Widget,
+              W::Msg: 'static,
+    {
         self.model.shortcut_pressed = false;
         {
             self.model.shortcuts.clear();
@@ -209,10 +229,10 @@ impl<COMM, SETT> Mg<COMM, SETT>
         }
         else {
             if let Some(callback) = dialog_builder.callback {
-                let stream = self.model.relm.stream().clone();
+                let stream = relm.stream().clone();
                 self.model.input_callback = Some(Box::new(move |answer| {
                     let msg = callback(answer);
-                    stream.emit(CustomCommand(msg));
+                    stream.emit(msg);
                 }));
             }
             self.set_mode(INPUT_MODE);
@@ -242,8 +262,12 @@ impl<COMM, SETT> Mg<COMM, SETT>
     }
 
     /// Show a dialog created with a `DialogBuilder` which does not contain shortcut.
-    pub fn show_dialog_without_shortcuts(&mut self, dialog_builder: DialogBuilder<COMM>) -> Option<String> {
-        match self.show_dialog(dialog_builder) {
+    pub fn show_dialog_without_shortcuts<W>(&mut self, relm: &Relm<W>, dialog_builder: DialogBuilder<W::Msg>)
+        -> Option<String>
+        where W: Widget,
+              W::Msg: 'static,
+    {
+        match self.show_dialog(relm, dialog_builder) {
             Answer(answer) => answer,
             Shortcut(_) => panic!("cannot return a shortcut in show_dialog_without_shortcuts()"),
         }
