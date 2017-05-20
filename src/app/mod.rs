@@ -625,6 +625,11 @@ impl<COMM, SETT> Mg<COMM, SETT>
         }
     }
 
+    /// Add a completer to the completion view.
+    pub fn set_completers(&self, completers: Completers) {
+        self.completion_view.widget_mut().add_completers(completers);
+    }
+
     /// Handle an application command.
     fn app_command(&self, command: &str) {
         match command {

@@ -100,6 +100,11 @@ impl Completion {
         }
     }
 
+    /// Add a new completer.
+    pub fn add_completer(&mut self, ident: &'static str, completer: Box<Completer>) {
+        self.completers.insert(ident, completer);
+    }
+
     /// Adjust the model by using the specified completer.
     pub fn adjust_model(&mut self, completer_ident: &str) -> bool {
         if completer_ident != self.completer_ident {

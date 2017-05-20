@@ -60,6 +60,12 @@ pub struct Model {
 /// A widget to show completions for the command entry.
 #[widget]
 impl Widget for CompletionView {
+    pub fn add_completers(&mut self, completers: Completers) {
+        for (ident, completer) in completers {
+            self.model.completion.add_completer(ident, completer);
+        }
+    }
+
     fn init_view(&mut self) {
         self.add_columns(2);
     }
