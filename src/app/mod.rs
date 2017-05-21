@@ -172,12 +172,11 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         let message =
             if self.model.current_mode == INPUT_MODE || self.model.current_mode == BLOCKING_INPUT_MODE {
                 let mut should_reset = false;
-                if let Some(ref callback) = self.model.input_callback {
+                if let Some(callback) = self.model.input_callback.take() {
                     self.model.answer = input.clone();
                     callback(input);
                     should_reset = true;
                 }
-                self.model.input_callback = None;
                 self.model.choices.clear();
                 if should_reset {
                     Some(EnterNormalModeAndReset)
@@ -349,10 +348,9 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     fn input_key_press(&mut self, key: &EventKey) -> (Option<Msg<COMM, SETT>>, Inhibit) {
         match key.get_keyval() {
             Escape => {
-                if let Some(ref callback) = self.model.input_callback {
+                if let Some(callback) = self.model.input_callback.take() {
                     callback(None);
                 }
-                self.model.input_callback = None;
                 (Some(EnterNormalModeAndReset), Inhibit(false))
             },
             keyval => {
@@ -490,12 +488,11 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             self.model.answer = Some(answer.to_string());
             gtk::main_quit();
         }
-        else if let Some(ref callback) = self.model.input_callback {
+        else if let Some(callback) = self.model.input_callback.take() {
             callback(Some(answer.to_string()));
             self.model.choices.clear();
             should_reset = true;
         }
-        self.model.input_callback = None;
         if should_reset {
             Some(EnterNormalModeAndReset)
         }

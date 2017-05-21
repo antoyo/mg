@@ -20,6 +20,8 @@
  */
 
 /*
+ * TODO: refactor to remove every use of callbacks in relm widgets, taking advantage of async
+ * callback.
  * FIXME: the commands in the config file are not executed.
  * TODO: take advantage of IntoOption and IntoPair.
  * TODO: automatically connect the AppClose message to Quit if it exists.
