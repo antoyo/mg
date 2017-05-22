@@ -142,8 +142,9 @@ pub struct Model<COMM, SETT>
     variables: HashMap<String, fn() -> String>,
 }
 
+// TODO: Switch back to SimpleMsg.
 #[allow(missing_docs)]
-#[derive(SimpleMsg)]
+#[derive(Msg)]
 pub enum Msg<COMM, SETT>
     where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
           SETT: mg_settings::settings::Settings + EnumMetaData + SettingCompletion + 'static,
@@ -268,7 +269,8 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         self.reset_colors();
 
         let timeout = Timeout::new(Duration::from_secs(INFO_MESSAGE_DURATION));
-        self.model.relm.connect_exec_ignore_err(timeout, HideInfo(message));
+        // TODO: remove the clone and closure when switching back to SimpleMsg.
+        self.model.relm.connect_exec_ignore_err(timeout, move |_| HideInfo(message.clone()));
     }
 
     /// Show a message to the user.
@@ -285,7 +287,8 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         self.status_bar.widget().color_orange();
 
         let timeout = Timeout::new(Duration::from_secs(INFO_MESSAGE_DURATION));
-        self.model.relm.connect_exec_ignore_err(timeout, HideColoredMessage(message));
+        // TODO: remove the clone and closure when switching back to SimpleMsg.
+        self.model.relm.connect_exec_ignore_err(timeout, move |_| HideColoredMessage(message.clone()));
     }
 
     fn execute_commands(&mut self, mut parse_result: ParseResult<COMM>, activated: bool) {
@@ -582,7 +585,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                     StatusBarItem {
                         text: &shortcut_to_string(&self.model.current_shortcut),
                     },
-                    EntryActivate(input) => self.command_activate(input),
+                    EntryActivate(ref input) => self.command_activate(input.clone()),
                     EntryChanged(_) => self.update_completions(),
                 },
                 gtk::Overlay {
