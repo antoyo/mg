@@ -39,7 +39,7 @@
 //! Minimal UI library based on GTK+.
 
 #![warn(missing_docs)]
-#![feature(fn_traits, proc_macro, unboxed_closures)]
+#![feature(proc_macro, unboxed_closures)]
 
 #[macro_use]
 extern crate error_chain;

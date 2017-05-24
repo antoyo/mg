@@ -126,7 +126,7 @@ impl Widget for Win {
             AppClose => Command(Quit),
             CustomCommand(Insert) => mg@SetMode("insert"),
             CustomCommand(Normal) => mg@SetMode("normal"),
-            CustomCommand(command) => Command(command),
+            CustomCommand(ref command) => Command(command.clone()),
         }
     }
 }

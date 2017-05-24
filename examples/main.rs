@@ -191,9 +191,9 @@ impl Widget for Win {
             AppClose => Command(Quit),
             CustomCommand(Insert) => mg@SetMode("insert"),
             CustomCommand(Normal) => mg@SetMode("normal"),
-            CustomCommand(command) => Command(command),
-            ModeChanged(mode) => Mode(mode),
-            SettingChanged(setting) => Setting(setting),
+            CustomCommand(ref command) => Command(command.clone()),
+            ModeChanged(ref mode) => Mode(mode.clone()),
+            SettingChanged(ref setting) => Setting(setting.clone()),
         }
     }
 }
