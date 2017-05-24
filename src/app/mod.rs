@@ -76,7 +76,7 @@ use self::status_bar::StatusBar;
 use self::status_bar::Msg::*;
 use self::Msg::*;
 pub use self::status_bar::StatusBarItem;
-use super::{Modes, Variables};
+use super::Modes;
 
 #[derive(PartialEq)]
 enum ActivationType {
@@ -139,7 +139,7 @@ pub struct Model<COMM, SETT>
     settings_parser: Box<Parser<COMM>>,
     shortcuts: HashMap<Key, String>,
     shortcut_pressed: bool,
-    variables: HashMap<String, fn() -> String>,
+    variables: HashMap<String, Box<Fn() -> String>>,
 }
 
 // TODO: Switch back to SimpleMsg.
@@ -791,9 +791,9 @@ impl<COMM, SETT> Mg<COMM, SETT>
     /// Set the variables that will be available in the settings.
     /// A variable can be used in mappings.
     /// The placeholder will be replaced by the value returned by the function.
-    pub fn set_variables(&mut self, variables: Variables) {
-        self.model.variables = variables.iter()
-            .map(|&(string, func)| (string.to_string(), func))
+    pub fn set_variables(&mut self, variables: Vec<(&'static str, Box<Fn() -> String>)>) {
+        self.model.variables = variables.into_iter()
+            .map(|(string, func)| (string.to_string(), func))
             .collect();
     }
 

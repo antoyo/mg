@@ -45,7 +45,6 @@ use mg::{
     NoSettings,
     SetMode,
     StatusBarItem,
-    Variables,
 };
 use relm::Widget;
 use relm_attributes::widget;
@@ -72,10 +71,6 @@ pub enum AppCommand {
 
 static MODES: Modes = &[
     ("i", "insert"),
-];
-
-static VARIABLES: Variables = &[
-    ("url", || "http://duckduckgo.com/lite".to_string()),
 ];
 
 #[widget]
@@ -107,7 +102,7 @@ impl Widget for Win {
         Mg<AppCommand, NoSettings>((MODES, Ok("examples/main.conf".into()), None, vec![])) {
             dark_theme: true,
             title: "First Mg Program",
-            variables: VARIABLES,
+            variables: vec![("url", Box::new(|| "http://duckduckgo.com/lite".to_string()))],
             gtk::Box {
                 orientation: Vertical,
                 gtk::Label {

@@ -66,7 +66,6 @@ mod key_converter;
 /// Map mode prefix (i.e. "i") to the mode name (i.e. "insert").
 pub type Modes = &'static [(&'static str, &'static str)];
 /// Map variable names to a function returning the value of this variable.
-pub type Variables = &'static [(&'static str, fn() -> String)]; // TODO: probably needs to use a Box<Fn() -> String>.
 
 pub use app::{Mg, parse_config};
 pub use app::Msg::{AppClose, CustomCommand, ModeChanged, SetMode, SettingChanged};
