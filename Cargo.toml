@@ -10,6 +10,7 @@ version = "0.0.5-pre"
 
 [dependencies]
 error-chain = "^0.10.0"
+futures = "^0.1.14"
 gdk = "^0.5.2"
 glib = "^0.1.2"
 gtk = "^0.1.2"
@@ -41,9 +42,3 @@ pretty_env_logger = "^0.1.0"
 [features]
 default = ["gtk/v3_22"]
 nightly = []
-
-[replace]
-
-[replace."futures:0.1.13"]
-branch = "spawn-trait"
-git = "https://github.com/alexcrichton/futures-rs"

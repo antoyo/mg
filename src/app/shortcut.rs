@@ -24,11 +24,11 @@ use gdk::enums::key::{Escape, Tab, ISO_Left_Tab};
 use gtk::Inhibit;
 use mg_settings::{self, EnumFromStr, EnumMetaData, SettingCompletion, SpecialCommand};
 use mg_settings::key::Key::{self, Char};
-use relm::Widget;
 
 use app::{Mg, Msg, BLOCKING_INPUT_MODE, COMMAND_MODE, INPUT_MODE, NORMAL_MODE};
 use app::ShortcutCommand::{Complete, Incomplete};
 use key_converter::gdk_key_to_key;
+use completion::completion_view::Msg::ShowCompletion;
 
 /// Convert a shortcut of keys to a `String`.
 pub fn shortcut_to_string(keys: &[Key]) -> String {
@@ -98,8 +98,8 @@ impl<COMM, SETT> Mg<COMM, SETT>
                             return (self.handle_command(Some(command), false), Inhibit(should_inhibit));
                         },
                         Incomplete(command) => {
-                            self.input_command(&command);
-                            self.completion_view.widget_mut().show_completion();
+                            self.input_command(command);
+                            self.completion_view.stream().emit(ShowCompletion);
                             self.update_completions();
                             should_inhibit = true;
                         },
@@ -182,7 +182,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
     // TODO: remove this when updating the model in methods outside the trait will update the view.
     /// Update the shortcut label.
     fn update_shortcut_label(&self) {
-        self.shortcut.widget().root().set_text(&shortcut_to_string(&self.model.current_shortcut));
+        self.shortcut.widget().set_text(&shortcut_to_string(&self.model.current_shortcut));
     }
 }
 

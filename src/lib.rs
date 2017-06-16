@@ -43,6 +43,7 @@
 
 #[macro_use]
 extern crate error_chain;
+extern crate futures;
 extern crate futures_glib;
 extern crate gdk;
 extern crate glib;
@@ -68,8 +69,23 @@ pub type Modes = &'static [(&'static str, &'static str)];
 /// Map variable names to a function returning the value of this variable.
 
 pub use app::{Mg, parse_config};
-pub use app::Msg::{AppClose, CustomCommand, ModeChanged, SetMode, SettingChanged};
-pub use app::dialog::{DialogBuilder, DialogResult};
+pub use app::Msg::{
+    Alert,
+    AppClose,
+    CustomCommand,
+    DarkTheme,
+    DeleteCompletionItem,
+    Info,
+    ModeChanged,
+    Question,
+    SetMode,
+    SetSetting,
+    SettingChanged,
+    Title,
+    Variables,
+    Warning,
+};
+pub use app::dialog::{DialogBuilder, DialogResult, input, question};
 pub use app::settings::{DefaultConfig, NoSettings};
 pub use app::status_bar::{StatusBar, StatusBarItem};
 pub use completion::Completers;
@@ -80,5 +96,21 @@ macro_rules! hash {
         let mut hash_map: ::mg::Completers = ::std::collections::HashMap::new();
         $(hash_map.insert($ident, $value);)*
         hash_map
+    }};
+}
+
+#[macro_export]
+macro_rules! char_slice {
+    ($( $val:expr ),*) => {{
+        static SLICE: &'static [char] = &[$($val),*];
+        SLICE
+    }};
+}
+
+#[macro_export]
+macro_rules! static_slice {
+    ($( $val:expr ),* ; $typ:ty) => {{
+        static SLICE: &'static [$typ] = &[$($val),*];
+        SLICE
     }};
 }

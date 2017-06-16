@@ -68,7 +68,7 @@ pub struct NoCompleter {
 
 impl NoCompleter {
     /// Create a new nop completer.
-    #[allow(new_without_default_derive)]
+    #[allow(new_without_default_derive, unknown_lints)]
     pub fn new() -> Self {
         NoCompleter {
         }

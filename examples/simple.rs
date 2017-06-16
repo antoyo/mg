@@ -19,7 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#![feature(closure_to_fn_coercion, proc_macro)]
+#![feature(proc_macro)]
 
 extern crate gtk;
 extern crate mg;
@@ -40,11 +40,14 @@ use gtk::Orientation::Vertical;
 use mg::{
     AppClose,
     CustomCommand,
+    DarkTheme,
     Mg,
     Modes,
     NoSettings,
     SetMode,
     StatusBarItem,
+    Title,
+    Variables,
 };
 use relm::Widget;
 use relm_attributes::widget;
@@ -100,9 +103,9 @@ impl Widget for Win {
     view! {
         #[name="mg"]
         Mg<AppCommand, NoSettings>((MODES, Ok("examples/main.conf".into()), None, vec![])) {
-            dark_theme: true,
-            title: "First Mg Program",
-            variables: vec![("url", Box::new(|| "http://duckduckgo.com/lite".to_string()))],
+            DarkTheme: true,
+            Title: "First Mg Program".to_string(),
+            Variables: vec![("url", Box::new(|| "http://duckduckgo.com/lite".to_string()))],
             gtk::Box {
                 orientation: Vertical,
                 gtk::Label {

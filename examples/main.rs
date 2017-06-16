@@ -19,9 +19,10 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#![feature(closure_to_fn_coercion, proc_macro)]
+#![feature(proc_macro)]
 
 extern crate gtk;
+#[macro_use]
 extern crate mg;
 extern crate mg_settings;
 #[macro_use]
@@ -36,14 +37,24 @@ extern crate relm_derive;
 use gtk::{ButtonExt, OrientableExt, WidgetExt};
 use gtk::Orientation::Vertical;
 use mg::{
+    Alert,
     AppClose,
     CustomCommand,
+    DarkTheme,
+    DeleteCompletionItem,
+    Info,
     Mg,
     Modes,
     ModeChanged,
     SetMode,
+    SetSetting,
     SettingChanged,
     StatusBarItem,
+    Title,
+    Variables,
+    Warning,
+    input,
+    question,
 };
 use relm::{Relm, Widget};
 use relm_attributes::widget;
@@ -61,16 +72,16 @@ pub struct Model {
 
 #[derive(Msg)]
 pub enum Msg {
-    Alert,
     CheckQuit(Option<String>),
     Command(AppCommand),
     Echo(Option<String>),
-    Info,
-    Input,
     Mode(String),
-    Question,
     Setting(AppSettingsVariant),
-    Warning,
+    ShowAlert,
+    ShowInfo,
+    ShowInput,
+    ShowQuestion,
+    ShowWarning,
 }
 
 static MODES: Modes = &[
@@ -93,19 +104,15 @@ impl Widget for Win {
 
     fn mode_changed(&mut self, mode: &str) {
         if mode != "normal" {
-            {
-                let widget = self.mg.widget();
-                let title = &widget.settings().title;
-                self.model.text = format!("Title was: {}", title);
-            }
-            self.mg.widget_mut().set_setting(Title(mode.to_string()));
+            self.model.text = format!("Title was: {}", self.model.title);
+            self.mg.emit(SetSetting(WindowTitle(mode.to_string())));
         }
     }
 
     fn setting_changed(&mut self, setting: AppSettingsVariant) {
         match setting {
             CustomSet(setting) => self.model.text = format!("custom setting is: {:?}", setting),
-            Title(title) => self.model.title = title,
+            WindowTitle(title) => self.model.title = title,
             TitleLen(len) => self.model.title = format!("New title len: {}", len),
             Boolean(_) | Width(_) => (),
         }
@@ -113,7 +120,6 @@ impl Widget for Win {
 
     fn update(&mut self, event: Msg) {
         match event {
-            Alert => self.mg.widget_mut().alert("Blue Alert"),
             CheckQuit(answer) => {
                 if answer == Some("y".to_string()) {
                     gtk::main_quit();
@@ -122,7 +128,7 @@ impl Widget for Win {
             Command(command) => {
                 match command {
                     BackwardSearch(input) => println!("Searching backward for {}", input),
-                    DeleteEntry => self.mg.widget().delete_current_completion_item(),
+                    DeleteEntry => self.mg.emit(DeleteCompletionItem),
                     Follow => (),
                     Insert | Normal => (),
                     Open(url) => self.model.text = format!("Opening URL {}", url),
@@ -133,21 +139,24 @@ impl Widget for Win {
                 }
             },
             Echo(answer) => self.model.text = format!("You said: {}", answer.unwrap_or("Nothing".to_string())),
-            Info => self.mg.widget_mut().info("Info"),
-            Input => self.mg.widget_mut().input(&self.model.relm, "Say something", "Oh yeah?", Echo),
             Mode(mode) => self.mode_changed(&mode),
-            Question => self.mg.widget_mut().question(&self.model.relm, "Do you want to quit?", &['y', 'n'], CheckQuit),
             Setting(setting) => self.setting_changed(setting),
-            Warning => self.mg.widget_mut().warning("Warning"),
+            ShowAlert => self.mg.emit(Alert("Blue Alert".to_string())),
+            ShowInfo => self.mg.emit(Info("Info".to_string())),
+            ShowInput => input(&self.mg, &self.model.relm, "Say something".to_string(),
+                "Oh yeah?".to_string(), Echo),
+            ShowQuestion => question(&self.mg, &self.model.relm, "Do you want to quit?".to_string(),
+                char_slice!['y', 'n'], CheckQuit),
+            ShowWarning => self.mg.emit(Warning("Warning".to_string())),
         }
     }
 
     view! {
         #[name="mg"]
         Mg<AppCommand, AppSettings>((MODES, Ok("examples/main.conf".into()), Some("/home/bouanto".into()), vec![])) {
-            dark_theme: true,
-            title: &self.model.title,
-            variables: vec![("url", Box::new(|| "http://duckduckgo.com/lite".to_string()))],
+            DarkTheme: true,
+            Title: self.model.title.clone(),
+            Variables: vec![("url", Box::new(|| "http://duckduckgo.com/lite".to_string()))],
             gtk::Box {
                 orientation: Vertical,
                 gtk::Label {
@@ -158,23 +167,23 @@ impl Widget for Win {
                 },
                 gtk::Button {
                     label: "Alert",
-                    clicked => Alert,
+                    clicked => ShowAlert,
                 },
                 gtk::Button {
                     label: "Info",
-                    clicked => Info,
+                    clicked => ShowInfo,
                 },
                 gtk::Button {
                     label: "Warning",
-                    clicked => Warning,
+                    clicked => ShowWarning,
                 },
                 gtk::Button {
                     label: "Question",
-                    clicked => Question,
+                    clicked => ShowQuestion,
                 },
                 gtk::Button {
                     label: "Input",
-                    clicked => Input,
+                    clicked => ShowInput,
                 },
             },
             StatusBarItem {
@@ -232,7 +241,7 @@ pub struct AppSettings {
     boolean: bool,
     custom_set: CustomSetting,
     #[help(text="The window title")]
-    title: String,
     title_len: i64,
     width: i64,
+    window_title: String,
 }

@@ -19,7 +19,6 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-use gdk::RGBA;
 use gtk;
 use gtk::{
     BoxExt,
@@ -30,7 +29,6 @@ use gtk::{
     OrientableExt,
     PackType,
     WidgetExt,
-    STATE_FLAG_NORMAL,
     STYLE_PROVIDER_PRIORITY_APPLICATION,
 };
 use gtk::Orientation::Horizontal;
@@ -39,11 +37,25 @@ use relm::{Relm, Widget};
 use relm_attributes::widget;
 
 use self::Msg::*;
+use self::ItemMsg::Text;
 
 #[derive(Msg)]
 pub enum Msg {
+    DeleteNextChar,
+    DeleteNextWord,
+    DeletePreviousWord,
+    End,
     EntryActivate(Option<String>),
     EntryChanged(Option<String>),
+    EntryText(String),
+    EntryShown(bool),
+    Identifier(String),
+    NextChar,
+    NextWord,
+    PreviousChar,
+    PreviousWord,
+    ShowIdentifier,
+    SmartHome,
 }
 
 pub struct Model {
@@ -72,21 +84,41 @@ impl Widget for StatusBar {
         }
     }
 
-    // TODO: merge with show_entry()?
     /// Set whether the entry is visible or not.
-    pub fn set_entry_shown(&mut self, visible: bool) {
+    fn set_entry_shown(&mut self, visible: bool) {
+        // TODO: document this use of lock.
         let _lock = self.model.relm.stream().lock();
         self.command_entry.set_text("");
         self.model.identifier_visible = visible;
         self.command_entry.set_visible(visible);
+
+        if visible {
+            self.command_entry.grab_focus();
+        }
     }
 
     /// Show the identifier.
-    pub fn show_identifier(&mut self) {
+    fn show_identifier(&mut self) {
         self.model.identifier_visible = true;
     }
 
-    fn update(&mut self, _msg: Msg) {
+    fn update(&mut self, msg: Msg) {
+        match msg {
+            DeleteNextChar => self.delete_next_char(),
+            DeleteNextWord => self.delete_next_word(),
+            DeletePreviousWord => self.delete_previous_word(),
+            End => self.end(),
+            EntryActivate(_) | EntryChanged(_) => (), // NOTE: to be listened by the user.
+            EntryShown(visible) => self.set_entry_shown(visible),
+            EntryText(input) => self.set_input(&input),
+            Identifier(identifier) => self.set_identifier(&identifier),
+            NextChar => self.next_char(),
+            NextWord => self.next_word(),
+            PreviousChar => self.previous_char(),
+            PreviousWord => self.previous_word(),
+            ShowIdentifier => self.show_identifier(),
+            SmartHome => self.smart_home(),
+        }
     }
 
     view! {
@@ -112,37 +144,10 @@ impl Widget for StatusBar {
 }
 
 impl StatusBar {
-    /// Color the status bar in blue.
-    pub fn color_blue(&self) {
-        self.root().override_background_color(STATE_FLAG_NORMAL, &RGBA::blue());
-        self.white_foreground();
-    }
-
-    /// Color the status bar in orange.
-    pub fn color_orange(&self) {
-        self.root().override_background_color(STATE_FLAG_NORMAL, &RGBA {
-            red: 0.9,
-            green: 0.55,
-            blue: 0.0,
-            alpha: 1.0 ,
-        });
-        self.white_foreground();
-    }
-
-    /// Color the status bar in red.
-    pub fn color_red(&self) {
-        self.root().override_background_color(STATE_FLAG_NORMAL, &RGBA::red());
-        self.white_foreground();
-    }
-
-    /// Connect the active entry event.
-    pub fn connect_activate<F: Fn(Option<String>) + 'static>(&self, callback: F) {
-        self.command_entry.connect_activate(move |entry| callback(entry.get_text()));
-    }
-
     /// Delete the character after the cursor.
-    pub fn delete_next_char(&self) {
+    fn delete_next_char(&self) {
         if self.command_entry.get_selection_bounds().is_some() {
+            // NOTE: Lock to avoid moving the cursor when updating the text entry.
             let _lock = self.model.relm.stream().lock();
             self.command_entry.delete_selection();
         }
@@ -151,6 +156,7 @@ impl StatusBar {
                 let pos = self.command_entry.get_position();
                 let len = text.len();
                 if pos < len as i32 {
+                    // NOTE: Lock to avoid moving the cursor when updating the text entry.
                     let _lock = self.model.relm.stream().lock();
                     self.command_entry.delete_text(pos, pos + 1);
                 }
@@ -159,8 +165,9 @@ impl StatusBar {
     }
 
     /// Delete the word after the cursor.
-    pub fn delete_next_word(&self) {
+    fn delete_next_word(&self) {
         if self.command_entry.get_selection_bounds().is_some() {
+            // NOTE: Lock to avoid moving the cursor when updating the text entry.
             let _lock = self.model.relm.stream().lock();
             self.command_entry.delete_selection();
         }
@@ -174,6 +181,7 @@ impl StatusBar {
                     .map(|(index, _)| index)
                     .next()
                     .unwrap_or_else(|| text.len());
+                // NOTE: Lock to avoid moving the cursor when updating the text entry.
                 let _lock = self.model.relm.stream().lock();
                 self.command_entry.delete_text(pos, end as i32);
             }
@@ -181,8 +189,9 @@ impl StatusBar {
     }
 
     /// Delete the word before the cursor.
-    pub fn delete_previous_word(&self) {
+    fn delete_previous_word(&self) {
         if self.command_entry.get_selection_bounds().is_some() {
+            // NOTE: Lock to avoid moving the cursor when updating the text entry.
             let _lock = self.model.relm.stream().lock();
             self.command_entry.delete_selection();
         }
@@ -197,6 +206,7 @@ impl StatusBar {
                     .map(|(index, _)| len - index)
                     .next()
                     .unwrap_or_default();
+                // NOTE: Lock to avoid moving the cursor when updating the text entry.
                 let _lock = self.model.relm.stream().lock();
                 self.command_entry.delete_text(start as i32, pos);
             }
@@ -204,23 +214,18 @@ impl StatusBar {
     }
 
     /// Go to the end of the command entry.
-    pub fn end(&self) {
+    fn end(&self) {
         let text = self.get_command().unwrap_or_default();
         self.command_entry.set_position(text.len() as i32);
     }
 
     /// Get the text of the command entry.
-    pub fn get_command(&self) -> Option<String> {
+    fn get_command(&self) -> Option<String> {
         self.command_entry.get_text()
     }
 
-    /// Hide the entry.
-    pub fn hide_entry(&mut self) {
-        self.set_entry_shown(false);
-    }
-
     /// Go forward one character in the command entry.
-    pub fn next_char(&self) {
+    fn next_char(&self) {
         let pos = self.command_entry.get_position();
         let text = self.get_command().unwrap_or_default();
         if pos < text.len() as i32 {
@@ -229,7 +234,7 @@ impl StatusBar {
     }
 
     /// Go forward one word in the command entry.
-    pub fn next_word(&self) {
+    fn next_word(&self) {
         let pos = self.command_entry.get_position();
         let text = self.get_command().unwrap_or_default();
         let position = text.chars().enumerate()
@@ -243,7 +248,7 @@ impl StatusBar {
     }
 
     /// Go back one character in the command entry.
-    pub fn previous_char(&self) {
+    fn previous_char(&self) {
         let pos = self.command_entry.get_position();
         if pos > 0 {
             self.command_entry.set_position(pos - 1);
@@ -251,7 +256,7 @@ impl StatusBar {
     }
 
     /// Go back one word in the command entry.
-    pub fn previous_word(&self) {
+    fn previous_word(&self) {
         let pos = self.command_entry.get_position();
         let text = self.get_command().unwrap_or_default();
         let len = text.len();
@@ -266,26 +271,21 @@ impl StatusBar {
     }
 
     /// Seth the prefix identifier shown at the left of the command entry.
-    pub fn set_identifier(&self, identifier: &str) {
+    fn set_identifier(&self, identifier: &str) {
         self.identifier_label.set_text(identifier);
     }
 
     /// Set the text of the input entry and move the cursor at the end.
-    pub fn set_input(&self, command: &str) {
-        // Prevent updating the completions when the user selects a completion entry.
+    fn set_input(&self, command: &str) {
+        // NOTE: Prevent updating the completions when the user selects a completion entry.
         let _lock = self.model.relm.stream().lock();
         self.command_entry.set_text(command);
         self.command_entry.set_position(command.len() as i32);
     }
 
-    /// Show the entry.
-    pub fn show_entry(&self) {
-        self.command_entry.grab_focus();
-    }
-
     /// Go to the beginning of the command entry.
     /// If the cursor is already at the beginning, go after the spaces after the command name.
-    pub fn smart_home(&self) {
+    fn smart_home(&self) {
         let pos = self.command_entry.get_position();
         if pos == 0 {
             let text = self.get_command().unwrap_or_default();
@@ -302,11 +302,11 @@ impl StatusBar {
             self.command_entry.set_position(0);
         }
     }
+}
 
-    /// Set the foreground (text) color to white.
-    pub fn white_foreground(&self) {
-        self.root().override_color(STATE_FLAG_NORMAL, &RGBA::white());
-    }
+#[derive(Msg)]
+pub enum ItemMsg {
+    Text(String),
 }
 
 /// A status bar text item.
@@ -316,7 +316,10 @@ impl Widget for StatusBarItem {
         ()
     }
 
-    fn update(&mut self, _msg: ()) {
+    fn update(&mut self, msg: ItemMsg) {
+        match msg {
+            Text(text) => self.label.set_text(&text),
+        }
     }
 
     view! {
@@ -329,12 +332,5 @@ impl Widget for StatusBarItem {
                 padding: 3,
             },
         }
-    }
-}
-
-impl StatusBarItem {
-    /// Set the text of the status bar item.
-    pub fn set_text(&self, text: &str) {
-        self.label.set_text(text);
     }
 }
