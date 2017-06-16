@@ -19,8 +19,40 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+use glib::translate::ToGlib;
 use gdk::RGBA;
-use gtk::{IsA, Object, Widget, WidgetExt, STATE_FLAG_NORMAL};
+use gtk::{IsA, Object, Settings, Widget, WidgetExt, STATE_FLAG_NORMAL};
+use mg_settings::{self, EnumFromStr, EnumMetaData, SettingCompletion, SpecialCommand};
+
+use app::Mg;
+
+const TRANSPARENT: &RGBA = &RGBA { red: 0.0, green: 0.0, blue: 0.0, alpha: 0.0 };
+
+impl<COMM, SETT> Mg<COMM, SETT>
+    where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
+          SETT: Default + EnumMetaData + mg_settings::settings::Settings + SettingCompletion + 'static,
+{
+    /// Get the color of the text.
+    pub fn get_foreground_color(&self) -> RGBA {
+        let style_context = self.window.get_style_context().unwrap();
+        style_context.get_color(STATE_FLAG_NORMAL)
+    }
+
+    /// Reset the background and foreground colors of the status bar.
+    pub fn reset_colors(&self) {
+        let status_bar = self.status_bar.widget();
+        // TODO: switch to CSS.
+        status_bar.override_background_color(STATE_FLAG_NORMAL, TRANSPARENT);
+        status_bar.override_color(STATE_FLAG_NORMAL, &self.model.foreground_color);
+    }
+
+    /// Use the dark variant of the theme if available.
+    pub fn set_dark_theme(&mut self, use_dark: bool) {
+        let settings = Settings::get_default().unwrap();
+        settings.set_long_property("gtk-application-prefer-dark-theme", use_dark.to_glib() as _, "");
+        self.model.foreground_color = self.get_foreground_color();
+    }
+}
 
 /// Color the status bar in blue.
 pub fn color_blue<W: IsA<Object> + IsA<Widget>>(widget: &W) {

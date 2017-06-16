@@ -31,7 +31,7 @@ use relm::{ContainerComponent, EventStream, Relm, Widget};
 
 use app::{Mg, BLOCKING_INPUT_MODE, INPUT_MODE};
 use app::color::color_blue;
-use app::Msg::{Input, Question};
+use app::Msg::{self, EnterNormalModeAndReset, Input, Question};
 use app::status_bar::Msg::{Identifier, ShowIdentifier};
 use completion::completion_view::Msg::{SetOriginalInput, ShowCompletion};
 use self::DialogResult::{Answer, Shortcut};
@@ -193,6 +193,26 @@ impl<COMM, SETT> Mg<COMM, SETT>
             .message(message)
             .choices(choices);
         self.show_dialog(builder);
+    }
+
+    /// Set the answer to return to the caller of the dialog.
+    pub fn set_dialog_answer(&mut self, answer: &str) -> Option<Msg<COMM, SETT>> {
+        let mut should_reset = false;
+        if self.model.current_mode == BLOCKING_INPUT_MODE {
+            self.model.answer = Some(answer.to_string());
+            gtk::main_quit();
+        }
+        else if let Some(callback) = self.model.input_callback.take() {
+            callback(Some(answer.to_string()));
+            self.model.choices.clear();
+            should_reset = true;
+        }
+        if should_reset {
+            Some(EnterNormalModeAndReset)
+        }
+        else {
+            None
+        }
     }
 
     /// Show a dialog created with a `DialogBuilder`.
