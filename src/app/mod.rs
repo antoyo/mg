@@ -56,7 +56,7 @@ use mg_settings::{
     SpecialCommand,
 };
 use mg_settings::ParseResult;
-use mg_settings::errors::Error;
+use mg_settings::errors;
 use mg_settings::key::Key;
 use relm::{Relm, Resolver, Widget};
 use relm_attributes::widget;
@@ -145,7 +145,7 @@ pub struct Model<COMM, SETT>
     current_shortcut: Vec<Key>,
     entry_shown: bool,
     foreground_color: RGBA,
-    initial_errors: Vec<Error>,
+    initial_errors: Vec<errors::Error>,
     initial_parse_result: Option<ParseResult<COMM>>,
     input_callback: Option<Box<Fn(Option<String>)>>,
     mappings: Mappings,
@@ -176,6 +176,7 @@ pub enum Msg<COMM, SETT>
     EnterCommandMode,
     EnterNormalMode,
     EnterNormalModeAndReset,
+    Error(errors::Error),
     HideColoredMessage(String),
     HideInfo(String),
     Info(String),
@@ -216,7 +217,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     }
 
     /// Show an error to the user.
-    fn error(&mut self, error: Error) {
+    fn error(&mut self, error: errors::Error) {
         let mut message = String::new();
         let error_str = error.to_string();
         message.push_str(&error_str);
@@ -455,6 +456,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             Message(msg) => self.message(&msg),
             KeyPress(key, resolver) => self.key_press(&key, resolver),
             KeyRelease(key) => self.key_release(&key),
+            Error(error) => self.error(error),
             HideColoredMessage(message) => self.hide_colored_message(&message),
             HideInfo(message) => self.hide_info(&message),
             // To be listened by the user.

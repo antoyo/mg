@@ -75,6 +75,7 @@ pub use app::Msg::{
     CustomCommand,
     DarkTheme,
     DeleteCompletionItem,
+    Error,
     Info,
     Message,
     ModeChanged,
