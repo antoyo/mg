@@ -76,6 +76,7 @@ pub use app::Msg::{
     DarkTheme,
     DeleteCompletionItem,
     Info,
+    Message,
     ModeChanged,
     Question,
     SetMode,

@@ -161,7 +161,6 @@ pub struct Model<COMM, SETT>
     variables: HashMap<String, Box<Fn() -> String>>,
 }
 
-// TODO: Switch back to SimpleMsg.
 #[allow(missing_docs)]
 #[derive(Msg)]
 pub enum Msg<COMM, SETT>
@@ -257,7 +256,6 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         self.reset_colors();
 
         let timeout = Timeout::new(Duration::from_secs(INFO_MESSAGE_DURATION));
-        // TODO: remove the clone and closure when switching back to SimpleMsg.
         self.model.relm.connect_exec_ignore_err(timeout, move |_| HideInfo(message.clone()));
     }
 
@@ -275,7 +273,6 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         color_orange(self.status_bar.widget());
 
         let timeout = Timeout::new(Duration::from_secs(INFO_MESSAGE_DURATION));
-        // TODO: remove the clone and closure when switching back to SimpleMsg.
         self.model.relm.connect_exec_ignore_err(timeout, move |_| HideColoredMessage(message.clone()));
     }
 
@@ -460,6 +457,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             KeyRelease(key) => self.key_release(&key),
             HideColoredMessage(message) => self.hide_colored_message(&message),
             HideInfo(message) => self.hide_info(&message),
+            // To be listened by the user.
             ModeChanged(_) | SettingChanged(_) => (),
             Question(responder, question, choices) => self.question(responder, &question, choices),
             SetMode(mode) => self.set_mode(mode),
