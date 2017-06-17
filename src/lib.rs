@@ -72,6 +72,8 @@ pub use app::{Mg, parse_config};
 pub use app::Msg::{
     Alert,
     AppClose,
+    Completers,
+    CompletionViewChange,
     CustomCommand,
     DarkTheme,
     DeleteCompletionItem,
@@ -90,7 +92,6 @@ pub use app::Msg::{
 pub use app::dialog::{DialogBuilder, DialogResult, input, question};
 pub use app::settings::{DefaultConfig, NoSettings};
 pub use app::status_bar::{StatusBar, StatusBarItem};
-pub use completion::Completers;
 
 #[macro_export]
 macro_rules! hash {
