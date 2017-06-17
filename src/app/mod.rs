@@ -69,13 +69,13 @@ use app::shortcut::shortcut_to_string;
 use completion::{
     self,
     CommandCompleter,
-    Completers,
     CompletionView,
     SettingCompleter,
     DEFAULT_COMPLETER_IDENT,
     NO_COMPLETER_IDENT,
 };
 use completion::completion_view::Msg::{
+    AddCompleters,
     Completer,
     CompletionChange,
     DeleteCurrentCompletionItem,
@@ -169,6 +169,7 @@ pub enum Msg<COMM, SETT>
 {
     Alert(String),
     AppClose,
+    Completers(HashMap<&'static str, Box<completion::Completer>>),
     CompletionViewChange(String),
     CustomCommand(COMM),
     DarkTheme(bool),
@@ -209,7 +210,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         color_blue(self.status_bar.widget());
     }
 
-    fn default_completers() -> Completers {
+    fn default_completers() -> completion::Completers {
         let mut completers: HashMap<_, Box<completion::Completer>> = HashMap::new();
         completers.insert(DEFAULT_COMPLETER_IDENT, Box::new(CommandCompleter::<COMM>::new()));
         completers.insert("set", Box::new(SettingCompleter::<SETT>::new()));
@@ -429,6 +430,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             Alert(msg) => self.alert(&msg),
             // To be listened to by the user.
             AppClose => (),
+            Completers(completers) => self.completion_view.emit(AddCompleters(completers)),
             CompletionViewChange(completion) => self.set_input(&completion),
             // To be listened to by the user.
             CustomCommand(_) => (),
