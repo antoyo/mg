@@ -68,7 +68,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
         match key.get_keyval() {
             Escape => {
                 if let Some(callback) = self.model.input_callback.take() {
-                    callback(None);
+                    callback(None, self.model.shortcut_pressed);
                 }
                 (Some(EnterNormalModeAndReset), Inhibit(false))
             },

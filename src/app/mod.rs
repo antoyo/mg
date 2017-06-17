@@ -147,7 +147,7 @@ pub struct Model<COMM, SETT>
     foreground_color: RGBA,
     initial_errors: Vec<errors::Error>,
     initial_parse_result: Option<ParseResult<COMM>>,
-    input_callback: Option<Box<Fn(Option<String>)>>,
+    input_callback: Option<Box<Fn(Option<String>, bool)>>,
     mappings: Mappings,
     message: String,
     mode_label: String,
@@ -169,6 +169,9 @@ pub enum Msg<COMM, SETT>
 {
     Alert(String),
     AppClose,
+    BlockingInput(Box<Responder>, String, String),
+    BlockingQuestion(Box<Responder>, String, Vec<char>),
+    BlockingYesNoQuestion(Box<Responder>, String),
     Completers(HashMap<&'static str, Box<completion::Completer>>),
     CompletionViewChange(String),
     CustomCommand(COMM),
@@ -187,6 +190,7 @@ pub enum Msg<COMM, SETT>
     Message(String),
     ModeChanged(String),
     Question(Box<Responder>, String, &'static [char]),
+    ResetInput,
     SetMode(&'static str),
     SetSetting(SETT::Variant),
     SettingChanged(SETT::Variant),
@@ -388,6 +392,13 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         self.clear_shortcut();
     }
 
+    /// Reset the input after closing a input dialog.
+    fn reset_input(&mut self) {
+        self.reset();
+        self.return_to_normal_mode();
+        self.model.choices.clear();
+    }
+
     fn return_to_normal_mode(&mut self) {
         self.hide_entry_and_completion();
         self.set_mode(NORMAL_MODE);
@@ -430,6 +441,10 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             Alert(msg) => self.alert(&msg),
             // To be listened to by the user.
             AppClose => (),
+            BlockingInput(responder, question, default_answer) =>
+                self.blocking_input(responder, question, default_answer),
+            BlockingQuestion(responder, question, choices) => self.blocking_question(responder, question, choices),
+            BlockingYesNoQuestion(responder, question) => self.blocking_yes_no_question(responder, question),
             Completers(completers) => self.completion_view.emit(AddCompleters(completers)),
             CompletionViewChange(completion) => self.set_input(&completion),
             // To be listened to by the user.
@@ -454,7 +469,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                 self.clear_shortcut();
             },
             Info(msg) => self.info(&msg),
-            Input(responder, input, default_answer) => self.input(responder, &input, &default_answer),
+            Input(responder, input, default_answer) => self.input(responder, input, default_answer),
             Message(msg) => self.message(&msg),
             KeyPress(key, resolver) => self.key_press(&key, resolver),
             KeyRelease(key) => self.key_release(&key),
@@ -463,7 +478,8 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             HideInfo(message) => self.hide_info(&message),
             // To be listened by the user.
             ModeChanged(_) | SettingChanged(_) => (),
-            Question(responder, question, choices) => self.question(responder, &question, choices),
+            Question(responder, question, choices) => self.question(responder, question, choices),
+            ResetInput => self.reset_input(),
             SetMode(mode) => self.set_mode(mode),
             SetSetting(setting) => self.set_setting(setting),
             StatusBarEntryActivate(input) => self.command_activate(input),

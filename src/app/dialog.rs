@@ -22,22 +22,63 @@
 //! Non-modal input dialogs.
 
 use std::collections::HashMap;
+use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
 
 use gtk;
 use mg_settings::{EnumFromStr, EnumMetaData, SettingCompletion, SpecialCommand};
 use mg_settings::key::Key;
 use mg_settings::settings;
-use relm::{ContainerComponent, EventStream, Relm, Widget};
+use relm::{
+    ContainerComponent,
+    EventStream,
+    Relm,
+    Update,
+    Widget,
+};
 
 use app::{Mg, BLOCKING_INPUT_MODE, INPUT_MODE};
 use app::color::color_blue;
-use app::Msg::{self, EnterNormalModeAndReset, Input, Question};
+use app::Msg::{
+    self,
+    BlockingInput,
+    BlockingQuestion,
+    BlockingYesNoQuestion,
+    EnterNormalModeAndReset,
+    Input,
+    Question,
+    ResetInput,
+};
 use app::status_bar::Msg::{Identifier, ShowIdentifier};
 use completion::completion_view::Msg::{SetOriginalInput, ShowCompletion};
 use self::DialogResult::{Answer, Shortcut};
 
 pub trait Responder {
-    fn respond(&self, answer: Option<String>);
+    fn respond(&self, answer: DialogResult);
+}
+
+pub struct BlockingInputDialog {
+    tx: SyncSender<Option<String>>,
+}
+
+impl BlockingInputDialog {
+    fn new() -> (Self, Receiver<Option<String>>) {
+        let (tx, rx) = sync_channel(1);
+        (BlockingInputDialog {
+            tx,
+        }, rx)
+    }
+}
+
+impl Responder for BlockingInputDialog {
+    fn respond(&self, answer: DialogResult) {
+        match answer {
+            Answer(answer) => {
+                self.tx.send(answer).expect("Sending answer shouldn't fail")
+            },
+            _ => unimplemented!(),
+        }
+        gtk::main_quit();
+    }
 }
 
 pub struct InputDialog<WIDGET: Widget> {
@@ -55,8 +96,11 @@ impl<WIDGET: Widget> InputDialog<WIDGET> {
 }
 
 impl<WIDGET: Widget> Responder for InputDialog<WIDGET> {
-    fn respond(&self, answer: Option<String>) {
-        self.stream.emit((self.callback)(answer));
+    fn respond(&self, answer: DialogResult) {
+        match answer {
+            Answer(answer) => self.stream.emit((self.callback)(answer)),
+            _ => unimplemented!(),
+        }
     }
 }
 
@@ -100,8 +144,8 @@ impl DialogBuilder {
     }
 
     /// Set the choices available for the input.
-    pub fn choices(mut self, choices: &[char]) -> Self {
-        self.choices = choices.to_vec();
+    pub fn choices(mut self, choices: Vec<char>) -> Self {
+        self.choices = choices;
         self
     }
 
@@ -112,14 +156,14 @@ impl DialogBuilder {
     }
 
     /// Set the default answer for the input.
-    pub fn default_answer(mut self, answer: &str) -> Self {
-        self.default_answer = answer.to_string();
+    pub fn default_answer(mut self, answer: String) -> Self {
+        self.default_answer = answer;
         self
     }
 
     /// Set the message/question to show to the user.
-    pub fn message(mut self, message: &str) -> Self {
-        self.message = message.to_string();
+    pub fn message(mut self, message: String) -> Self {
+        self.message = message;
         self
     }
 
@@ -147,38 +191,41 @@ pub enum DialogResult {
 }
 
 impl<COMM, SETT> Mg<COMM, SETT>
-    where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
-          SETT: Default + EnumMetaData + settings::Settings + SettingCompletion + 'static,
+where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
+      SETT: Default + EnumMetaData + settings::Settings + SettingCompletion + 'static,
 {
     /// Ask a question to the user and block until the user provides it (or cancel).
-    pub fn blocking_input(&mut self, message: &str, default_answer: &str) -> Option<String> {
+    pub fn blocking_input(&mut self, responder: Box<Responder>, message: String, default_answer: String) {
         let builder = DialogBuilder::new()
             .blocking(true)
             .default_answer(default_answer)
-            .message(message);
-        self.show_dialog_without_shortcuts(builder)
+            .message(message)
+            .responder(responder);
+        self.show_dialog_without_shortcuts(builder);
     }
 
     /// Ask a multiple-choice question to the user and block until the user provides it (or cancel).
-    pub fn blocking_question(&mut self, message: &str, choices: &[char]) -> Option<String> {
+    pub fn blocking_question(&mut self, responder: Box<Responder>, message: String, choices: Vec<char>) {
         let builder = DialogBuilder::new()
             .blocking(true)
+            .choices(choices)
             .message(message)
-            .choices(choices);
-        self.show_dialog_without_shortcuts(builder)
+            .responder(responder);
+        self.show_dialog_without_shortcuts(builder);
     }
 
     /// Show a blocking yes/no question.
-    pub fn blocking_yes_no_question(&mut self, message: &str) -> bool {
+    pub fn blocking_yes_no_question(&mut self, responder: Box<Responder>, message: String) {
         let builder = DialogBuilder::new()
             .blocking(true)
+            .choices(vec!['y', 'n'])
             .message(message)
-            .choices(&['y', 'n']);
-        self.show_dialog_without_shortcuts(builder) == Some("y".to_string())
+            .responder(responder);
+        self.show_dialog_without_shortcuts(builder);
     }
 
     /// Ask a question to the user.
-    pub fn input(&mut self, responder: Box<Responder>, message: &str, default_answer: &str) {
+    pub fn input(&mut self, responder: Box<Responder>, message: String, default_answer: String) {
         let builder = DialogBuilder::new()
             .responder(responder)
             .default_answer(default_answer)
@@ -187,23 +234,19 @@ impl<COMM, SETT> Mg<COMM, SETT>
     }
 
     /// Ask a multiple-choice question to the user.
-    pub fn question(&mut self, responder: Box<Responder>, message: &str, choices: &[char]) {
+    pub fn question(&mut self, responder: Box<Responder>, message: String, choices: &[char]) {
         let builder = DialogBuilder::new()
             .responder(responder)
             .message(message)
-            .choices(choices);
+            .choices(choices.to_vec());
         self.show_dialog(builder);
     }
 
     /// Set the answer to return to the caller of the dialog.
     pub fn set_dialog_answer(&mut self, answer: &str) -> Option<Msg<COMM, SETT>> {
         let mut should_reset = false;
-        if self.model.current_mode == BLOCKING_INPUT_MODE {
-            self.model.answer = Some(answer.to_string());
-            gtk::main_quit();
-        }
-        else if let Some(callback) = self.model.input_callback.take() {
-            callback(Some(answer.to_string()));
+        if let Some(callback) = self.model.input_callback.take() {
+            callback(Some(answer.to_string()), self.model.shortcut_pressed);
             self.model.choices.clear();
             should_reset = true;
         }
@@ -248,60 +291,96 @@ impl<COMM, SETT> Mg<COMM, SETT>
 
         self.model.answer = None;
         if dialog_builder.blocking {
-            self.model.input_callback = Some(Box::new(|_| {
-                gtk::main_quit();
-            }));
+            /*self.model.input_callback = Some(Box::new(|_, _| {
+                // TODO: is it still needed?
+                //gtk::main_quit();
+            }));*/
         }
         if dialog_builder.blocking {
             self.set_mode(BLOCKING_INPUT_MODE);
         }
         else {
-            if let Some(responder) = dialog_builder.responder {
-                self.model.input_callback = Some(Box::new(move |answer| {
-                    responder.respond(answer);
-                }));
-            }
             self.set_mode(INPUT_MODE);
-
+        }
+        if let Some(responder) = dialog_builder.responder {
+            self.model.input_callback = Some(Box::new(move |answer, shortcut_pressed| {
+                let answer =
+                    if shortcut_pressed {
+                        if let Some(answer) = answer.clone() {
+                            Shortcut(answer)
+                        }
+                        else {
+                            Answer(None)
+                        }
+                    }
+                    else {
+                        Answer(answer.clone())
+                    };
+                responder.respond(answer);
+            }));
         }
         color_blue(self.status_bar.widget());
-        if dialog_builder.blocking {
-            gtk::main();
-            self.reset();
-            self.return_to_normal_mode();
-            self.model.choices.clear();
-            if self.model.shortcut_pressed {
-                if let Some(answer) = self.model.answer.clone() {
-                    Shortcut(answer)
-                }
-                else {
-                    Answer(None)
-                }
-            }
-            else {
-                Answer(self.model.answer.clone())
-            }
-        }
-        else {
-            Answer(None)
-        }
+        Answer(None)
     }
 
     /// Show a dialog created with a `DialogBuilder` which does not contain shortcut.
-    pub fn show_dialog_without_shortcuts(&mut self, dialog_builder: DialogBuilder) -> Option<String> {
-        match self.show_dialog(dialog_builder) {
-            Answer(answer) => answer,
+    pub fn show_dialog_without_shortcuts(&mut self, dialog_builder: DialogBuilder) {
+        self.show_dialog(dialog_builder);
+            /*Answer(answer) => answer,
             Shortcut(_) => panic!("cannot return a shortcut in show_dialog_without_shortcuts()"),
-        }
+        }*/
+        // TODO
     }
+}
+
+/// Ask a question to the user and block until the user provides it (or cancel).
+pub fn blocking_input<COMM, SETT>(mg: &EventStream<<Mg<COMM, SETT> as Update>::Msg>, msg: String,
+    default_answer: String) -> Option<String>
+where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
+      SETT: Default + EnumMetaData + settings::Settings + SettingCompletion + 'static,
+{
+    let (blocking_input_dialog, rx) = BlockingInputDialog::new();
+    let responder = Box::new(blocking_input_dialog);
+    mg.emit(BlockingInput(responder, msg, default_answer));
+    gtk::main();
+    mg.emit(ResetInput);
+    rx.recv().unwrap_or(None)
+}
+
+/// Ask a multiple-choice question to the user and block until the user provides it (or cancel).
+pub fn blocking_question<COMM, SETT>(mg: &EventStream<<Mg<COMM, SETT> as Update>::Msg>, msg: String,
+    choices: &[char]) -> Option<String>
+where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
+      SETT: Default + EnumMetaData + settings::Settings + SettingCompletion + 'static,
+{
+    let (blocking_input_dialog, rx) = BlockingInputDialog::new();
+    let responder = Box::new(blocking_input_dialog);
+    mg.emit(BlockingQuestion(responder, msg, choices.to_vec()));
+    gtk::main();
+    mg.emit(ResetInput);
+    rx.recv().unwrap_or(None)
+}
+
+/// Show a blocking yes/no question.
+pub fn blocking_yes_no_question<COMM, SETT>(mg: &EventStream<<Mg<COMM, SETT> as Update>::Msg>, msg: String)
+    -> bool
+where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
+      SETT: Default + EnumMetaData + settings::Settings + SettingCompletion + 'static,
+{
+    let (blocking_input_dialog, rx) = BlockingInputDialog::new();
+    let responder = Box::new(blocking_input_dialog);
+    mg.emit(BlockingYesNoQuestion(responder, msg));
+    gtk::main();
+    mg.emit(ResetInput);
+    rx.recv() == Ok(Some("y".to_string()))
 }
 
 /// Ask a question to the user.
 pub fn input<COMM, SETT, WIDGET: Widget>(mg: &ContainerComponent<Mg<COMM, SETT>>, relm: &Relm<WIDGET>, msg: String,
     default_answer: String, callback: fn(Option<String>) -> WIDGET::Msg)
-    where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
-          SETT: Default + EnumMetaData + settings::Settings + SettingCompletion + 'static,
-          WIDGET: 'static,
+where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
+      SETT: Default + EnumMetaData + settings::Settings + SettingCompletion + 'static,
+      WIDGET: 'static,
 {
     let responder = Box::new(InputDialog::new(relm, callback));
     mg.emit(Input(responder, msg, default_answer));
@@ -310,9 +389,9 @@ pub fn input<COMM, SETT, WIDGET: Widget>(mg: &ContainerComponent<Mg<COMM, SETT>>
 /// Ask a multiple-choice question to the user.
 pub fn question<COMM, SETT, WIDGET: Widget>(mg: &ContainerComponent<Mg<COMM, SETT>>, relm: &Relm<WIDGET>, msg: String,
     choices: &'static [char], callback: fn(Option<String>) -> WIDGET::Msg)
-    where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
-          SETT: Default + EnumMetaData + settings::Settings + SettingCompletion + 'static,
-          WIDGET: 'static,
+where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
+      SETT: Default + EnumMetaData + settings::Settings + SettingCompletion + 'static,
+      WIDGET: 'static,
 {
     let responder = Box::new(InputDialog::new(relm, callback));
     mg.emit(Question(responder, msg, choices));

@@ -20,6 +20,7 @@
  */
 
 /*
+ * FIXME: avoid using an async callback for the key press event.
  * TODO: refactor to remove every use of callbacks in relm widgets, taking advantage of async
  * callback.
  * FIXME: the commands in the config file are not executed.
@@ -89,7 +90,15 @@ pub use app::Msg::{
     Variables,
     Warning,
 };
-pub use app::dialog::{DialogBuilder, DialogResult, input, question};
+pub use app::dialog::{
+    DialogBuilder,
+    DialogResult,
+    blocking_input,
+    blocking_question,
+    blocking_yes_no_question,
+    input,
+    question,
+};
 pub use app::settings::{DefaultConfig, NoSettings};
 pub use app::status_bar::{StatusBar, StatusBarItem};
 

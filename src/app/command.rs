@@ -156,7 +156,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
                 let mut should_reset = false;
                 if let Some(callback) = self.model.input_callback.take() {
                     self.model.answer = input.clone();
-                    callback(input);
+                    callback(input, self.model.shortcut_pressed);
                     should_reset = true;
                 }
                 self.model.choices.clear();
