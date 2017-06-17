@@ -96,7 +96,7 @@ pub use app::status_bar::{StatusBar, StatusBarItem};
 #[macro_export]
 macro_rules! hash {
     ($($ident:expr => $value:expr,)*) => {{
-        let mut hash_map: ::mg::Completers = ::std::collections::HashMap::new();
+        let mut hash_map: ::mg::completion::Completers = ::std::collections::HashMap::new();
         $(hash_map.insert($ident, $value);)*
         hash_map
     }};
