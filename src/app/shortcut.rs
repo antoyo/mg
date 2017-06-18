@@ -28,7 +28,6 @@ use mg_settings::key::Key::{self, Char};
 use app::{Mg, Msg, BLOCKING_INPUT_MODE, COMMAND_MODE, INPUT_MODE, NORMAL_MODE};
 use app::ShortcutCommand::{Complete, Incomplete};
 use key_converter::gdk_key_to_key;
-use completion::completion_view::Msg::ShowCompletion;
 
 /// Convert a shortcut of keys to a `String`.
 pub fn shortcut_to_string(keys: &[Key]) -> String {
@@ -57,8 +56,10 @@ impl<COMM, SETT> Mg<COMM, SETT>
         if let Some(key) = gdk_key_to_key(key) {
             if self.model.shortcuts.contains_key(&key) {
                 let answer = &self.model.shortcuts[&key].clone();
-                self.set_dialog_answer(answer);
                 self.model.shortcut_pressed = true;
+                // set_dialog_answer() must be called after setting shortcut_pressed because this
+                // method will set the answer to a Shortcut in this case.
+                self.set_dialog_answer(answer);
                 return true;
             }
         }
@@ -99,8 +100,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
                         },
                         Incomplete(command) => {
                             self.input_command(command);
-                            self.completion_view.stream().emit(ShowCompletion);
-                            self.update_completions();
+                            self.show_completion();
                             should_inhibit = true;
                         },
                     }

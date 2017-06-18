@@ -19,6 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+mod app_completion;
 mod color;
 mod command;
 mod config;
@@ -68,9 +69,7 @@ use app::settings::DefaultConfig;
 use app::shortcut::shortcut_to_string;
 use completion::{
     self,
-    CommandCompleter,
     CompletionView,
-    SettingCompleter,
     DEFAULT_COMPLETER_IDENT,
     NO_COMPLETER_IDENT,
 };
@@ -78,11 +77,10 @@ use completion::completion_view::Msg::{
     AddCompleters,
     Completer,
     CompletionChange,
-    DeleteCurrentCompletionItem,
-    UpdateCompletions,
     Visible,
 };
 use self::color::{color_blue, color_orange, color_red};
+use self::dialog::DialogBuilder;
 use self::status_bar::StatusBar;
 use self::status_bar::Msg::{
     EntryActivate,
@@ -175,6 +173,7 @@ pub enum Msg<COMM, SETT>
     Completers(HashMap<&'static str, Box<completion::Completer>>),
     CompletionViewChange(String),
     CustomCommand(COMM),
+    CustomDialog(DialogBuilder),
     DarkTheme(bool),
     DeleteCompletionItem,
     EnterCommandMode,
@@ -224,13 +223,6 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     fn alert(&mut self, message: &str) {
         self.model.message = message.to_string();
         color_blue(self.status_bar.widget());
-    }
-
-    fn default_completers() -> completion::Completers {
-        let mut completers: HashMap<_, Box<completion::Completer>> = HashMap::new();
-        completers.insert(DEFAULT_COMPLETER_IDENT, Box::new(CommandCompleter::<COMM>::new()));
-        completers.insert("set", Box::new(SettingCompleter::<SETT>::new()));
-        completers
     }
 
     /// Show an error to the user.
@@ -412,10 +404,6 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         self.set_current_identifier(':');
     }
 
-    fn set_completer(&mut self, completer: &str) {
-        self.model.completer = completer.to_string();
-    }
-
     /// Set the current (special) command identifier.
     fn set_current_identifier(&mut self, identifier: char) {
         self.model.current_command_mode = identifier;
@@ -456,6 +444,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             CompletionViewChange(completion) => self.set_input(&completion),
             // To be listened to by the user.
             CustomCommand(_) => (),
+            CustomDialog(builder) => self.show_dialog(builder),
             DarkTheme(dark) => self.set_dark_theme(dark),
             DeleteCompletionItem => self.delete_current_completion_item(),
             EnterCommandMode => {
@@ -561,11 +550,6 @@ impl<COMM, SETT> Mg<COMM, SETT>
     where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
           SETT: Default + EnumMetaData + mg_settings::settings::Settings + SettingCompletion + 'static,
 {
-    /// Delete the current completion item.
-    fn delete_current_completion_item(&self) {
-        self.completion_view.emit(DeleteCurrentCompletionItem);
-    }
-
     /// Set a setting value.
     fn set_setting(&mut self, setting: SETT::Variant) {
         self.model.settings.set_value(setting.clone());
@@ -584,10 +568,5 @@ impl<COMM, SETT> Mg<COMM, SETT>
         self.model.variables = variables.into_iter()
             .map(|(string, func)| (string.to_string(), func))
             .collect();
-    }
-
-    fn update_completions(&self) {
-        let input = self.model.status_bar_command.clone();
-        self.completion_view.emit(UpdateCompletions(self.model.current_mode.clone(), input));
     }
 }

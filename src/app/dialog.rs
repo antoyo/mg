@@ -39,7 +39,6 @@ use relm::{
 use app::{Mg, BLOCKING_INPUT_MODE, INPUT_MODE};
 use app::color::color_blue;
 use app::Msg::{
-    self,
     BlockingInput,
     BlockingQuestion,
     BlockingYesNoQuestion,
@@ -49,13 +48,18 @@ use app::Msg::{
     ResetInput,
 };
 use app::status_bar::Msg::{Identifier, ShowIdentifier};
-use completion::completion_view::Msg::{SetOriginalInput, ShowCompletion};
+use completion::completion_view::Msg::SetOriginalInput;
 use self::DialogResult::{Answer, Shortcut};
 
+/// A Responder is a way to send back the answer of a dialog to the code that showed this dialog.
 pub trait Responder {
+    /// Send the answer back.
+    /// It can be to a widget or a channel.
     fn respond(&self, answer: DialogResult);
 }
 
+/// Blocking input dialog responder.
+/// This is used to send the message to a channel when the user answers the dialog.
 pub struct BlockingInputDialog {
     tx: SyncSender<Option<String>>,
 }
@@ -81,6 +85,8 @@ impl Responder for BlockingInputDialog {
     }
 }
 
+/// Input dialog responder.
+/// This is used to specify which message to send to which widget when the user answers the dialog.
 pub struct InputDialog<WIDGET: Widget> {
     callback: fn(Option<String>) -> WIDGET::Msg,
     stream: EventStream<WIDGET::Msg>,
@@ -227,9 +233,9 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
     /// Ask a question to the user.
     pub fn input(&mut self, responder: Box<Responder>, message: String, default_answer: String) {
         let builder = DialogBuilder::new()
-            .responder(responder)
             .default_answer(default_answer)
-            .message(message);
+            .message(message)
+            .responder(responder);
         self.show_dialog(builder);
     }
 
@@ -243,7 +249,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
     }
 
     /// Set the answer to return to the caller of the dialog.
-    pub fn set_dialog_answer(&mut self, answer: &str) -> Option<Msg<COMM, SETT>> {
+    pub fn set_dialog_answer(&mut self, answer: &str) {
         let mut should_reset = false;
         if let Some(callback) = self.model.input_callback.take() {
             callback(Some(answer.to_string()), self.model.shortcut_pressed);
@@ -251,21 +257,17 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
             should_reset = true;
         }
         if should_reset {
-            Some(EnterNormalModeAndReset)
-        }
-        else {
-            None
+            self.model.relm.stream().emit(EnterNormalModeAndReset);
         }
     }
 
     /// Show a dialog created with a `DialogBuilder`.
-    pub fn show_dialog(&mut self, mut dialog_builder: DialogBuilder) -> DialogResult {
+    pub fn show_dialog(&mut self, mut dialog_builder: DialogBuilder) {
         self.model.shortcut_pressed = false;
-        {
-            self.model.shortcuts.clear();
-            for (key, value) in dialog_builder.shortcuts {
-                self.model.shortcuts.insert(key, value);
-            }
+
+        self.model.shortcuts.clear();
+        for (key, value) in dialog_builder.shortcuts {
+            self.model.shortcuts.insert(key, value);
         }
 
         let choices = dialog_builder.choices.clone();
@@ -286,7 +288,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
         if let Some(completer) = dialog_builder.completer {
             self.set_completer(&completer);
             self.completion_view.emit(SetOriginalInput(dialog_builder.default_answer));
-            self.completion_view.emit(ShowCompletion);
+            self.show_completion();
         }
 
         self.model.answer = None;
@@ -320,7 +322,6 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
             }));
         }
         color_blue(self.status_bar.widget());
-        Answer(None)
     }
 
     /// Show a dialog created with a `DialogBuilder` which does not contain shortcut.

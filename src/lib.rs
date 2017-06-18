@@ -76,6 +76,7 @@ pub use app::Msg::{
     Completers,
     CompletionViewChange,
     CustomCommand,
+    CustomDialog,
     DarkTheme,
     DeleteCompletionItem,
     Error,
@@ -91,8 +92,11 @@ pub use app::Msg::{
     Warning,
 };
 pub use app::dialog::{
+    BlockingInputDialog,
     DialogBuilder,
     DialogResult,
+    InputDialog,
+    Responder,
     blocking_input,
     blocking_question,
     blocking_yes_no_question,

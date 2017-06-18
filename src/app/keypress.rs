@@ -78,8 +78,8 @@ impl<COMM, SETT> Mg<COMM, SETT>
                 }
                 else if let Some(character) = char::from_u32(keyval) {
                     if self.model.choices.contains(&character) {
-                        let msg = self.set_dialog_answer(&character.to_string());
-                        return (msg, Inhibit(true));
+                        self.set_dialog_answer(&character.to_string());
+                        return (None, Inhibit(true));
                     }
                 }
                 self.handle_shortcut(key)
