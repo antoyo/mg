@@ -114,7 +114,7 @@ impl Widget for Win {
             CustomSet(setting) => self.model.text = format!("custom setting is: {:?}", setting),
             WindowTitle(title) => self.model.title = title,
             TitleLen(len) => self.model.title = format!("New title len: {}", len),
-            Boolean(_) | Width(_) => (),
+            Boolean(_) | Width(_) => println!("boolean or width"),
         }
     }
 

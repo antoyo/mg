@@ -184,6 +184,7 @@ pub enum Msg<COMM, SETT>
     HideColoredMessage(String),
     HideInfo(String),
     Info(String),
+    InitAfter,
     Input(Box<Responder>, String, String),
     KeyPress(EventKey, Resolver<Inhibit>),
     KeyRelease(EventKey),
@@ -208,6 +209,17 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
           SETT: Default + EnumMetaData + mg_settings::settings::Settings + SettingCompletion + 'static,
 {
+    fn after_children_added(&mut self) {
+        // NOTE: This code is not in init_view() because the SettingChanged signal would be sent
+        // before the user's code connected to this event.
+        let parse_result = self.model.initial_parse_result.take().expect("initial parse result");
+        self.execute_commands(parse_result, false);
+        let errors: Vec<_> = self.model.initial_errors.drain(..).collect();
+        for error in errors {
+            self.error(error);
+        }
+    }
+
     /// Show an alert message to the user.
     fn alert(&mut self, message: &str) {
         self.model.message = message.to_string();
@@ -290,12 +302,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
 
     fn init_view(&mut self) {
         self.model.foreground_color = self.get_foreground_color();
-        let parse_result = self.model.initial_parse_result.take().expect("initial parse result");
-        self.execute_commands(parse_result, false);
-        let errors: Vec<_> = self.model.initial_errors.drain(..).collect();
-        for error in errors {
-            self.error(error);
-        }
+        self.model.relm.stream().emit(InitAfter);
     }
 
     /// Input the specified command.
@@ -469,6 +476,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                 self.clear_shortcut();
             },
             Info(msg) => self.info(&msg),
+            InitAfter => self.after_children_added(),
             Input(responder, input, default_answer) => self.input(responder, input, default_answer),
             Message(msg) => self.message(&msg),
             KeyPress(key, resolver) => self.key_press(&key, resolver),
