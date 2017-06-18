@@ -306,6 +306,7 @@ impl StatusBar {
 
 #[derive(Msg)]
 pub enum ItemMsg {
+    /// Set the text of the status bar item.
     Text(String),
 }
 
