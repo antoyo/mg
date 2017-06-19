@@ -88,14 +88,16 @@ impl Responder for BlockingInputDialog {
 /// Input dialog responder.
 /// This is used to specify which message to send to which widget when the user answers the dialog.
 pub struct InputDialog<WIDGET: Widget> {
-    callback: fn(Option<String>) -> WIDGET::Msg,
+    callback: Box<Fn(Option<String>) -> WIDGET::Msg>,
     stream: EventStream<WIDGET::Msg>,
 }
 
 impl<WIDGET: Widget> InputDialog<WIDGET> {
-    fn new(relm: &Relm<WIDGET>, callback: fn(Option<String>) -> WIDGET::Msg) -> Self {
+    fn new<F>(relm: &Relm<WIDGET>, callback: F) -> Self
+        where F: Fn(Option<String>) -> WIDGET::Msg + 'static,
+    {
         InputDialog {
-            callback,
+            callback: Box::new(callback),
             stream: relm.stream().clone(),
         }
     }
@@ -377,22 +379,24 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
 }
 
 /// Ask a question to the user.
-pub fn input<COMM, SETT, WIDGET: Widget>(mg: &ContainerComponent<Mg<COMM, SETT>>, relm: &Relm<WIDGET>, msg: String,
-    default_answer: String, callback: fn(Option<String>) -> WIDGET::Msg)
-where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
+pub fn input<CALLBACK, COMM, SETT, WIDGET>(mg: &ContainerComponent<Mg<COMM, SETT>>, relm: &Relm<WIDGET>, msg: String,
+    default_answer: String, callback: CALLBACK)
+where CALLBACK: Fn(Option<String>) -> WIDGET::Msg + 'static,
+      COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
       SETT: Default + EnumMetaData + settings::Settings + SettingCompletion + 'static,
-      WIDGET: 'static,
+      WIDGET: Widget + 'static,
 {
     let responder = Box::new(InputDialog::new(relm, callback));
     mg.emit(Input(responder, msg, default_answer));
 }
 
 /// Ask a multiple-choice question to the user.
-pub fn question<COMM, SETT, WIDGET: Widget>(mg: &ContainerComponent<Mg<COMM, SETT>>, relm: &Relm<WIDGET>, msg: String,
-    choices: &'static [char], callback: fn(Option<String>) -> WIDGET::Msg)
-where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
+pub fn question<CALLBACK, COMM, SETT, WIDGET>(mg: &ContainerComponent<Mg<COMM, SETT>>, relm: &Relm<WIDGET>, msg: String,
+    choices: &'static [char], callback: CALLBACK)
+where CALLBACK: Fn(Option<String>) -> WIDGET::Msg + 'static,
+      COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
       SETT: Default + EnumMetaData + settings::Settings + SettingCompletion + 'static,
-      WIDGET: 'static,
+      WIDGET: Widget + 'static,
 {
     let responder = Box::new(InputDialog::new(relm, callback));
     mg.emit(Question(responder, msg, choices));
