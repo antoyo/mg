@@ -102,6 +102,7 @@ pub use app::dialog::{
     blocking_yes_no_question,
     input,
     question,
+    yes_no_question,
 };
 pub use app::settings::{DefaultConfig, NoSettings};
 pub use app::status_bar::{StatusBar, StatusBarItem};

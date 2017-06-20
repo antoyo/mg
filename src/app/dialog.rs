@@ -46,6 +46,7 @@ use app::Msg::{
     Input,
     Question,
     ResetInput,
+    YesNoQuestion,
 };
 use app::status_bar::Msg::{Identifier, ShowIdentifier};
 use completion::completion_view::Msg::SetOriginalInput;
@@ -107,6 +108,33 @@ impl<WIDGET: Widget> Responder for InputDialog<WIDGET> {
     fn respond(&self, answer: DialogResult) {
         match answer {
             Answer(answer) => self.stream.emit((self.callback)(answer)),
+            _ => unimplemented!(),
+        }
+    }
+}
+
+/// Yes/no question input dialog responder.
+/// This is used to specify which message to send to which widget when the user answers the dialog.
+pub struct YesNoInputDialog<WIDGET: Widget> {
+    callback: Box<Fn(bool) -> WIDGET::Msg>,
+    stream: EventStream<WIDGET::Msg>,
+}
+
+impl<WIDGET: Widget> YesNoInputDialog<WIDGET> {
+    fn new<F>(relm: &Relm<WIDGET>, callback: F) -> Self
+        where F: Fn(bool) -> WIDGET::Msg + 'static,
+    {
+        YesNoInputDialog {
+            callback: Box::new(callback),
+            stream: relm.stream().clone(),
+        }
+    }
+}
+
+impl<WIDGET: Widget> Responder for YesNoInputDialog<WIDGET> {
+    fn respond(&self, answer: DialogResult) {
+        match answer {
+            Answer(answer) => self.stream.emit((self.callback)(answer == Some("y".to_string()))),
             _ => unimplemented!(),
         }
     }
@@ -334,6 +362,15 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
         }*/
         // TODO
     }
+
+    /// Show a yes/no question.
+    pub fn yes_no_question(&mut self, responder: Box<Responder>, message: String) {
+        let builder = DialogBuilder::new()
+            .choices(vec!['y', 'n'])
+            .message(message)
+            .responder(responder);
+        self.show_dialog(builder);
+    }
 }
 
 /// Ask a question to the user and block until the user provides it (or cancel).
@@ -400,4 +437,16 @@ where CALLBACK: Fn(Option<String>) -> WIDGET::Msg + 'static,
 {
     let responder = Box::new(InputDialog::new(relm, callback));
     mg.emit(Question(responder, msg, choices));
+}
+
+/// Show a yes/no question.
+pub fn yes_no_question<CALLBACK, COMM, SETT, WIDGET>(mg: &ContainerComponent<Mg<COMM, SETT>>, relm: &Relm<WIDGET>,
+    msg: String, callback: CALLBACK)
+where CALLBACK: Fn(bool) -> WIDGET::Msg + 'static,
+      COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
+      SETT: Default + EnumMetaData + settings::Settings + SettingCompletion + 'static,
+      WIDGET: Widget + 'static,
+{
+    let responder = Box::new(YesNoInputDialog::new(relm, callback));
+    mg.emit(YesNoQuestion(responder, msg));
 }

@@ -199,6 +199,7 @@ pub enum Msg<COMM, SETT>
     Title(String),
     Variables(Variables),
     Warning(String),
+    YesNoQuestion(Box<Responder>, String),
 }
 
 /// An Mg application window contains a status bar where the user can type a command and a central widget.
@@ -487,6 +488,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             Title(title) => self.set_title(&title),
             Variables(variables) => self.set_variables(variables),
             Warning(message) => self.warning(&message),
+            YesNoQuestion(responder, question) => self.yes_no_question(responder, question),
         }
     }
 
