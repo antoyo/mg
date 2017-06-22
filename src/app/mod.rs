@@ -492,6 +492,11 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         }
     }
 
+    /// Set the current status bar input completer.
+    pub fn set_completer(&mut self, completer: &str) {
+        self.model.completer = completer.to_string();
+    }
+
     // TODO: try to replace emit() calls to view! connection.
     view! {
         #[name="window"]

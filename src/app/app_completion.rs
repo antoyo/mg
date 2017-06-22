@@ -55,11 +55,6 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
         self.completion_view.emit(DeleteCurrentCompletionItem);
     }
 
-    /// Set the current status bar input completer.
-    pub fn set_completer(&mut self, completer: &str) {
-        self.model.completer = completer.to_string();
-    }
-
     /// Show the completion view.
     pub fn show_completion(&self) {
         self.completion_view.stream().emit(ShowCompletion);

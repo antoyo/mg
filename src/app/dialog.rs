@@ -323,12 +323,6 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
 
         self.model.answer = None;
         if dialog_builder.blocking {
-            /*self.model.input_callback = Some(Box::new(|_, _| {
-                // TODO: is it still needed?
-                //gtk::main_quit();
-            }));*/
-        }
-        if dialog_builder.blocking {
             self.set_mode(BLOCKING_INPUT_MODE);
         }
         else {
