@@ -187,7 +187,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
 }
 
 fn is_digit(key: &&Key) -> bool {
-    !is_not_digit(&key)
+    !is_not_digit(key)
 }
 
 fn is_not_digit(key: &Key) -> bool {

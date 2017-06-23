@@ -153,7 +153,7 @@ impl Widget for Win {
 
     view! {
         #[name="mg"]
-        Mg<AppCommand, AppSettings>((MODES, Ok("examples/main.conf".into()), Some("/home/bouanto".into()), vec![])) {
+        Mg<AppCommand, AppSettings>(MODES, Ok("examples/main.conf".into()), Some("/home/bouanto".into()), vec![]) {
             DarkTheme: true,
             Title: self.model.title.clone(),
             Variables: vec![("url", Box::new(|| "http://duckduckgo.com/lite".to_string()))],

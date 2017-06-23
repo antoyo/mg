@@ -102,7 +102,7 @@ impl Widget for Win {
 
     view! {
         #[name="mg"]
-        Mg<AppCommand, NoSettings>((MODES, Ok("examples/main.conf".into()), None, vec![])) {
+        Mg<AppCommand, NoSettings>(MODES, Ok("examples/main.conf".into()), None, vec![]) {
             DarkTheme: true,
             Title: "First Mg Program".to_string(),
             Variables: vec![("url", Box::new(|| "http://duckduckgo.com/lite".to_string()))],

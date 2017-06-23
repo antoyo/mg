@@ -97,7 +97,7 @@ impl Widget for Win {
 
     view! {
         #[name="mg"]
-        Mg<AppCommand, AppSettings>((MODES, Ok("examples/main.conf".into()), None, vec![])) {
+        Mg<AppCommand, AppSettings>(MODES, Ok("examples/main.conf".into()), None, vec![]) {
             #[name="label"]
             gtk::Label {
                 text: &self.model.text,
