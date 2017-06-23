@@ -134,11 +134,13 @@ impl Completion {
     }
 
     /// Get the current completer.
-    pub fn current_completer(&self) -> Option<&Box<Completer>> {
+    pub fn current_completer(&self) -> Option<&Completer> {
         self.completers.get(self.completer_ident.as_str())
+            .map(AsRef::as_ref)
     }
 
     /// Get the current completer.
+    #[allow(borrowed_box)]
     pub fn current_completer_mut(&mut self) -> Option<&mut Box<Completer>> {
         self.completers.get_mut(self.completer_ident.as_str())
     }

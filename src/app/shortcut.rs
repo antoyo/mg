@@ -147,11 +147,11 @@ impl<COMM, SETT> Mg<COMM, SETT>
 
     fn shortcut_prefix(&self) -> String {
         let prefix: String = self.model.current_shortcut.iter()
-            .take_while(|key| !digit_predicate(key))
+            .take_while(is_digit)
             .map(|key| {
                 if let Char(c) = *key {
                     if let Some(digit) = c.to_digit(10) {
-                        return (digit as u8 + '0' as u8) as char;
+                        return (digit as u8 + b'0') as char;
                     }
                 }
                 unreachable!()
@@ -166,14 +166,14 @@ impl<COMM, SETT> Mg<COMM, SETT>
     }
 
     fn shortcut_without_prefix(&self) -> &[Key] {
-        let first = self.model.current_shortcut.first().map(Clone::clone).unwrap_or(Char('0'));
+        let first = self.model.current_shortcut.first().cloned().unwrap_or(Char('0'));
         let start =
             if first == Char('0') {
                 0
             }
             else {
                 self.model.current_shortcut.iter()
-                    .position(digit_predicate)
+                    .position(is_not_digit)
                     .unwrap_or_else(|| self.model.current_shortcut.len())
             };
         &self.model.current_shortcut[start..]
@@ -186,14 +186,13 @@ impl<COMM, SETT> Mg<COMM, SETT>
     }
 }
 
-fn digit_predicate(key: &Key) -> bool {
+fn is_digit(key: &&Key) -> bool {
+    !is_not_digit(&key)
+}
+
+fn is_not_digit(key: &Key) -> bool {
     if let Char(c) = *key {
-        if let Some(_) = c.to_digit(10) {
-            false
-        }
-        else {
-            true
-        }
+        !c.to_digit(10).is_some()
     }
     else {
         true

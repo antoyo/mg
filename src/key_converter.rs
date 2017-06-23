@@ -166,13 +166,11 @@ pub fn gdk_key_to_key(key: &EventKey) -> Option<Key> {
                 Control(Box::new(key))
             }
         }
+        else if alt_pressed {
+            Alt(Box::new(key))
+        }
         else {
-            if alt_pressed {
-                Alt(Box::new(key))
-            }
-            else {
-                key
-            }
+            key
         };
     Some(key)
 }

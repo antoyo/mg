@@ -317,7 +317,7 @@ impl CompletionView {
         }
         {
             let completer = self.model.completion.current_completer().expect("completer should be set");
-            self.adjust_columns(&**completer);
+            self.adjust_columns(completer);
         }
         self.filter(command_entry_text);
     }

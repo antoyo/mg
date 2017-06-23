@@ -33,6 +33,7 @@ pub struct CommandCompleter<T: Clone> {
 }
 
 impl<T: Clone + EnumMetaData> CommandCompleter<T> {
+    #[allow(new_without_default_derive)]
     /// Create a new command completer.
     pub fn new() -> CommandCompleter<T> {
         let mut data: Vec<_> =
@@ -67,8 +68,8 @@ pub struct NoCompleter {
 }
 
 impl NoCompleter {
-    /// Create a new nop completer.
     #[allow(new_without_default_derive, unknown_lints)]
+    /// Create a new nop completer.
     pub fn new() -> Self {
         NoCompleter {
         }
@@ -94,6 +95,7 @@ pub struct SettingCompleter<T> {
 }
 
 impl<T: EnumMetaData + SettingCompletion> SettingCompleter<T> {
+    #[allow(new_without_default_derive)]
     /// Create a new setting completer.
     pub fn new() -> Self {
         let mut data: Vec<_> =
