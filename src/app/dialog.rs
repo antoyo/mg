@@ -67,7 +67,7 @@ pub struct BlockingInputDialog {
 }
 
 impl BlockingInputDialog {
-    fn new() -> (Self, Receiver<Option<String>>) {
+    pub fn new() -> (Self, Receiver<Option<String>>) {
         let (tx, rx) = sync_channel(1);
         (BlockingInputDialog {
             tx,
@@ -95,7 +95,7 @@ pub struct InputDialog<WIDGET: Widget> {
 }
 
 impl<WIDGET: Widget> InputDialog<WIDGET> {
-    fn new<F>(relm: &Relm<WIDGET>, callback: F) -> Self
+    pub fn new<F>(relm: &Relm<WIDGET>, callback: F) -> Self
         where F: Fn(Option<String>) -> WIDGET::Msg + 'static,
     {
         InputDialog {
@@ -122,7 +122,7 @@ pub struct YesNoInputDialog<WIDGET: Widget> {
 }
 
 impl<WIDGET: Widget> YesNoInputDialog<WIDGET> {
-    fn new<F>(relm: &Relm<WIDGET>, callback: F) -> Self
+    pub fn new<F>(relm: &Relm<WIDGET>, callback: F) -> Self
         where F: Fn(bool) -> WIDGET::Msg + 'static,
     {
         YesNoInputDialog {
