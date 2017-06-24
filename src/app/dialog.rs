@@ -67,6 +67,8 @@ pub struct BlockingInputDialog {
 }
 
 impl BlockingInputDialog {
+    /// Create a new blocking input dialog responder.
+    /// The answer will be sent to the receiver.
     pub fn new() -> (Self, Receiver<Option<String>>) {
         let (tx, rx) = sync_channel(1);
         (BlockingInputDialog {
@@ -95,6 +97,9 @@ pub struct InputDialog<WIDGET: Widget> {
 }
 
 impl<WIDGET: Widget> InputDialog<WIDGET> {
+    /// Create a new input dialog responder.
+    /// The `callback` is a message constructor.
+    /// The message will be sent to `relm` stream.
     pub fn new<F>(relm: &Relm<WIDGET>, callback: F) -> Self
         where F: Fn(Option<String>) -> WIDGET::Msg + 'static,
     {
@@ -212,7 +217,7 @@ impl DialogBuilder {
 
     /// Add a shortcut.
     pub fn shortcut(mut self, shortcut: Key, value: &str) -> Self {
-        self.shortcuts.insert(shortcut, value.to_string());
+        let _ = self.shortcuts.insert(shortcut, value.to_string());
         self
     }
 }
@@ -307,7 +312,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
 
         self.model.shortcuts.clear();
         for (key, value) in dialog_builder.shortcuts {
-            self.model.shortcuts.insert(key, value);
+            let _ = self.model.shortcuts.insert(key, value);
         }
 
         let choices = dialog_builder.choices.clone();

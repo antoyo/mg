@@ -39,8 +39,16 @@
 
 //! Minimal UI library based on GTK+.
 
-#![warn(missing_docs)]
 #![feature(proc_macro, unboxed_closures)]
+#![warn(
+    missing_docs,
+    trivial_casts,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    unused_results,
+)]
 
 #[macro_use]
 extern crate error_chain;
@@ -49,7 +57,6 @@ extern crate futures_glib;
 extern crate gdk;
 extern crate glib;
 extern crate gtk;
-extern crate libc;
 #[macro_use]
 extern crate log;
 #[macro_use]

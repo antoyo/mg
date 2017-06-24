@@ -151,7 +151,7 @@ impl CompletionView {
         view_column.pack_start(&cell, true);
         view_column.add_attribute(&cell, "text", index);
         view_column.add_attribute(&cell, "foreground", foreground_index);
-        self.tree_view.append_column(&view_column);
+        let _ = self.tree_view.append_column(&view_column);
     }
 
     /// Add the specified number of columns.
@@ -229,7 +229,7 @@ impl CompletionView {
     /// Remove all the columns.
     fn remove_columns(&self) {
         for column in &self.tree_view.get_columns() {
-            self.tree_view.remove_column(column);
+            let _ = self.tree_view.remove_column(column);
         }
     }
 
