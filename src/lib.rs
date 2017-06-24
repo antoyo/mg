@@ -120,7 +120,7 @@ pub use app::status_bar::ItemMsg::Text;
 macro_rules! hash {
     ($($ident:expr => $value:expr,)*) => {{
         let mut hash_map: ::mg::completion::Completers = ::std::collections::HashMap::new();
-        $(hash_map.insert($ident, $value);)*
+        let _ = $(hash_map.insert($ident, $value);)*
         hash_map
     }};
 }
