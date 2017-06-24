@@ -97,6 +97,7 @@ pub use app::dialog::{
     DialogResult,
     InputDialog,
     Responder,
+    blocking_dialog,
     blocking_input,
     blocking_question,
     blocking_yes_no_question,

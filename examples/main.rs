@@ -42,6 +42,7 @@ use mg::{
     CustomCommand,
     DarkTheme,
     DeleteCompletionItem,
+    DialogBuilder,
     Info,
     Mg,
     Modes,
@@ -53,6 +54,7 @@ use mg::{
     Title,
     Variables,
     Warning,
+    blocking_dialog,
     input,
     question,
 };
@@ -78,6 +80,7 @@ pub enum Msg {
     Mode(String),
     Setting(AppSettingsVariant),
     ShowAlert,
+    ShowBlockingInput,
     ShowInfo,
     ShowInput,
     ShowQuestion,
@@ -142,6 +145,14 @@ impl Widget for Win {
             Mode(mode) => self.mode_changed(&mode),
             Setting(setting) => self.setting_changed(setting),
             ShowAlert => self.mg.emit(Alert("Blue Alert".to_string())),
+            ShowBlockingInput => {
+                let builder = DialogBuilder::new()
+                    .message("Do you wanto to quit?".to_string());
+                let res = blocking_dialog(self.mg.stream(), builder);
+                if res == Some("yes".to_string()) {
+                    gtk::main_quit();
+                }
+            },
             ShowInfo => self.mg.emit(Info("Info".to_string())),
             ShowInput => input(&self.mg, &self.model.relm, "Say something".to_string(),
                 "Oh yeah?".to_string(), Echo),
@@ -184,6 +195,10 @@ impl Widget for Win {
                 gtk::Button {
                     label: "Input",
                     clicked => ShowInput,
+                },
+                gtk::Button {
+                    label: "Blocking Input",
+                    clicked => ShowBlockingInput,
                 },
             },
             StatusBarItem {

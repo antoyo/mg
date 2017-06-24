@@ -167,6 +167,7 @@ pub enum Msg<COMM, SETT>
 {
     Alert(String),
     AppClose,
+    BlockingCustomDialog(Box<Responder>, DialogBuilder),
     BlockingInput(Box<Responder>, String, String),
     BlockingQuestion(Box<Responder>, String, Vec<char>),
     BlockingYesNoQuestion(Box<Responder>, String),
@@ -437,6 +438,8 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             Alert(msg) => self.alert(&msg),
             // To be listened to by the user.
             AppClose => (),
+            BlockingCustomDialog(responder, builder) =>
+                self.blocking_custom_dialog(responder, builder),
             BlockingInput(responder, question, default_answer) =>
                 self.blocking_input(responder, question, default_answer),
             BlockingQuestion(responder, question, choices) => self.blocking_question(responder, question, choices),

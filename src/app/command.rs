@@ -121,9 +121,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
     fn call_command(&mut self, command: Command<COMM>) {
         match command {
             App(command) => self.app_command(&command),
-            Custom(command) => {
-                self.model.relm.stream().emit(CustomCommand(command));
-            },
+            Custom(command) => self.model.relm.stream().emit(CustomCommand(command)),
             Map { action, keys, mode } => {
                 let mode_mappings = self.model.mappings.entry(self.model.modes[mode.as_str()])
                     .or_insert_with(HashMap::new);

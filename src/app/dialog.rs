@@ -39,6 +39,7 @@ use relm::{
 use app::{Mg, BLOCKING_INPUT_MODE, INPUT_MODE};
 use app::color::color_blue;
 use app::Msg::{
+    BlockingCustomDialog,
     BlockingInput,
     BlockingQuestion,
     BlockingYesNoQuestion,
@@ -231,6 +232,14 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
       SETT: Default + EnumMetaData + settings::Settings + SettingCompletion + 'static,
 {
     /// Ask a question to the user and block until the user provides it (or cancel).
+    pub fn blocking_custom_dialog(&mut self, responder: Box<Responder>, builder: DialogBuilder) {
+        let builder = builder
+            .blocking(true)
+            .responder(responder);
+        self.show_dialog_without_shortcuts(builder);
+    }
+
+    /// Ask a question to the user and block until the user provides it (or cancel).
     pub fn blocking_input(&mut self, responder: Box<Responder>, message: String, default_answer: String) {
         let builder = DialogBuilder::new()
             .blocking(true)
@@ -261,6 +270,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
     }
 
     /// Ask a question to the user.
+    // TODO: use Option<String> for default_answer?
     pub fn input(&mut self, responder: Box<Responder>, message: String, default_answer: String) {
         let builder = DialogBuilder::new()
             .default_answer(default_answer)
@@ -365,6 +375,20 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
             .responder(responder);
         self.show_dialog(builder);
     }
+}
+
+/// Ask a question to the user and block until the user provides it (or cancel).
+pub fn blocking_dialog<COMM, SETT>(mg: &EventStream<<Mg<COMM, SETT> as Update>::Msg>, builder: DialogBuilder)
+    -> Option<String>
+where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
+      SETT: Default + EnumMetaData + settings::Settings + SettingCompletion + 'static,
+{
+    let (blocking_input_dialog, rx) = BlockingInputDialog::new();
+    let responder = Box::new(blocking_input_dialog);
+    mg.emit(BlockingCustomDialog(responder, builder));
+    gtk::main();
+    mg.emit(ResetInput);
+    rx.recv().unwrap_or(None)
 }
 
 /// Ask a question to the user and block until the user provides it (or cancel).
