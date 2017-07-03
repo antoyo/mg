@@ -171,6 +171,7 @@ pub enum Msg<COMM, SETT>
     BlockingInput(Box<Responder>, String, String),
     BlockingQuestion(Box<Responder>, String, Vec<char>),
     BlockingYesNoQuestion(Box<Responder>, String),
+    CloseWin,
     Completers(HashMap<&'static str, Box<completion::Completer>>),
     CompletionViewChange(String),
     CustomCommand(COMM),
@@ -444,6 +445,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                 self.blocking_input(responder, question, default_answer),
             BlockingQuestion(responder, question, choices) => self.blocking_question(responder, question, choices),
             BlockingYesNoQuestion(responder, question) => self.blocking_yes_no_question(responder, question),
+            CloseWin => self.window.destroy(),
             Completers(completers) => self.completion_view.emit(AddCompleters(completers)),
             CompletionViewChange(completion) => self.set_input(&completion),
             // To be listened to by the user.

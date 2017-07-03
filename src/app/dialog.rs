@@ -393,7 +393,8 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
     mg.emit(BlockingCustomDialog(responder, builder));
     gtk::main();
     mg.emit(ResetInput);
-    rx.recv().unwrap_or(None)
+    // TODO: really return None if no value was received?
+    rx.try_recv().unwrap_or(None)
 }
 
 /// Ask a question to the user and block until the user provides it (or cancel).
@@ -407,7 +408,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
     mg.emit(BlockingInput(responder, msg, default_answer));
     gtk::main();
     mg.emit(ResetInput);
-    rx.recv().unwrap_or(None)
+    rx.try_recv().unwrap_or(None)
 }
 
 /// Ask a multiple-choice question to the user and block until the user provides it (or cancel).
@@ -421,7 +422,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
     mg.emit(BlockingQuestion(responder, msg, choices.to_vec()));
     gtk::main();
     mg.emit(ResetInput);
-    rx.recv().unwrap_or(None)
+    rx.try_recv().unwrap_or(None)
 }
 
 /// Show a blocking yes/no question.
@@ -435,7 +436,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
     mg.emit(BlockingYesNoQuestion(responder, msg));
     gtk::main();
     mg.emit(ResetInput);
-    rx.recv() == Ok(Some("y".to_string()))
+    rx.try_recv() == Ok(Some("y".to_string()))
 }
 
 /// Ask a question to the user.

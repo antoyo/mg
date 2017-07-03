@@ -20,6 +20,11 @@
  */
 
 /*
+ * FIXME: when inserting text in the middle of the command entry, the cursor is moved at the end.
+ * FIXME: can block in input mode.
+ * TODO: use MainLoop::new() instead of gtk::main()?
+ * FIXME: deleting previous word does not update completions.
+ * FIXME: cursor moved to the end on CTRL-backspace.
  * FIXME: avoid using an async callback for the key press event.
  * TODO: refactor to remove every use of callbacks in relm widgets, taking advantage of async
  * callback.
@@ -80,6 +85,7 @@ pub use app::{Mg, parse_config};
 pub use app::Msg::{
     Alert,
     AppClose,
+    CloseWin,
     Completers,
     CompletionViewChange,
     CustomCommand,
