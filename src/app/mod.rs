@@ -487,6 +487,8 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             SetSetting(setting) => self.set_setting(setting),
             StatusBarEntryActivate(input) => self.command_activate(input),
             StatusBarEntryChanged(input) => {
+                // NOTE: Lock to prevent moving the cursor of the command entry.
+                let _lock = self.status_bar.stream().lock();
                 self.model.status_bar_command = input.unwrap_or_default();
                 self.update_completions()
             },

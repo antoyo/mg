@@ -20,7 +20,7 @@
  */
 
 /*
- * FIXME: when inserting text in the middle of the command entry, the cursor is moved at the end.
+ * FIXME: typing numbers in insert mode adds them to the shortcut label.
  * FIXME: can block in input mode.
  * TODO: use MainLoop::new() instead of gtk::main()?
  * FIXME: deleting previous word does not update completions.
