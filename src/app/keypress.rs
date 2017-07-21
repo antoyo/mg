@@ -19,7 +19,9 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+use std::cell::Cell;
 use std::char;
+use std::rc::Rc;
 
 use gdk::EventKey;
 use gdk::enums::key::Escape;
@@ -31,9 +33,8 @@ use mg_settings::{
     SettingCompletion,
     SpecialCommand,
 };
-use relm::Resolver;
 
-use app::{Mg, BLOCKING_INPUT_MODE, COMMAND_MODE, INPUT_MODE, NORMAL_MODE};
+use app::{Mg, Mode};
 use app::ActivationType::Current;
 use app::Msg::{self, EnterNormalModeAndReset};
 
@@ -43,11 +44,9 @@ impl<COMM, SETT> Mg<COMM, SETT>
 {
     /// Handle the key press event for the command mode.
     #[allow(non_upper_case_globals)]
-    fn command_key_press(&mut self, key: &EventKey) -> (Option<Msg<COMM, SETT>>, Inhibit) {
+    fn command_key_press(&mut self, key: &EventKey) -> Option<Msg<COMM, SETT>> {
         match key.get_keyval() {
-            Escape => {
-                (Some(EnterNormalModeAndReset), Inhibit(false))
-            },
+            Escape => Some(EnterNormalModeAndReset),
             _ => self.handle_shortcut(key),
         }
     }
@@ -62,24 +61,52 @@ impl<COMM, SETT> Mg<COMM, SETT>
         None
     }
 
+    /// Check if the key should be inhibitted for the command mode.
+    #[allow(non_upper_case_globals)]
+    fn inhibit_command_key_press(current_mode: &Rc<Cell<Mode>>, key: &EventKey) -> Inhibit {
+        match key.get_keyval() {
+            Escape => Inhibit(false),
+            _ => Self::inhibit_handle_shortcut(current_mode, key),
+        }
+    }
+
+    /// Check if the key should be inhibitted for the input mode.
+    #[allow(non_upper_case_globals)]
+    fn inhibit_input_key_press(current_mode: &Rc<Cell<Mode>>, key: &EventKey) -> Inhibit {
+        match key.get_keyval() {
+            Escape => Inhibit(false),
+            _ => Self::inhibit_handle_shortcut(current_mode, key),
+        }
+    }
+
+    /// Check if the key should be inhibitted.
+    pub fn inhibit_key_press(current_mode: &Rc<Cell<Mode>>, key: &EventKey) -> Inhibit {
+        match current_mode.get() {
+            Mode::Normal => Self::inhibit_normal_key_press(current_mode, key),
+            Mode::Command => Self::inhibit_command_key_press(current_mode, key),
+            Mode::BlockingInput | Mode::Input => Self::inhibit_input_key_press(current_mode, key),
+            _ => Self::inhibit_handle_shortcut(current_mode, key)
+        }
+    }
+
     /// Handle the key press event for the input mode.
     #[allow(non_upper_case_globals)]
-    fn input_key_press(&mut self, key: &EventKey) -> (Option<Msg<COMM, SETT>>, Inhibit) {
+    fn input_key_press(&mut self, key: &EventKey) -> Option<Msg<COMM, SETT>> {
         match key.get_keyval() {
             Escape => {
                 if let Some(callback) = self.model.input_callback.take() {
                     callback(None, self.model.shortcut_pressed);
                 }
-                (Some(EnterNormalModeAndReset), Inhibit(false))
+                Some(EnterNormalModeAndReset)
             },
             keyval => {
                 if self.handle_input_shortcut(key) {
-                    return (None, Inhibit(true));
+                    return None;
                 }
                 else if let Some(character) = char::from_u32(keyval) {
                     if self.model.choices.contains(&character) {
                         self.set_dialog_answer(&character.to_string());
-                        return (None, Inhibit(true));
+                        return None;
                     }
                 }
                 self.handle_shortcut(key)
@@ -88,25 +115,24 @@ impl<COMM, SETT> Mg<COMM, SETT>
     }
 
     /// Handle the key press event.
-    pub fn key_press(&mut self, key: &EventKey, mut resolver: Resolver<Inhibit>) {
-        let (msg, inhibit) =
-            match self.model.current_mode.as_ref() {
-                NORMAL_MODE => self.normal_key_press(key),
-                COMMAND_MODE => self.command_key_press(key),
-                BLOCKING_INPUT_MODE | INPUT_MODE => self.input_key_press(key),
+    pub fn key_press(&mut self, key: &EventKey) {
+        let msg =
+            match self.model.current_mode.get() {
+                Mode::Normal => self.normal_key_press(key),
+                Mode::Command => self.command_key_press(key),
+                Mode::BlockingInput | Mode::Input => self.input_key_press(key),
                 _ => self.handle_shortcut(key)
             };
         if let Some(msg) = msg {
             self.model.relm.stream().emit(msg);
         }
-        resolver.resolve(inhibit)
     }
 
     /// Handle the key release event.
     pub fn key_release(&mut self, key: &EventKey) {
         let msg =
-            match self.model.current_mode.as_ref() {
-                COMMAND_MODE => self.command_key_release(key),
+            match self.model.current_mode.get() {
+                Mode::Command => self.command_key_release(key),
                 _ => None,
             };
         if let Some(msg) = msg {

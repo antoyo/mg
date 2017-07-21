@@ -29,10 +29,12 @@ pub mod settings;
 mod shortcut;
 pub mod status_bar;
 
+use std::cell::Cell;
 use std::char;
 use std::collections::HashMap;
 use std::io;
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::time::Duration;
 
 use futures_glib::Timeout;
@@ -59,7 +61,7 @@ use mg_settings::{
 use mg_settings::ParseResult;
 use mg_settings::errors;
 use mg_settings::key::Key;
-use relm::{Relm, Resolver, Widget};
+use relm::{Relm, Widget};
 use relm_attributes::widget;
 
 use app::config::create_default_config;
@@ -97,6 +99,16 @@ use super::Modes;
 type Mappings = HashMap<&'static str, HashMap<Vec<Key>, String>>;
 type ModesHash = HashMap<&'static str, &'static str>;
 type Variables = Vec<(&'static str, Box<Fn() -> String>)>;
+
+/// A known mode or an unknown mode.
+#[derive(Clone, Copy, PartialEq)]
+pub enum Mode {
+    BlockingInput,
+    Command,
+    Input,
+    Normal,
+    Unknown,
+}
 
 /// A command from a map command.
 #[derive(Debug)]
@@ -139,7 +151,7 @@ pub struct Model<COMM, SETT>
     completer: String,
     completion_shown: bool,
     current_command_mode: char,
-    current_mode: String,
+    current_mode: Rc<Cell<Mode>>,
     current_shortcut: Vec<Key>,
     entry_shown: bool,
     foreground_color: RGBA,
@@ -149,6 +161,7 @@ pub struct Model<COMM, SETT>
     mappings: Mappings,
     message: String,
     mode_label: String,
+    mode_string: String,
     modes: ModesHash,
     relm: Relm<Mg<COMM, SETT>>,
     settings: SETT,
@@ -187,7 +200,7 @@ pub enum Msg<COMM, SETT>
     Info(String),
     InitAfter,
     Input(Box<Responder>, String, String),
-    KeyPress(EventKey, Resolver<Inhibit>),
+    KeyPress(EventKey),
     KeyRelease(EventKey),
     Message(String),
     ModeChanged(String),
@@ -295,9 +308,31 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         self.model.entry_shown = false;
     }
 
+    /// Check if the key should be inhibitted for a normal mode.
+    #[allow(non_upper_case_globals)]
+    fn inhibit_normal_key_press(current_mode: &Rc<Cell<Mode>>, key: &EventKey) -> Inhibit {
+        match key.get_keyval() {
+            colon | Escape => Inhibit(true),
+            keyval => {
+                let character = keyval as u8 as char;
+                if COMM::is_identifier(character) {
+                    Inhibit(true)
+                }
+                else {
+                    Self::inhibit_handle_shortcut(current_mode, key)
+                }
+            },
+        }
+    }
+
     fn init_view(&mut self) {
         self.model.foreground_color = self.get_foreground_color();
         self.model.relm.stream().emit(InitAfter);
+
+        // TODO: rewrite using a relm syntax that will automatically clone the Rcs.
+        let current_mode = self.model.current_mode.clone();
+        connect!(self.model.relm, self.window, connect_key_press_event(_, key),
+            return (KeyPress(key.clone()), Self::inhibit_key_press(&current_mode, key)));
     }
 
     /// Input the specified command.
@@ -337,7 +372,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             completer: DEFAULT_COMPLETER_IDENT.to_string(),
             completion_shown: false,
             current_command_mode: ':',
-            current_mode: NORMAL_MODE.to_string(),
+            current_mode: Rc::new(Cell::new(Mode::Normal)),
             current_shortcut: vec![],
             entry_shown: false,
             foreground_color: RGBA::white(),
@@ -347,6 +382,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             mappings: HashMap::new(),
             message: String::new(),
             mode_label: String::new(),
+            mode_string: NORMAL_MODE.to_string(),
             modes,
             relm: relm.clone(),
             settings: SETT::default(),
@@ -360,9 +396,9 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
 
     /// Handle the key press event for the normal mode.
     #[allow(non_upper_case_globals)]
-    fn normal_key_press(&mut self, key: &EventKey) -> (Option<Msg<COMM, SETT>>, Inhibit) {
+    fn normal_key_press(&mut self, key: &EventKey) -> Option<Msg<COMM, SETT>> {
         match key.get_keyval() {
-            colon => (Some(EnterCommandMode), Inhibit(true)),
+            colon => Some(EnterCommandMode),
             Escape => {
                 self.reset();
                 self.clear_shortcut();
@@ -377,7 +413,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                     self.reset();
                     self.clear_shortcut();
                     self.show_entry();
-                    (None, Inhibit(true))
+                    None
                 }
                 else {
                     self.handle_shortcut(key)
@@ -418,15 +454,22 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
 
     /// Set the current mode.
     fn set_mode(&mut self, mode: &str) {
-        self.model.current_mode = mode.to_string();
-        if self.model.current_mode != NORMAL_MODE && self.model.current_mode != COMMAND_MODE &&
-            self.model.current_mode != INPUT_MODE && self.model.current_mode != BLOCKING_INPUT_MODE
-        {
-            self.model.mode_label = self.model.current_mode.clone();
+        self.model.mode_string = mode.to_string();
+        let current_mode =
+            match mode {
+                BLOCKING_INPUT_MODE => Mode::BlockingInput,
+                COMMAND_MODE => Mode::Command,
+                INPUT_MODE => Mode::Input,
+                NORMAL_MODE => Mode::Normal,
+                _ => Mode::Unknown,
+            };
+        if current_mode == Mode::Unknown {
+            self.model.mode_label = mode.to_string();
         }
         else {
             self.model.mode_label = String::new();
         }
+        self.model.current_mode.set(current_mode);
         self.model.relm.stream().emit(ModeChanged(mode.to_string()));
     }
 
@@ -474,7 +517,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             InitAfter => self.after_children_added(),
             Input(responder, input, default_answer) => self.input(responder, input, default_answer),
             Message(msg) => self.message(&msg),
-            KeyPress(key, resolver) => self.key_press(&key, resolver),
+            KeyPress(key) => self.key_press(&key),
             KeyRelease(key) => self.key_release(&key),
             Error(error) => self.error(error),
             HideColoredMessage(message) => self.hide_colored_message(&message),
@@ -553,7 +596,6 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                     },
                 },
             },
-            key_press_event(_, key) => async KeyPress(key.clone()),
             key_release_event(_, key) => (KeyRelease(key.clone()), Inhibit(false)),
             delete_event(_, _) => (AppClose, Inhibit(true)),
         },

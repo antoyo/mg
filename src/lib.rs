@@ -20,14 +20,12 @@
  */
 
 /*
+ * FIXME: deleting previous word does not update completions.
+ * TODO: remove blocking dialogs?
  * FIXME: typing numbers in insert mode adds them to the shortcut label.
+ * FIXME: should not be able to select completion items for input dialog without completer.
  * FIXME: can block in input mode.
  * TODO: use MainLoop::new() instead of gtk::main()?
- * FIXME: deleting previous word does not update completions.
- * FIXME: cursor moved to the end on CTRL-backspace.
- * FIXME: avoid using an async callback for the key press event.
- * TODO: refactor to remove every use of callbacks in relm widgets, taking advantage of async
- * callback.
  * FIXME: the commands in the config file are not executed.
  * TODO: take advantage of IntoOption and IntoPair.
  * TODO: automatically connect the AppClose message to Quit if it exists.
@@ -57,7 +55,6 @@
 
 #[macro_use]
 extern crate error_chain;
-extern crate futures;
 extern crate futures_glib;
 extern crate gdk;
 extern crate glib;

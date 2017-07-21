@@ -37,7 +37,7 @@ use mg_settings::Command::{App, Custom, Map, Set, Unmap};
 
 use app::{
     Mg,
-    BLOCKING_INPUT_MODE,
+    Mode,
     COMPLETE_NEXT_COMMAND,
     COMPLETE_PREVIOUS_COMMAND,
     ENTRY_DELETE_NEXT_CHAR,
@@ -49,7 +49,6 @@ use app::{
     ENTRY_PREVIOUS_CHAR,
     ENTRY_PREVIOUS_WORD,
     ENTRY_SMART_HOME,
-    INPUT_MODE,
 };
 use app::ActivationType::{self, Final};
 use app::Msg::{
@@ -149,8 +148,9 @@ impl<COMM, SETT> Mg<COMM, SETT>
 
     /// Handle the command entry activate event.
     pub fn command_activate(&mut self, input: Option<String>) {
+        let current_mode = self.model.current_mode.get();
         let message =
-            if self.model.current_mode == INPUT_MODE || self.model.current_mode == BLOCKING_INPUT_MODE {
+            if current_mode == Mode::Input || current_mode == Mode::BlockingInput {
                 let mut should_reset = false;
                 if let Some(callback) = self.model.input_callback.take() {
                     self.model.answer = input.clone();
