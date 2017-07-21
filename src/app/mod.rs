@@ -328,11 +328,6 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     fn init_view(&mut self) {
         self.model.foreground_color = self.get_foreground_color();
         self.model.relm.stream().emit(InitAfter);
-
-        // TODO: rewrite using a relm syntax that will automatically clone the Rcs.
-        let current_mode = self.model.current_mode.clone();
-        connect!(self.model.relm, self.window, connect_key_press_event(_, key),
-            return (KeyPress(key.clone()), Self::inhibit_key_press(&current_mode, key)));
     }
 
     /// Input the specified command.
@@ -596,6 +591,8 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                     },
                 },
             },
+            key_press_event(_, key) with(current_mode) =>
+                (KeyPress(key.clone()), Self::inhibit_key_press(&current_mode, key)),
             key_release_event(_, key) => (KeyRelease(key.clone()), Inhibit(false)),
             delete_event(_, _) => (AppClose, Inhibit(true)),
         },
