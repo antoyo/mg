@@ -20,6 +20,7 @@
  */
 
 /*
+ * FIXME: delete previous word does not remove enough characters when it contains multi-byte characters.
  * FIXME: deleting previous word does not update completions.
  * TODO: remove blocking dialogs?
  * FIXME: typing numbers in insert mode adds them to the shortcut label.
