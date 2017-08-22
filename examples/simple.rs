@@ -33,6 +33,7 @@ extern crate relm_attributes;
 extern crate relm_derive;
 
 use gtk::{
+    LabelExt,
     OrientableExt,
     WidgetExt,
 };

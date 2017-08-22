@@ -34,7 +34,7 @@ extern crate relm_attributes;
 #[macro_use]
 extern crate relm_derive;
 
-use gtk::{ButtonExt, OrientableExt, WidgetExt};
+use gtk::{ButtonExt, LabelExt, OrientableExt, WidgetExt};
 use gtk::Orientation::Vertical;
 use mg::{
     Alert,

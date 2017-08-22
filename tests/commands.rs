@@ -37,7 +37,7 @@ mod utils;
 
 use std::thread;
 
-use gtk::WidgetExt;
+use gtk::{LabelExt, WidgetExt};
 use libxdo::XDo;
 use mg::{
     CustomCommand,
