@@ -21,7 +21,16 @@
 
 use glib::translate::ToGlib;
 use gdk::RGBA;
-use gtk::{IsA, Object, Settings, Widget, WidgetExt, STATE_FLAG_NORMAL};
+use gtk::{
+    IsA,
+    Object,
+    Settings,
+    SettingsExt,
+    StyleContextExt,
+    Widget,
+    WidgetExt,
+    STATE_FLAG_NORMAL,
+};
 use mg_settings::{self, EnumFromStr, EnumMetaData, SettingCompletion, SpecialCommand};
 
 use app::Mg;

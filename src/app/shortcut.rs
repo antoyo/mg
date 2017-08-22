@@ -24,7 +24,7 @@ use std::rc::Rc;
 
 use gdk::{EventKey, CONTROL_MASK, MOD1_MASK};
 use gdk::enums::key::{Escape, Tab, ISO_Left_Tab};
-use gtk::Inhibit;
+use gtk::{Inhibit, LabelExt};
 use mg_settings::{self, EnumFromStr, EnumMetaData, SettingCompletion, SpecialCommand};
 use mg_settings::key::Key::{self, Char};
 

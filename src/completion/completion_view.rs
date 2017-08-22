@@ -30,11 +30,15 @@ use gtk::{
     CellRendererTextExt,
     IsA,
     ListStore,
+    ListStoreExt,
     ScrolledWindowExt,
     TreeIter,
     TreeModel,
     TreeModelExt,
+    TreeSelectionExt,
     TreeViewColumn,
+    TreeViewColumnExt,
+    TreeViewExt,
     WidgetExt,
 };
 use gtk::PolicyType::{Automatic, Never};
@@ -204,7 +208,7 @@ impl CompletionView {
         if let Some((model, iter)) = self.tree_view.get_selection().get_selected() {
             if let Ok(model) = model.downcast::<ListStore>() {
                 self.select_next();
-                model.remove(&iter);
+                let _ = model.remove(&iter);
                 self.adjust_policy(&model);
             }
         }

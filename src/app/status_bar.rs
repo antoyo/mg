@@ -23,11 +23,14 @@ use gtk;
 use gtk::{
     BoxExt,
     CssProvider,
+    CssProviderExt,
     EditableExt,
     EditableSignals,
     EntryExt,
+    LabelExt,
     OrientableExt,
     PackType,
+    StyleContextExt,
     WidgetExt,
     STYLE_PROVIDER_PRIORITY_APPLICATION,
 };
@@ -70,7 +73,7 @@ impl Widget for StatusBar {
         // Adjust the look of the entry.
         let style_context = self.command_entry.get_style_context().unwrap();
         // TODO: remove the next line when relm supports css.
-        let style = include_str!("../../style/command-input.css");
+        let style = include_bytes!("../../style/command-input.css");
         let provider = CssProvider::new();
         provider.load_from_data(style).unwrap();
         style_context.add_provider(&provider, STYLE_PROVIDER_PRIORITY_APPLICATION);
