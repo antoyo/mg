@@ -105,7 +105,7 @@ impl Completion {
 
     /// Add a new completer.
     pub fn add_completer(&mut self, ident: &'static str, completer: Box<Completer>) {
-        let _ = self.completers.insert(ident, completer);
+        self.completers.insert(ident, completer);
     }
 
     /// Adjust the model by using the specified completer.
@@ -185,7 +185,7 @@ impl Completion {
 
     /// Set all the completers.
     pub fn set_completers(&mut self, mut completers: Completers) {
-        let _ = completers.insert(NO_COMPLETER_IDENT, Box::new(NoCompleter::new()));
+        completers.insert(NO_COMPLETER_IDENT, Box::new(NoCompleter::new()));
         self.completers = completers;
     }
 }

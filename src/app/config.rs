@@ -78,7 +78,7 @@ pub fn parse_config<P: AsRef<Path>, COMM: EnumFromStr>(filename: P, user_modes: 
 
     let mut modes = HashMap::new();
     for &(key, value) in user_modes {
-        let _ = modes.insert(key, value);
+        modes.insert(key, value);
     }
     assert!(modes.insert("n", NORMAL_MODE).is_none(), "Duplicate mode prefix n.");
     assert!(modes.insert("c", COMMAND_MODE).is_none(), "Duplicate mode prefix c.");

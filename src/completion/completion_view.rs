@@ -155,7 +155,7 @@ impl CompletionView {
         view_column.pack_start(&cell, true);
         view_column.add_attribute(&cell, "text", index);
         view_column.add_attribute(&cell, "foreground", foreground_index);
-        let _ = self.tree_view.append_column(&view_column);
+        self.tree_view.append_column(&view_column);
     }
 
     /// Add the specified number of columns.
@@ -208,7 +208,7 @@ impl CompletionView {
         if let Some((model, iter)) = self.tree_view.get_selection().get_selected() {
             if let Ok(model) = model.downcast::<ListStore>() {
                 self.select_next();
-                let _ = model.remove(&iter);
+                model.remove(&iter);
                 self.adjust_policy(&model);
             }
         }
@@ -233,7 +233,7 @@ impl CompletionView {
     /// Remove all the columns.
     fn remove_columns(&self) {
         for column in &self.tree_view.get_columns() {
-            let _ = self.tree_view.remove_column(column);
+            self.tree_view.remove_column(column);
         }
     }
 

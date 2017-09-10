@@ -124,7 +124,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
             Map { action, keys, mode } => {
                 let mode_mappings = self.model.mappings.entry(self.model.modes[mode.as_str()])
                     .or_insert_with(HashMap::new);
-                let _ = mode_mappings.insert(keys, action);
+                mode_mappings.insert(keys, action);
             },
             Set(name, value) => {
                 match SETT::to_variant(&name, value) {
@@ -141,7 +141,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
             Unmap { keys, mode } => {
                 let mode_mappings = self.model.mappings.entry(self.model.modes[mode.as_str()])
                     .or_insert_with(HashMap::new);
-                let _ = mode_mappings.remove(&keys);
+                mode_mappings.remove(&keys);
             },
         }
     }

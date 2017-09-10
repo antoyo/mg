@@ -50,6 +50,7 @@ use app::Msg::{
     YesNoQuestion,
 };
 use app::status_bar::Msg::{Identifier, ShowIdentifier};
+use completion::NO_COMPLETER_IDENT;
 use completion::completion_view::Msg::SetOriginalInput;
 use self::DialogResult::{Answer, Shortcut};
 
@@ -217,7 +218,7 @@ impl DialogBuilder {
 
     /// Add a shortcut.
     pub fn shortcut(mut self, shortcut: Key, value: &str) -> Self {
-        let _ = self.shortcuts.insert(shortcut, value.to_string());
+        self.shortcuts.insert(shortcut, value.to_string());
         self
     }
 }
@@ -312,7 +313,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
 
         self.model.shortcuts.clear();
         for (key, value) in dialog_builder.shortcuts {
-            let _ = self.model.shortcuts.insert(key, value);
+            self.model.shortcuts.insert(key, value);
         }
 
         let choices = dialog_builder.choices.clone();
@@ -334,6 +335,9 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
             self.set_completer(&completer);
             self.completion_view.emit(SetOriginalInput(dialog_builder.default_answer));
             self.show_completion();
+        }
+        else {
+            self.set_completer(NO_COMPLETER_IDENT);
         }
 
         self.model.answer = None;

@@ -128,7 +128,7 @@ impl<T> Completer for SettingCompleter<T> {
             let mut iter = input.split_whitespace();
             if let Some(name) = iter.next() {
                 if let Some(values) = self.setting_values.get(name) {
-                    let _ = iter.next(); // Skip the equal token.
+                    iter.next(); // Skip the equal token.
                     let input_value = iter.next().unwrap_or_default();
                     self.selected_name = Some(name.to_string());
                     return values.iter()

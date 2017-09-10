@@ -20,10 +20,11 @@
  */
 
 /*
- * FIXME: should not be able to select completion items for input dialog without completer.
+ * FIXME: delete previous word in / (search)
+ * FIXME: remove error-chain.
+ *
  * TODO: shortcut to move the cursor at the other end of the selection.
  * TODO: smart selection (select all on first time, select all except the prefix on the second).
- *
  * TODO: remove blocking dialogs?
  * FIXME: can block in input mode.
  * TODO: use MainLoop::new() instead of gtk::main()?
@@ -121,7 +122,7 @@ pub use app::status_bar::ItemMsg::Text;
 macro_rules! hash {
     ($($ident:expr => $value:expr,)*) => {{
         let mut hash_map: ::mg::completion::Completers = ::std::collections::HashMap::new();
-        $(let _ = hash_map.insert($ident, $value);)*
+        $(hash_map.insert($ident, $value);)*
         hash_map
     }};
 }
