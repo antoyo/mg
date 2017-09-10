@@ -95,7 +95,7 @@ pub struct Completion {
 
 impl Completion {
     /// Create a new completion widget.
-    #[allow(new_without_default_derive, unknown_lints)]
+    #[allow(unknown_lints, new_without_default_derive)]
     pub fn new() -> Self {
         Completion {
             completer_ident: String::new(),
@@ -143,7 +143,7 @@ impl Completion {
     }
 
     /// Get the current completer.
-    #[allow(borrowed_box)]
+    #[allow(unknown_lints, borrowed_box)]
     pub fn current_completer_mut(&mut self) -> Option<&mut Box<Completer>> {
         self.completers.get_mut(self.completer_ident.as_str())
     }

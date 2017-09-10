@@ -166,7 +166,7 @@ pub struct DialogBuilder {
 
 impl DialogBuilder {
     /// Create a new dialog builder.
-    #[allow(new_without_default_derive, unknown_lints)]
+    #[allow(unknown_lints, new_without_default_derive)]
     pub fn new() -> Self {
         DialogBuilder {
             blocking: false,

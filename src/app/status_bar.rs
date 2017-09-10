@@ -169,7 +169,7 @@ impl StatusBar {
             if let Some(text) = self.get_command() {
                 if !text.is_empty() {
                     let pos = self.command_entry.get_position();
-                    let len = text.len();
+                    let len = text.chars().count();
                     if pos < len as i32 {
                         // NOTE: Lock to avoid moving the cursor when updating the text entry.
                         let _lock = self.model.relm.stream().lock();
@@ -192,7 +192,7 @@ impl StatusBar {
                         .skip_while(|&(_, c)| c.is_alphanumeric())
                         .map(|(index, _)| index)
                         .next()
-                        .unwrap_or_else(|| text.len());
+                        .unwrap_or_else(|| text.chars().count());
                     // NOTE: Lock to avoid moving the cursor when updating the text entry.
                     let _lock = self.model.relm.stream().lock();
                     self.command_entry.delete_text(pos, end as i32);
@@ -207,7 +207,7 @@ impl StatusBar {
             if let Some(text) = self.get_command() {
                 if !text.is_empty() {
                     let pos = self.command_entry.get_position();
-                    let len = text.len();
+                    let len = text.chars().count();
                     let start = text.chars().rev().enumerate()
                         .skip(len - pos as usize)
                         .skip_while(|&(_, c)| !c.is_alphanumeric())
@@ -239,7 +239,7 @@ impl StatusBar {
     /// Go to the end of the command entry.
     fn end(&self) {
         let text = self.get_command().unwrap_or_default();
-        self.command_entry.set_position(text.len() as i32);
+        self.command_entry.set_position(text.chars().count() as i32);
     }
 
     /// Get the text of the command entry.
@@ -251,7 +251,7 @@ impl StatusBar {
     fn next_char(&self) {
         let pos = self.command_entry.get_position();
         let text = self.get_command().unwrap_or_default();
-        if pos < text.len() as i32 {
+        if pos < text.chars().count() as i32 {
             self.command_entry.set_position(pos + 1);
         }
     }
@@ -266,7 +266,7 @@ impl StatusBar {
             .skip_while(|&(_, c)| c.is_alphanumeric())
             .next()
             .map(|(index, _)| index)
-            .unwrap_or_else(|| text.len());
+            .unwrap_or_else(|| text.chars().count());
         self.command_entry.set_position(position as i32);
     }
 
@@ -287,7 +287,7 @@ impl StatusBar {
     fn previous_word(&self) {
         let pos = self.command_entry.get_position();
         let text = self.get_command().unwrap_or_default();
-        let len = text.len();
+        let len = text.chars().count();
         let position = text.chars().rev().enumerate()
             .skip(len - pos as usize)
             .skip_while(|&(_, c)| !c.is_alphanumeric())
@@ -308,7 +308,7 @@ impl StatusBar {
         // NOTE: Prevent updating the completions when the user selects a completion entry.
         let _lock = self.model.relm.stream().lock();
         self.command_entry.set_text(command);
-        self.command_entry.set_position(command.len() as i32);
+        self.command_entry.set_position(command.chars().count() as i32);
     }
 
     /// Go to the beginning of the command entry.
