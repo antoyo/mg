@@ -44,6 +44,8 @@ use self::ItemMsg::Text;
 
 #[derive(Msg)]
 pub enum Msg {
+    Copy,
+    Cut,
     DeleteNextChar,
     DeleteNextWord,
     DeletePreviousWord,
@@ -55,6 +57,7 @@ pub enum Msg {
     Identifier(String),
     NextChar,
     NextWord,
+    Paste,
     PreviousChar,
     PreviousWord,
     ShowIdentifier,
@@ -107,6 +110,8 @@ impl Widget for StatusBar {
 
     fn update(&mut self, msg: Msg) {
         match msg {
+            Copy => self.copy(),
+            Cut => self.cut(),
             DeleteNextChar => self.delete_next_char(),
             DeleteNextWord => self.delete_next_word(),
             DeletePreviousWord => self.delete_previous_word(),
@@ -117,6 +122,7 @@ impl Widget for StatusBar {
             Identifier(identifier) => self.set_identifier(&identifier),
             NextChar => self.next_char(),
             NextWord => self.next_word(),
+            Paste => self.paste(),
             PreviousChar => self.previous_char(),
             PreviousWord => self.previous_word(),
             ShowIdentifier => self.show_identifier(),
@@ -147,21 +153,28 @@ impl Widget for StatusBar {
 }
 
 impl StatusBar {
+    /// Copy the selection to the clipboard.
+    fn copy(&self) {
+        self.command_entry.copy_clipboard();
+    }
+
+    /// Cut the selection to the clipboard.
+    fn cut(&self) {
+        self.command_entry.cut_clipboard();
+    }
+
     /// Delete the character after the cursor.
     fn delete_next_char(&self) {
-        if self.command_entry.get_selection_bounds().is_some() {
-            // NOTE: Lock to avoid moving the cursor when updating the text entry.
-            let _lock = self.model.relm.stream().lock();
-            self.command_entry.delete_selection();
-        }
-        else if let Some(text) = self.get_command() {
-            if !text.is_empty() {
-                let pos = self.command_entry.get_position();
-                let len = text.len();
-                if pos < len as i32 {
-                    // NOTE: Lock to avoid moving the cursor when updating the text entry.
-                    let _lock = self.model.relm.stream().lock();
-                    self.command_entry.delete_text(pos, pos + 1);
+        if !self.delete_selection() {
+            if let Some(text) = self.get_command() {
+                if !text.is_empty() {
+                    let pos = self.command_entry.get_position();
+                    let len = text.len();
+                    if pos < len as i32 {
+                        // NOTE: Lock to avoid moving the cursor when updating the text entry.
+                        let _lock = self.model.relm.stream().lock();
+                        self.command_entry.delete_text(pos, pos + 1);
+                    }
                 }
             }
         }
@@ -169,50 +182,57 @@ impl StatusBar {
 
     /// Delete the word after the cursor.
     fn delete_next_word(&self) {
-        if self.command_entry.get_selection_bounds().is_some() {
-            // NOTE: Lock to avoid moving the cursor when updating the text entry.
-            let _lock = self.model.relm.stream().lock();
-            self.command_entry.delete_selection();
-        }
-        else if let Some(text) = self.get_command() {
-            if !text.is_empty() {
-                let pos = self.command_entry.get_position();
-                let end = text.chars().enumerate()
-                    .skip(pos as usize)
-                    .skip_while(|&(_, c)| !c.is_alphanumeric())
-                    .skip_while(|&(_, c)| c.is_alphanumeric())
-                    .map(|(index, _)| index)
-                    .next()
-                    .unwrap_or_else(|| text.len());
-                // NOTE: Lock to avoid moving the cursor when updating the text entry.
-                let _lock = self.model.relm.stream().lock();
-                self.command_entry.delete_text(pos, end as i32);
+        if !self.delete_selection() {
+            if let Some(text) = self.get_command() {
+                if !text.is_empty() {
+                    let pos = self.command_entry.get_position();
+                    let end = text.chars().enumerate()
+                        .skip(pos as usize)
+                        .skip_while(|&(_, c)| !c.is_alphanumeric())
+                        .skip_while(|&(_, c)| c.is_alphanumeric())
+                        .map(|(index, _)| index)
+                        .next()
+                        .unwrap_or_else(|| text.len());
+                    // NOTE: Lock to avoid moving the cursor when updating the text entry.
+                    let _lock = self.model.relm.stream().lock();
+                    self.command_entry.delete_text(pos, end as i32);
+                }
             }
         }
     }
 
     /// Delete the word before the cursor.
     fn delete_previous_word(&self) {
+        if !self.delete_selection() {
+            if let Some(text) = self.get_command() {
+                if !text.is_empty() {
+                    let pos = self.command_entry.get_position();
+                    let len = text.len();
+                    let start = text.chars().rev().enumerate()
+                        .skip(len - pos as usize)
+                        .skip_while(|&(_, c)| !c.is_alphanumeric())
+                        .skip_while(|&(_, c)| c.is_alphanumeric())
+                        .map(|(index, _)| len - index)
+                        .next()
+                        .unwrap_or_default();
+                    // NOTE: Lock to avoid moving the cursor when updating the text entry.
+                    let _lock = self.model.relm.stream().lock();
+                    self.command_entry.delete_text(start as i32, pos);
+                }
+            }
+        }
+    }
+
+    /// Delete the selected text.
+    fn delete_selection(&self) -> bool {
         if self.command_entry.get_selection_bounds().is_some() {
             // NOTE: Lock to avoid moving the cursor when updating the text entry.
             let _lock = self.model.relm.stream().lock();
             self.command_entry.delete_selection();
+            true
         }
-        else if let Some(text) = self.get_command() {
-            if !text.is_empty() {
-                let pos = self.command_entry.get_position();
-                let len = text.len();
-                let start = text.chars().rev().enumerate()
-                    .skip(len - pos as usize)
-                    .skip_while(|&(_, c)| !c.is_alphanumeric())
-                    .skip_while(|&(_, c)| c.is_alphanumeric())
-                    .map(|(index, _)| len - index)
-                    .next()
-                    .unwrap_or_default();
-                // NOTE: Lock to avoid moving the cursor when updating the text entry.
-                let _lock = self.model.relm.stream().lock();
-                self.command_entry.delete_text(start as i32, pos);
-            }
+        else {
+            false
         }
     }
 
@@ -248,6 +268,11 @@ impl StatusBar {
             .map(|(index, _)| index)
             .unwrap_or_else(|| text.len());
         self.command_entry.set_position(position as i32);
+    }
+
+    /// Paste the clipboard to the selection or the cursor position.
+    fn paste(&self) {
+        self.command_entry.paste_clipboard();
     }
 
     /// Go back one character in the command entry.

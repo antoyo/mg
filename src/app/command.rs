@@ -40,6 +40,8 @@ use app::{
     Mode,
     COMPLETE_NEXT_COMMAND,
     COMPLETE_PREVIOUS_COMMAND,
+    COPY,
+    CUT,
     ENTRY_DELETE_NEXT_CHAR,
     ENTRY_DELETE_NEXT_WORD,
     ENTRY_DELETE_PREVIOUS_WORD,
@@ -49,6 +51,7 @@ use app::{
     ENTRY_PREVIOUS_CHAR,
     ENTRY_PREVIOUS_WORD,
     ENTRY_SMART_HOME,
+    PASTE,
 };
 use app::ActivationType::{self, Final};
 use app::Msg::{
@@ -57,12 +60,15 @@ use app::Msg::{
     EnterNormalModeAndReset,
 };
 use app::status_bar::Msg::{
+    Copy,
+    Cut,
     DeleteNextChar,
     DeleteNextWord,
     DeletePreviousWord,
     End,
     NextChar,
     NextWord,
+    Paste,
     PreviousChar,
     PreviousWord,
     SmartHome,
@@ -94,6 +100,8 @@ impl<COMM, SETT> Mg<COMM, SETT>
         match command {
             COMPLETE_NEXT_COMMAND => self.completion_view.emit(SelectNext),
             COMPLETE_PREVIOUS_COMMAND => self.completion_view.emit(SelectPrevious),
+            COPY => self.status_bar.emit(Copy),
+            CUT => self.status_bar.emit(Cut),
             ENTRY_DELETE_NEXT_CHAR => {
                 self.status_bar.emit(DeleteNextChar);
                 self.update_completions();
@@ -112,6 +120,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
             ENTRY_PREVIOUS_CHAR => self.status_bar.emit(PreviousChar),
             ENTRY_PREVIOUS_WORD => self.status_bar.emit(PreviousWord),
             ENTRY_SMART_HOME => self.status_bar.emit(SmartHome),
+            PASTE => self.status_bar.emit(Paste),
             _ => unreachable!(),
         }
     }

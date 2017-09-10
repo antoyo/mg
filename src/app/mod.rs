@@ -123,6 +123,8 @@ const BLOCKING_INPUT_MODE: &str = "blocking-input";
 pub const COMMAND_MODE: &str = "command";
 const COMPLETE_NEXT_COMMAND: &str = "complete-next";
 const COMPLETE_PREVIOUS_COMMAND: &str = "complete-previous";
+const COPY: &str = "entry-copy";
+const CUT: &str = "entry-cut";
 const ENTRY_DELETE_NEXT_CHAR: &str = "entry-delete-next-char";
 const ENTRY_DELETE_NEXT_WORD: &str = "entry-delete-next-word";
 const ENTRY_DELETE_PREVIOUS_WORD: &str = "entry-delete-previous-word";
@@ -135,6 +137,7 @@ const ENTRY_SMART_HOME: &str = "entry-smart-home";
 const INFO_MESSAGE_DURATION: u64 = 5;
 const INPUT_MODE: &str = "input";
 const NORMAL_MODE: &str = "normal";
+const PASTE: &str = "entry-paste";
 
 #[derive(PartialEq)]
 pub enum ActivationType {
