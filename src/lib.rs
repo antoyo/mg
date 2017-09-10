@@ -20,17 +20,17 @@
  */
 
 /*
- * FIXME: deleting previous word does not update completions.
- * TODO: remove blocking dialogs?
  * FIXME: typing numbers in insert mode adds them to the shortcut label.
  * FIXME: should not be able to select completion items for input dialog without completer.
+ * TODO: shortcut to move the cursor at the other end of the selection.
+ * TODO: smart selection (select all on first time, select all except the prefix on the second).
+ *
+ * TODO: remove blocking dialogs?
  * FIXME: can block in input mode.
  * TODO: use MainLoop::new() instead of gtk::main()?
  * FIXME: the commands in the config file are not executed.
  * TODO: take advantage of IntoOption and IntoPair.
  * TODO: automatically connect the AppClose message to Quit if it exists.
- * TODO: smart selection (select all on first time, select all except the prefix on the second).
- * TODO: shortcut to move the cursor at the other end of the selection.
  * TODO: thread example (using a oneshot).
  * TODO: generate async gtk methods as returning futures.
  * TODO: change all unneeded &mut self to &self.

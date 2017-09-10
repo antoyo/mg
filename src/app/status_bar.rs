@@ -178,6 +178,7 @@ impl StatusBar {
                 }
             }
         }
+        self.emit_entry_changed();
     }
 
     /// Delete the word after the cursor.
@@ -199,6 +200,7 @@ impl StatusBar {
                 }
             }
         }
+        self.emit_entry_changed();
     }
 
     /// Delete the word before the cursor.
@@ -221,6 +223,7 @@ impl StatusBar {
                 }
             }
         }
+        self.emit_entry_changed();
     }
 
     /// Delete the selected text.
@@ -234,6 +237,11 @@ impl StatusBar {
         else {
             false
         }
+    }
+
+    /// Emit the EntryChanged event with the current text.
+    fn emit_entry_changed(&self) {
+        self.model.relm.stream().emit(EntryChanged(self.command_entry.get_text()));
     }
 
     /// Go to the end of the command entry.

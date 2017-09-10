@@ -102,18 +102,9 @@ impl<COMM, SETT> Mg<COMM, SETT>
             COMPLETE_PREVIOUS_COMMAND => self.completion_view.emit(SelectPrevious),
             COPY => self.status_bar.emit(Copy),
             CUT => self.status_bar.emit(Cut),
-            ENTRY_DELETE_NEXT_CHAR => {
-                self.status_bar.emit(DeleteNextChar);
-                self.update_completions();
-            },
-            ENTRY_DELETE_NEXT_WORD => {
-                self.status_bar.emit(DeleteNextWord);
-                self.update_completions();
-            },
-            ENTRY_DELETE_PREVIOUS_WORD => {
-                self.status_bar.emit(DeletePreviousWord);
-                self.update_completions();
-            },
+            ENTRY_DELETE_NEXT_CHAR => self.status_bar.emit(DeleteNextChar),
+            ENTRY_DELETE_NEXT_WORD => self.status_bar.emit(DeleteNextWord),
+            ENTRY_DELETE_PREVIOUS_WORD => self.status_bar.emit(DeletePreviousWord),
             ENTRY_END => self.status_bar.emit(End),
             ENTRY_NEXT_CHAR => self.status_bar.emit(NextChar),
             ENTRY_NEXT_WORD => self.status_bar.emit(NextWord),
