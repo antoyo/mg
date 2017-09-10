@@ -106,6 +106,7 @@ pub enum Mode {
     BlockingInput,
     Command,
     Input,
+    Insert,
     Normal,
     Unknown,
 }
@@ -136,6 +137,7 @@ const ENTRY_PREVIOUS_WORD: &str = "entry-previous-word";
 const ENTRY_SMART_HOME: &str = "entry-smart-home";
 const INFO_MESSAGE_DURATION: u64 = 5;
 const INPUT_MODE: &str = "input";
+const INSERT_MODE: &str = "insert";
 const NORMAL_MODE: &str = "normal";
 const PASTE: &str = "entry-paste";
 
@@ -458,10 +460,11 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                 BLOCKING_INPUT_MODE => Mode::BlockingInput,
                 COMMAND_MODE => Mode::Command,
                 INPUT_MODE => Mode::Input,
+                INSERT_MODE => Mode::Insert,
                 NORMAL_MODE => Mode::Normal,
                 _ => Mode::Unknown,
             };
-        if current_mode == Mode::Unknown {
+        if current_mode == Mode::Unknown || current_mode == Mode::Insert {
             self.model.mode_label = mode.to_string();
         }
         else {
@@ -577,7 +580,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                     },
                     #[name="shortcut"]
                     StatusBarItem {
-                        Text: shortcut_to_string(&self.model.current_shortcut),
+                        Text: shortcut_to_string(self.model.current_mode.get(), &self.model.current_shortcut),
                     },
                     EntryActivate(ref input) => StatusBarEntryActivate(input.clone()),
                     EntryChanged(ref text) => StatusBarEntryChanged(text.clone()),

@@ -45,6 +45,7 @@ use super::{
     ENTRY_PREVIOUS_CHAR,
     ENTRY_PREVIOUS_WORD,
     ENTRY_SMART_HOME,
+    INSERT_MODE,
     NORMAL_MODE,
     PASTE,
 };
@@ -81,6 +82,7 @@ pub fn parse_config<P: AsRef<Path>, COMM: EnumFromStr>(filename: P, user_modes: 
     }
     assert!(modes.insert("n", NORMAL_MODE).is_none(), "Duplicate mode prefix n.");
     assert!(modes.insert("c", COMMAND_MODE).is_none(), "Duplicate mode prefix c.");
+    assert!(modes.insert("i", INSERT_MODE).is_none(), "Duplicate mode prefix i.");
     let config = Config {
         application_commands: vec![COMPLETE_NEXT_COMMAND, COMPLETE_PREVIOUS_COMMAND, COPY, CUT, ENTRY_DELETE_NEXT_CHAR,
             ENTRY_DELETE_NEXT_WORD, ENTRY_DELETE_PREVIOUS_WORD, ENTRY_END, ENTRY_NEXT_CHAR, ENTRY_NEXT_WORD,

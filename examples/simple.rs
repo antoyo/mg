@@ -43,7 +43,6 @@ use mg::{
     CustomCommand,
     DarkTheme,
     Mg,
-    Modes,
     NoSettings,
     SetMode,
     StatusBarItem,
@@ -73,10 +72,6 @@ pub enum AppCommand {
     Quit,
 }
 
-static MODES: Modes = &[
-    ("i", "insert"),
-];
-
 #[widget]
 impl Widget for Win {
     fn init_view(&mut self) {
@@ -103,7 +98,7 @@ impl Widget for Win {
 
     view! {
         #[name="mg"]
-        Mg<AppCommand, NoSettings>(MODES, Ok("examples/main.conf".into()), None, vec![]) {
+        Mg<AppCommand, NoSettings>(&[], Ok("examples/main.conf".into()), None, vec![]) {
             DarkTheme: true,
             Title: "First Mg Program".to_string(),
             Variables: vec![("url", Box::new(|| "http://duckduckgo.com/lite".to_string()))],

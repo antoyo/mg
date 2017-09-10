@@ -40,9 +40,14 @@ use app::ShortcutCommand::{Complete, Incomplete};
 use key_converter::gdk_key_to_key;
 
 /// Convert a shortcut of keys to a `String`.
-pub fn shortcut_to_string(keys: &[Key]) -> String {
-    let strings: Vec<_> = keys.iter().map(ToString::to_string).collect();
-    strings.join("")
+pub fn shortcut_to_string(mode: Mode, keys: &[Key]) -> String {
+    if mode == Mode::Insert {
+        String::new()
+    }
+    else {
+        let strings: Vec<_> = keys.iter().map(ToString::to_string).collect();
+        strings.join("")
+    }
 }
 
 impl<COMM, SETT> Mg<COMM, SETT>
@@ -188,7 +193,8 @@ impl<COMM, SETT> Mg<COMM, SETT>
     // TODO: remove this when updating the model in methods outside the trait will update the view.
     /// Update the shortcut label.
     fn update_shortcut_label(&self) {
-        self.shortcut.widget().set_text(&shortcut_to_string(&self.model.current_shortcut));
+        self.shortcut.widget().set_text(&shortcut_to_string(self.model.current_mode.get(),
+            &self.model.current_shortcut));
     }
 }
 

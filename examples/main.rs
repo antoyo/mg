@@ -88,7 +88,7 @@ pub enum Msg {
 }
 
 static MODES: Modes = &[
-    ("i", "insert"),
+    ("f", "foo"),
 ];
 
 #[widget]

@@ -20,7 +20,6 @@
  */
 
 /*
- * FIXME: typing numbers in insert mode adds them to the shortcut label.
  * FIXME: should not be able to select completion items for input dialog without completer.
  * TODO: shortcut to move the cursor at the other end of the selection.
  * TODO: smart selection (select all on first time, select all except the prefix on the second).
