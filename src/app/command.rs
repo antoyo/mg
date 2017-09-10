@@ -189,11 +189,14 @@ impl<COMM, SETT> Mg<COMM, SETT>
     /// Handle the command activate event.
     pub fn handle_command(&mut self, command: Option<String>, activated: bool) -> Option<Msg<COMM, SETT>> {
         if let Some(command) = command {
-            if self.model.current_command_mode == ':' {
+            if self.model.current_command_mode == ':' || !activated {
                 let parse_result = self.model.settings_parser.parse_line(&command);
                 self.execute_commands(parse_result, activated);
             }
             else {
+                // If activated is true, it means the user pressed Enter to finish the special
+                // command. If it was false, that means that the user activated a command via a
+                // shortcut.
                 return self.handle_special_command(Final, &command);
             }
         }

@@ -20,7 +20,6 @@
  */
 
 /*
- * FIXME: delete previous word in / (search)
  * FIXME: remove error-chain.
  *
  * TODO: shortcut to move the cursor at the other end of the selection.

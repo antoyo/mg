@@ -498,7 +498,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             DarkTheme(dark) => self.set_dark_theme(dark),
             DeleteCompletionItem => self.delete_current_completion_item(),
             EnterCommandMode => {
-                self.set_completer(DEFAULT_COMPLETER_IDENT);
+                self.set_completer(NO_COMPLETER_IDENT);
                 self.set_current_identifier(':');
                 self.set_mode(COMMAND_MODE);
                 self.reset();
