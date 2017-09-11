@@ -20,8 +20,6 @@
  */
 
 /*
- * FIXME: remove error-chain.
- *
  * TODO: shortcut to move the cursor at the other end of the selection.
  * TODO: smart selection (select all on first time, select all except the prefix on the second).
  * TODO: remove blocking dialogs?
