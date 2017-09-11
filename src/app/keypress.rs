@@ -53,7 +53,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
 
     /// Handle the key release event for the command mode.
     fn command_key_release(&mut self, _key: &EventKey) -> Option<Msg<COMM, SETT>> {
-        if self.model.current_command_mode != ':' && COMM::is_incremental(self.model.current_command_mode) {
+        if !self.is_normal_command() && COMM::is_incremental(self.model.current_command_mode) {
             let command = self.model.status_bar_command.clone(); // TODO: remove this useless clone.
             let msg = self.handle_special_command(Current, &command);
             return msg;

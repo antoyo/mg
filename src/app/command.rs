@@ -189,7 +189,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
     /// Handle the command activate event.
     pub fn handle_command(&mut self, command: Option<String>, activated: bool) -> Option<Msg<COMM, SETT>> {
         if let Some(command) = command {
-            if self.model.current_command_mode == ':' || !activated {
+            if self.is_normal_command() || !activated {
                 let parse_result = self.model.settings_parser.parse_line(&command);
                 self.execute_commands(parse_result, activated);
             }

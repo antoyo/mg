@@ -498,7 +498,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             DarkTheme(dark) => self.set_dark_theme(dark),
             DeleteCompletionItem => self.delete_current_completion_item(),
             EnterCommandMode => {
-                self.set_completer(NO_COMPLETER_IDENT);
+                self.set_completer(DEFAULT_COMPLETER_IDENT);
                 self.set_current_identifier(':');
                 self.set_mode(COMMAND_MODE);
                 self.reset();
@@ -609,6 +609,10 @@ impl<COMM, SETT> Mg<COMM, SETT>
     where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
           SETT: Default + EnumMetaData + mg_settings::settings::Settings + SettingCompletion + 'static,
 {
+    fn is_normal_command(&self) -> bool {
+        self.model.current_command_mode == ':'
+    }
+
     /// Set a setting value.
     fn set_setting(&mut self, setting: SETT::Variant) {
         self.model.settings.set_value(setting.clone());

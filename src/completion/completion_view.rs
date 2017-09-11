@@ -75,7 +75,7 @@ pub enum Msg {
     SelectPrevious,
     SetOriginalInput(String),
     ShowCompletion,
-    UpdateCompletions(Mode, Text),
+    UpdateCompletions(Mode, Text, bool),
     Visible(bool),
 }
 
@@ -121,7 +121,8 @@ impl Widget for CompletionView {
             SelectPrevious => self.select_previous(),
             SetOriginalInput(input) => self.set_original_input(&input),
             ShowCompletion => self.show_completion(),
-            UpdateCompletions(mode, text) => self.update_completions(&mode, &text),
+            UpdateCompletions(mode, text, is_normal_command) =>
+                self.update_completions(&mode, &text, is_normal_command),
             Visible(visible) => self.model.visible = visible,
         }
     }
@@ -256,15 +257,19 @@ impl CompletionView {
     }
 
     /// Select the completer based on the currently typed command.
-    fn select_completer(&mut self, command_entry_text: &str) {
+    fn select_completer(&mut self, command_entry_text: &str, is_normal_command: bool) {
         let text = command_entry_text.trim_left();
-        if let Some(space_index) = text.find(' ') {
-            let command = &text[..space_index];
-            self.set_completer(command, command_entry_text);
-        }
-        else {
-            self.set_completer(DEFAULT_COMPLETER_IDENT, command_entry_text);
-        }
+        let completer =
+            if let Some(space_index) = text.find(' ') {
+                &text[..space_index]
+            }
+            else if is_normal_command {
+                DEFAULT_COMPLETER_IDENT
+            }
+            else {
+                NO_COMPLETER_IDENT
+            };
+        self.set_completer(completer, command_entry_text);
     }
 
     /// Select the next item.
@@ -338,13 +343,13 @@ impl CompletionView {
     }
 
     /// Update the completions.
-    fn update_completions(&mut self, current_mode: &str, command_entry_text: &str) {
+    fn update_completions(&mut self, current_mode: &str, command_entry_text: &str, is_normal_command: bool) {
         if current_mode == COMMAND_MODE {
             // In command mode, the completer can change when the user type.
             // For instance, after typing "set ", the completer switch to the settings
             // completer.
             // TODO: add command_entry_text in the model?
-            self.select_completer(command_entry_text);
+            self.select_completer(command_entry_text, is_normal_command);
         }
         else {
             // Do not select another completer when in input mode.

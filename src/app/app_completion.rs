@@ -64,6 +64,6 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
     /// Update the items of the completion view.
     pub fn update_completions(&self) {
         let input = self.model.status_bar_command.clone();
-        self.completion_view.emit(UpdateCompletions(self.model.mode_string.clone(), input));
+        self.completion_view.emit(UpdateCompletions(self.model.mode_string.clone(), input, self.is_normal_command()));
     }
 }
