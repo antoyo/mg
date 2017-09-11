@@ -21,7 +21,6 @@
 
 use std::collections::HashMap;
 
-use error_chain::ChainedError;
 use mg_settings::{
     self,
     Command,
@@ -31,7 +30,7 @@ use mg_settings::{
     SettingCompletion,
     SpecialCommand,
 };
-use mg_settings::errors::{Error, ErrorKind};
+use mg_settings::errors::Error;
 use mg_settings::errors::ErrorType::{MissingArgument, NoCommand, Parse, UnknownCommand};
 use mg_settings::Command::{App, Custom, Map, Set, Unmap};
 
@@ -128,12 +127,10 @@ impl<COMM, SETT> Mg<COMM, SETT>
             },
             Set(name, value) => {
                 match SETT::to_variant(&name, value) {
-                    Ok(setting) => {
-                        self.set_setting(setting);
-                    },
+                    Ok(setting) => self.set_setting(setting),
                     Err(error) => {
-                        let msg = ErrorKind::Msg("Error setting value".to_string());
-                        self.error(ChainedError::with_chain(error, msg));
+                        self.error(Error::Msg("Error setting value".to_string()));
+                        error!("{}", error);
                     },
                 }
                 self.return_to_normal_mode();
@@ -217,27 +214,18 @@ impl<COMM, SETT> Mg<COMM, SETT>
     }
 
     fn show_parse_error(&mut self, error: Error) {
-        let message =
-            match error {
-                Error(ErrorKind::Parse(ref parse_error), _) => {
-                    Some(match parse_error.typ {
-                        MissingArgument => "Argument required".to_string(),
-                        NoCommand => return,
-                        Parse => format!("Parse error: unexpected {}, expecting: {}", parse_error.unexpected,
-                                         parse_error.expected),
-                        UnknownCommand => format!("Not a command: {}", parse_error.unexpected),
-                    })
-                },
-                _ => None,
-            };
-        let error =
-            if let Some(message) = message {
-                ChainedError::with_chain(error, ErrorKind::Msg(message))
-            }
-            else {
-                error
-            };
+        if let Error::Parse(ref parse_error) = error {
+            let message =
+                match parse_error.typ {
+                    MissingArgument => "Argument required".to_string(),
+                    NoCommand => return,
+                    Parse => format!("Parse error: unexpected {}, expecting: {}", parse_error.unexpected,
+                                     parse_error.expected),
+                    UnknownCommand => format!("Not a command: {}", parse_error.unexpected),
+                };
+            self.error(Error::Msg(message));
+        }
 
-        self.error(error);
+        error!("{}", error);
     }
 }

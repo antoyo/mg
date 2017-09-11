@@ -51,8 +51,6 @@
     unused_qualifications,
 )]
 
-#[macro_use]
-extern crate error_chain;
 extern crate futures_glib;
 extern crate gdk;
 extern crate glib;
@@ -70,6 +68,7 @@ extern crate relm_derive;
 
 mod app;
 pub mod completion;
+mod file;
 mod key_converter;
 
 /// Map mode prefix (i.e. "i") to the mode name (i.e. "insert").

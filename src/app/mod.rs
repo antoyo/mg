@@ -251,13 +251,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         let mut message = String::new();
         let error_str = error.to_string();
         message.push_str(&error_str);
-        for cause in error.iter().skip(1) {
-            message.push_str(&format!("\n    caused by: {}", cause));
-        }
         error!("{}", message);
-        if let Some(backtrace) = error.backtrace() {
-            trace!("{:?}", backtrace);
-        }
 
         self.model.message = error_str;
         self.model.entry_shown = false;

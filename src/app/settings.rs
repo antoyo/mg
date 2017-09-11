@@ -24,7 +24,7 @@ use std::io;
 use std::path::PathBuf;
 
 use mg_settings::{EnumMetaData, MetaData, SettingCompletion, Value};
-use mg_settings::errors::{ErrorKind, Result, SettingError};
+use mg_settings::errors::{Error, Result, SettingError};
 use mg_settings::settings;
 
 /// A directory or a file to create if it does not exist.
@@ -47,7 +47,7 @@ impl settings::Settings for NoSettings {
     type Variant = NoSettingsVariant;
 
     fn to_variant(name: &str, _value: Value) -> Result<Self::Variant> {
-        bail!(ErrorKind::Setting(SettingError::UnknownSetting(name.to_string())))
+        Err(Error::Setting(SettingError::UnknownSetting(name.to_string())))
     }
 
     fn set_value(&mut self, _value: Self::Variant) {

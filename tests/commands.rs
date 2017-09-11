@@ -42,7 +42,6 @@ use libxdo::XDo;
 use mg::{
     CustomCommand,
     Mg,
-    Modes,
 };
 use relm::{Widget, init_test};
 use relm_attributes::widget;
@@ -72,10 +71,6 @@ pub enum Msg {
     Command(AppCommand),
 }
 
-static MODES: Modes = &[
-    ("i", "insert"),
-];
-
 #[widget]
 impl Widget for Win {
     fn model() -> Model {
@@ -97,7 +92,7 @@ impl Widget for Win {
 
     view! {
         #[name="mg"]
-        Mg<AppCommand, AppSettings>(MODES, Ok("examples/main.conf".into()), None, vec![]) {
+        Mg<AppCommand, AppSettings>(&[], Ok("examples/main.conf".into()), None, vec![]) {
             #[name="label"]
             gtk::Label {
                 text: &self.model.text,

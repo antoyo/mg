@@ -25,9 +25,9 @@ use std::io::{self, BufReader, Write};
 use std::path::{Path, PathBuf};
 
 use mg_settings::{Config, EnumFromStr, Parser, ParseResult};
-use mg_settings::errors::ResultExt;
 
 use app::settings::DefaultConfig;
+use file;
 use super::{
     Modes,
     ModesHash,
@@ -94,8 +94,7 @@ pub fn parse_config<P: AsRef<Path>, COMM: EnumFromStr>(filename: P, user_modes: 
         parser.set_include_path(include_path);
     }
 
-    let file = File::open(&filename)
-        .chain_err(|| format!("failed to open settings file `{}`", filename.as_ref().to_string_lossy()));
+    let file = file::open(&filename);
     let file = rtry_no_return!(parse_result, file, { return (parser, parse_result, modes); });
     let buf_reader = BufReader::new(file);
     let parse_result = parser.parse(buf_reader);
