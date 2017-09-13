@@ -97,6 +97,6 @@ pub fn parse_config<P: AsRef<Path>, COMM: EnumFromStr>(filename: P, user_modes: 
     let file = file::open(&filename);
     let file = rtry_no_return!(parse_result, file, { return (parser, parse_result, modes); });
     let buf_reader = BufReader::new(file);
-    let parse_result = parser.parse(buf_reader);
+    let parse_result = parser.parse(buf_reader, None);
     (parser, parse_result, modes)
 }

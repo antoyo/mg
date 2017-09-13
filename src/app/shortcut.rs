@@ -121,8 +121,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
                     self.clear_shortcut();
                     match self.action_to_command(&action) {
                         Complete(command) => {
-                            let command = format!("{} {}", command, prefix);
-                            return self.handle_command(Some(command), false);
+                            return self.handle_command(Some(command), false, prefix);
                         },
                         Incomplete(command) => {
                             self.input_command(command);
@@ -156,23 +155,24 @@ impl<COMM, SETT> Mg<COMM, SETT>
         true
     }
 
-    fn shortcut_prefix(&self) -> String {
-        let prefix: String = self.model.current_shortcut.iter()
+    fn shortcut_prefix(&self) -> Option<u32> {
+        let mut digits = self.model.current_shortcut.iter()
             .take_while(is_digit)
-            .map(|key| {
-                if let Char(c) = *key {
-                    if let Some(digit) = c.to_digit(10) {
-                        return (digit as u8 + b'0') as char;
-                    }
-                }
-                unreachable!()
-            })
-            .collect();
-        if prefix.is_empty() {
-            "1".to_string()
+            .peekable();
+        if digits.peek().is_none() {
+            None
         }
         else {
-            prefix
+            let num = digits
+                .fold(0, |num, key| {
+                    if let Char(c) = *key {
+                        if let Some(digit) = c.to_digit(10) {
+                            return num * 10 + digit;
+                        }
+                    }
+                    num
+                });
+            Some(num)
         }
     }
 

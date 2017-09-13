@@ -163,7 +163,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
                 }
             }
             else {
-                self.handle_command(input, true)
+                self.handle_command(input, true, None)
             };
         if let Some(message) = message {
             self.model.relm.stream().emit(message);
@@ -184,10 +184,12 @@ impl<COMM, SETT> Mg<COMM, SETT>
     }
 
     /// Handle the command activate event.
-    pub fn handle_command(&mut self, command: Option<String>, activated: bool) -> Option<Msg<COMM, SETT>> {
+    pub fn handle_command(&mut self, command: Option<String>, activated: bool, prefix: Option<u32>)
+        -> Option<Msg<COMM, SETT>>
+    {
         if let Some(command) = command {
             if self.is_normal_command() || !activated {
-                let parse_result = self.model.settings_parser.parse_line(&command);
+                let parse_result = self.model.settings_parser.parse_line(&command, prefix);
                 self.execute_commands(parse_result, activated);
             }
             else {
