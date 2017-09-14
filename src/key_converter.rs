@@ -98,6 +98,7 @@ pub fn gdk_key_to_key(key: &EventKey) -> Option<Key> {
             z => Char('z'),
             key::agrave => Char('à'),
             key::Agrave => Char('À'),
+            key::apostrophe => Char('\''),
             key::asciicircum => Char('^'),
             key::asciitilde => Char('~'),
             key::ampersand => Char('&'),
