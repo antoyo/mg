@@ -112,7 +112,7 @@ pub use app::dialog::{
 };
 pub use app::settings::{DefaultConfig, NoSettings};
 pub use app::status_bar::{StatusBar, StatusBarItem};
-pub use app::status_bar::ItemMsg::Text;
+pub use app::status_bar::ItemMsg::{Color, Text};
 
 #[macro_export]
 macro_rules! hash {

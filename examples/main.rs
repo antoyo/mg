@@ -21,6 +21,7 @@
 
 #![feature(proc_macro)]
 
+extern crate gdk;
 extern crate gtk;
 #[macro_use]
 extern crate mg;
@@ -34,11 +35,13 @@ extern crate relm_attributes;
 #[macro_use]
 extern crate relm_derive;
 
+use gdk::RGBA;
 use gtk::{ButtonExt, LabelExt, OrientableExt, WidgetExt};
 use gtk::Orientation::Vertical;
 use mg::{
     Alert,
     AppClose,
+    Color,
     CustomCommand,
     DarkTheme,
     DeleteCompletionItem,
@@ -202,6 +205,7 @@ impl Widget for Win {
                 },
             },
             StatusBarItem {
+                Color: RGBA::red(),
                 text: "Rightmost",
             },
             StatusBarItem {

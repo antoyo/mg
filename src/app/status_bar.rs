@@ -19,6 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+use gdk::RGBA;
 use gtk;
 use gtk::{
     BoxExt,
@@ -32,6 +33,7 @@ use gtk::{
     PackType,
     StyleContextExt,
     WidgetExt,
+    STATE_FLAG_NORMAL,
     STYLE_PROVIDER_PRIORITY_APPLICATION,
 };
 use gtk::Orientation::Horizontal;
@@ -40,7 +42,7 @@ use relm::{Relm, Widget};
 use relm_attributes::widget;
 
 use self::Msg::*;
-use self::ItemMsg::Text;
+use self::ItemMsg::{Color, Text};
 
 #[derive(Msg)]
 pub enum Msg {
@@ -342,6 +344,8 @@ impl StatusBar {
 
 #[derive(Msg)]
 pub enum ItemMsg {
+    /// Set the color of the status bar item.
+    Color(RGBA),
     /// Set the text of the status bar item.
     Text(String),
 }
@@ -355,6 +359,7 @@ impl Widget for StatusBarItem {
 
     fn update(&mut self, msg: ItemMsg) {
         match msg {
+            Color(color) => self.label.override_color(STATE_FLAG_NORMAL, &color),
             Text(text) => self.label.set_text(&text),
         }
     }
