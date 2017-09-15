@@ -345,7 +345,7 @@ impl StatusBar {
 #[derive(Msg)]
 pub enum ItemMsg {
     /// Set the color of the status bar item.
-    Color(RGBA),
+    Color(Option<RGBA>),
     /// Set the text of the status bar item.
     Text(String),
 }
@@ -359,7 +359,7 @@ impl Widget for StatusBarItem {
 
     fn update(&mut self, msg: ItemMsg) {
         match msg {
-            Color(color) => self.label.override_color(STATE_FLAG_NORMAL, &color),
+            Color(color) => self.label.override_color(STATE_FLAG_NORMAL, color.as_ref()),
             Text(text) => self.label.set_text(&text),
         }
     }

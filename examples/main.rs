@@ -205,7 +205,7 @@ impl Widget for Win {
                 },
             },
             StatusBarItem {
-                Color: RGBA::red(),
+                Color: Some(RGBA::red()),
                 text: "Rightmost",
             },
             StatusBarItem {
