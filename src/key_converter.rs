@@ -28,11 +28,54 @@ use mg_settings::key::Key::{self, Alt, Backspace, Char, Control, Delete, Down, E
     F6, F7, F8, F9, F10, F11, F12, Home, Insert, Left, PageDown, PageUp, Right, Shift, Space, Tab, Up};
 
 /// Convert a GDK key to an MG Key.
-#[allow(non_upper_case_globals)]
 pub fn gdk_key_to_key(key: &EventKey) -> Option<Key> {
     let alt_pressed = key.get_state() & MOD1_MASK == MOD1_MASK;
     let control_pressed = key.get_state() & CONTROL_MASK == CONTROL_MASK;
     let shift_pressed = key.get_state() & SHIFT_MASK == SHIFT_MASK;
+    let key =
+        match to_key(key) {
+            Some(key) => key,
+            None => return None,
+        };
+
+    let control_constructor: fn(Key) -> Key =
+        if control_pressed {
+            |key| Control(Box::new(key))
+        }
+        else {
+            |key| key
+        };
+
+    let alt_constructor: fn(Key) -> Key =
+        if alt_pressed {
+            |key| Alt(Box::new(key))
+        }
+        else {
+            |key| key
+        };
+
+    let shift_constructor: fn(Key) -> Key =
+        if shift_pressed && !is_char(&key) {
+            |key| Shift(Box::new(key))
+        }
+        else {
+            |key| key
+        };
+
+    Some(control_constructor(alt_constructor(shift_constructor(key))))
+}
+
+pub fn is_char(key: &Key) -> bool {
+    if let Char(_) = *key {
+        true
+    }
+    else {
+        false
+    }
+}
+
+#[allow(non_upper_case_globals)]
+pub fn to_key(key: &EventKey) -> Option<Key> {
     let key =
         match key.get_keyval() {
             _0 | KP_0 => Char('0'),
@@ -164,39 +207,5 @@ pub fn gdk_key_to_key(key: &EventKey) -> Option<Key> {
             key::Up => Up,
             _ => return None,
         };
-
-    let control_constructor: fn(Key) -> Key =
-        if control_pressed {
-            |key| Control(Box::new(key))
-        }
-        else {
-            |key| key
-        };
-
-    let alt_constructor: fn(Key) -> Key =
-        if alt_pressed {
-            |key| Alt(Box::new(key))
-        }
-        else {
-            |key| key
-        };
-
-    let shift_constructor: fn(Key) -> Key =
-        if shift_pressed && !is_char(&key) {
-            |key| Shift(Box::new(key))
-        }
-        else {
-            |key| key
-        };
-
-    Some(control_constructor(alt_constructor(shift_constructor(key))))
-}
-
-fn is_char(key: &Key) -> bool {
-    if let Char(_) = *key {
-        true
-    }
-    else {
-        false
-    }
+    Some(key)
 }

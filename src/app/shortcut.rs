@@ -37,7 +37,7 @@ use app::{
     INPUT_MODE,
 };
 use app::ShortcutCommand::{Complete, Incomplete};
-use key_converter::gdk_key_to_key;
+use key_converter::{is_char, gdk_key_to_key, to_key};
 
 /// Convert a shortcut of keys to a `String`.
 pub fn shortcut_to_string(mode: Mode, keys: &[Key]) -> String {
@@ -88,10 +88,17 @@ impl<COMM, SETT> Mg<COMM, SETT>
         let control_pressed = key.get_state() & CONTROL_MASK == CONTROL_MASK;
         let shift_pressed = key.get_state() & SHIFT_MASK == SHIFT_MASK;
         let current_mode = current_mode.get();
+        let key = to_key(key);
+        let is_char =
+            match key {
+                Some(ref key) => is_char(key),
+                None => false,
+            };
         let should_inhibit =
             current_mode == Mode::Normal || keyval == Escape ||
                 ((current_mode == Mode::Command || current_mode == Mode::Input || current_mode == Mode::BlockingInput) &&
-                 (alt_pressed || control_pressed || shift_pressed || keyval == Tab || keyval == ISO_Left_Tab));
+                 (alt_pressed || control_pressed || (!is_char && shift_pressed) || keyval == Tab ||
+                  keyval == ISO_Left_Tab));
         Inhibit(should_inhibit)
     }
 
