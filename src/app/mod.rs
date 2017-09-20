@@ -140,6 +140,7 @@ const INPUT_MODE: &str = "input";
 const INSERT_MODE: &str = "insert";
 const NORMAL_MODE: &str = "normal";
 const PASTE: &str = "entry-paste";
+const PASTE_SELECTION: &str = "entry-paste-selection";
 
 #[derive(PartialEq)]
 pub enum ActivationType {

@@ -19,10 +19,12 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-use gdk::RGBA;
+use gdk::{RGBA, SELECTION_PRIMARY};
 use gtk;
 use gtk::{
     BoxExt,
+    Clipboard,
+    ClipboardExt,
     CssProvider,
     CssProviderExt,
     EditableExt,
@@ -60,6 +62,7 @@ pub enum Msg {
     NextChar,
     NextWord,
     Paste,
+    PasteSelection,
     PreviousChar,
     PreviousWord,
     ShowIdentifier,
@@ -125,6 +128,7 @@ impl Widget for StatusBar {
             NextChar => self.next_char(),
             NextWord => self.next_word(),
             Paste => self.paste(),
+            PasteSelection => self.paste_selection(),
             PreviousChar => self.previous_char(),
             PreviousWord => self.previous_word(),
             ShowIdentifier => self.show_identifier(),
@@ -283,6 +287,17 @@ impl StatusBar {
     /// Paste the clipboard to the selection or the cursor position.
     fn paste(&self) {
         self.command_entry.paste_clipboard();
+    }
+
+    /// Paste the selection clipboard to the selection or the cursor position.
+    fn paste_selection(&self) {
+        self.delete_selection();
+        let clipboard = Clipboard::get(&SELECTION_PRIMARY);
+        if let Some(text) = clipboard.wait_for_text() {
+            let mut position = self.command_entry.get_position();
+            self.command_entry.insert_text(&text, &mut position);
+            self.command_entry.set_position(position);
+        }
     }
 
     /// Go back one character in the command entry.

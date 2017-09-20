@@ -22,7 +22,7 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use gdk::{EventKey, CONTROL_MASK, MOD1_MASK};
+use gdk::{EventKey, CONTROL_MASK, MOD1_MASK, SHIFT_MASK};
 use gdk::enums::key::{Escape, Tab, ISO_Left_Tab};
 use gtk::{Inhibit, LabelExt};
 use mg_settings::{self, EnumFromStr, EnumMetaData, SettingCompletion, SpecialCommand};
@@ -86,11 +86,12 @@ impl<COMM, SETT> Mg<COMM, SETT>
         let keyval = key.get_keyval();
         let alt_pressed = key.get_state() & MOD1_MASK == MOD1_MASK;
         let control_pressed = key.get_state() & CONTROL_MASK == CONTROL_MASK;
+        let shift_pressed = key.get_state() & SHIFT_MASK == SHIFT_MASK;
         let current_mode = current_mode.get();
         let should_inhibit =
             current_mode == Mode::Normal || keyval == Escape ||
                 ((current_mode == Mode::Command || current_mode == Mode::Input || current_mode == Mode::BlockingInput) &&
-                 (alt_pressed || control_pressed || keyval == Tab || keyval == ISO_Left_Tab));
+                 (alt_pressed || control_pressed || shift_pressed || keyval == Tab || keyval == ISO_Left_Tab));
         Inhibit(should_inhibit)
     }
 
@@ -99,7 +100,10 @@ impl<COMM, SETT> Mg<COMM, SETT>
         let keyval = key.get_keyval();
         let alt_pressed = key.get_state() & MOD1_MASK == MOD1_MASK;
         let control_pressed = key.get_state() & CONTROL_MASK == CONTROL_MASK;
-        if !self.model.entry_shown || alt_pressed || control_pressed || keyval == Tab || keyval == ISO_Left_Tab {
+        let shift_pressed = key.get_state() & SHIFT_MASK == SHIFT_MASK;
+        if !self.model.entry_shown || alt_pressed || control_pressed || shift_pressed || keyval == Tab ||
+            keyval == ISO_Left_Tab
+        {
             if let Some(key) = gdk_key_to_key(key) {
                 self.add_to_shortcut(key);
                 let action = {

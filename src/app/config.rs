@@ -48,6 +48,7 @@ use super::{
     INSERT_MODE,
     NORMAL_MODE,
     PASTE,
+    PASTE_SELECTION,
 };
 
 /// Create the default config directories and files.
@@ -86,7 +87,7 @@ pub fn parse_config<P: AsRef<Path>, COMM: EnumFromStr>(filename: P, user_modes: 
     let config = Config {
         application_commands: vec![COMPLETE_NEXT_COMMAND, COMPLETE_PREVIOUS_COMMAND, COPY, CUT, ENTRY_DELETE_NEXT_CHAR,
             ENTRY_DELETE_NEXT_WORD, ENTRY_DELETE_PREVIOUS_WORD, ENTRY_END, ENTRY_NEXT_CHAR, ENTRY_NEXT_WORD,
-            ENTRY_PREVIOUS_CHAR, ENTRY_PREVIOUS_WORD, ENTRY_SMART_HOME, PASTE],
+            ENTRY_PREVIOUS_CHAR, ENTRY_PREVIOUS_WORD, ENTRY_SMART_HOME, PASTE, PASTE_SELECTION],
         mapping_modes: modes.keys().cloned().collect(),
     };
     let mut parser = Parser::new_with_config(config);

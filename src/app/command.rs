@@ -51,6 +51,7 @@ use app::{
     ENTRY_PREVIOUS_WORD,
     ENTRY_SMART_HOME,
     PASTE,
+    PASTE_SELECTION,
 };
 use app::ActivationType::{self, Final};
 use app::Msg::{
@@ -68,6 +69,7 @@ use app::status_bar::Msg::{
     NextChar,
     NextWord,
     Paste,
+    PasteSelection,
     PreviousChar,
     PreviousWord,
     SmartHome,
@@ -111,6 +113,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
             ENTRY_PREVIOUS_WORD => self.status_bar.emit(PreviousWord),
             ENTRY_SMART_HOME => self.status_bar.emit(SmartHome),
             PASTE => self.status_bar.emit(Paste),
+            PASTE_SELECTION => self.status_bar.emit(PasteSelection),
             _ => unreachable!(),
         }
     }
