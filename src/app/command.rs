@@ -124,7 +124,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
             App(command) => self.app_command(&command),
             Custom(command) => self.model.relm.stream().emit(CustomCommand(command)),
             Map { action, keys, mode } => {
-                let mode_mappings = self.model.mappings.entry(self.model.modes[mode.as_str()])
+                let mode_mappings = self.model.mappings.entry(self.model.modes[mode.as_str()].name)
                     .or_insert_with(HashMap::new);
                 mode_mappings.insert(keys, action);
             },
@@ -139,7 +139,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
                 self.return_to_normal_mode();
             },
             Unmap { keys, mode } => {
-                let mode_mappings = self.model.mappings.entry(self.model.modes[mode.as_str()])
+                let mode_mappings = self.model.mappings.entry(self.model.modes[mode.as_str()].name)
                     .or_insert_with(HashMap::new);
                 mode_mappings.remove(&keys);
             },

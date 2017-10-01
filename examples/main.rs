@@ -48,6 +48,7 @@ use mg::{
     DialogBuilder,
     Info,
     Mg,
+    Mode,
     Modes,
     ModeChanged,
     SetMode,
@@ -80,7 +81,7 @@ pub enum Msg {
     CheckQuit(Option<String>),
     Command(AppCommand),
     Echo(Option<String>),
-    Mode(String),
+    NewMode(String),
     Setting(AppSettingsVariant),
     ShowAlert,
     ShowBlockingInput,
@@ -91,7 +92,8 @@ pub enum Msg {
 }
 
 static MODES: Modes = &[
-    ("f", "foo"),
+    Mode { name: "foo", prefix: "f", show_count: true },
+    Mode { name: "insert", prefix: "i", show_count: false },
 ];
 
 #[widget]
@@ -145,7 +147,7 @@ impl Widget for Win {
                 }
             },
             Echo(answer) => self.model.text = format!("You said: {}", answer.unwrap_or("Nothing".to_string())),
-            Mode(mode) => self.mode_changed(&mode),
+            NewMode(mode) => self.mode_changed(&mode),
             Setting(setting) => self.setting_changed(setting),
             ShowAlert => self.mg.emit(Alert("Blue Alert".to_string())),
             ShowBlockingInput => {
@@ -215,7 +217,7 @@ impl Widget for Win {
             CustomCommand(Insert) => mg@SetMode("insert"),
             CustomCommand(Normal) => mg@SetMode("normal"),
             CustomCommand(ref command) => Command(command.clone()),
-            ModeChanged(ref mode) => Mode(mode.clone()),
+            ModeChanged(ref mode) => NewMode(mode.clone()),
             SettingChanged(ref setting) => Setting(setting.clone()),
         }
     }

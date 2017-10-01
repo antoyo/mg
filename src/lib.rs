@@ -42,7 +42,6 @@
 
 #![feature(proc_macro, unboxed_closures)]
 #![warn(
-    missing_docs,
     trivial_casts,
     trivial_numeric_casts,
     unused_extern_crates,
@@ -70,9 +69,17 @@ pub mod completion;
 mod file;
 mod key_converter;
 
-/// Map mode prefix (i.e. "i") to the mode name (i.e. "insert").
-pub type Modes = &'static [(&'static str, &'static str)];
-/// Map variable names to a function returning the value of this variable.
+/// List of modes
+pub type Modes = &'static [Mode];
+
+/// A mode contains a prefix (i.e. "i") and a name (i.e. "insert").
+/// It can only specify whether a count can be shown for it.
+#[derive(Clone)]
+pub struct Mode {
+    pub name: &'static str,
+    pub prefix: &'static str,
+    pub show_count: bool,
+}
 
 pub use app::{Mg, parse_config};
 pub use app::Msg::{

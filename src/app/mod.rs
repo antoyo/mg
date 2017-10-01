@@ -97,7 +97,7 @@ pub use self::status_bar::StatusBarItem;
 use super::Modes;
 
 type Mappings = HashMap<&'static str, HashMap<Vec<Key>, String>>;
-type ModesHash = HashMap<&'static str, &'static str>;
+type ModesHash = HashMap<&'static str, super::Mode>;
 type Variables = Vec<(&'static str, Box<Fn() -> String>)>;
 
 /// A known mode or an unknown mode.
@@ -106,7 +106,6 @@ pub enum Mode {
     BlockingInput,
     Command,
     Input,
-    Insert,
     Normal,
     Unknown,
 }
@@ -137,7 +136,6 @@ const ENTRY_PREVIOUS_WORD: &str = "entry-previous-word";
 const ENTRY_SMART_HOME: &str = "entry-smart-home";
 const INFO_MESSAGE_DURATION: u64 = 5;
 const INPUT_MODE: &str = "input";
-const INSERT_MODE: &str = "insert";
 const NORMAL_MODE: &str = "normal";
 const PASTE: &str = "entry-paste";
 const PASTE_SELECTION: &str = "entry-paste-selection";
@@ -174,6 +172,7 @@ pub struct Model<COMM, SETT>
     settings_parser: Box<Parser<COMM>>,
     shortcuts: HashMap<Key, String>,
     shortcut_pressed: bool,
+    show_count: bool,
     status_bar_command: String,
     variables: HashMap<String, Box<Fn() -> String>>,
 }
@@ -384,6 +383,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             settings_parser,
             shortcuts: HashMap::new(),
             shortcut_pressed: false,
+            show_count: true,
             status_bar_command: String::new(),
             variables: HashMap::new(),
         }
@@ -455,11 +455,10 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                 BLOCKING_INPUT_MODE => Mode::BlockingInput,
                 COMMAND_MODE => Mode::Command,
                 INPUT_MODE => Mode::Input,
-                INSERT_MODE => Mode::Insert,
                 NORMAL_MODE => Mode::Normal,
                 _ => Mode::Unknown,
             };
-        if current_mode == Mode::Unknown || current_mode == Mode::Insert {
+        if current_mode == Mode::Unknown {
             self.model.mode_label = mode.to_string();
         }
         else {
@@ -467,6 +466,12 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         }
         self.model.current_mode.set(current_mode);
         self.model.relm.stream().emit(ModeChanged(mode.to_string()));
+
+        for mode in self.model.modes.values() {
+            if mode.name == self.model.mode_string {
+                self.model.show_count = mode.show_count;
+            }
+        }
     }
 
     fn show_entry(&mut self) {
@@ -575,7 +580,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                     },
                     #[name="shortcut"]
                     StatusBarItem {
-                        Text: shortcut_to_string(self.model.current_mode.get(), &self.model.current_shortcut),
+                        Text: shortcut_to_string(&self.model.current_shortcut, self.model.show_count),
                     },
                     EntryActivate(ref input) => StatusBarEntryActivate(input.clone()),
                     EntryChanged(ref text) => StatusBarEntryChanged(text.clone()),

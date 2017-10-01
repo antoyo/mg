@@ -27,7 +27,7 @@ use std::path::{Path, PathBuf};
 use mg_settings::{Config, EnumFromStr, Parser, ParseResult};
 
 use app::settings::DefaultConfig;
-use file;
+use {Mode, file};
 use super::{
     Modes,
     ModesHash,
@@ -45,7 +45,6 @@ use super::{
     ENTRY_PREVIOUS_CHAR,
     ENTRY_PREVIOUS_WORD,
     ENTRY_SMART_HOME,
-    INSERT_MODE,
     NORMAL_MODE,
     PASTE,
     PASTE_SELECTION,
@@ -78,12 +77,13 @@ pub fn parse_config<P: AsRef<Path>, COMM: EnumFromStr>(filename: P, user_modes: 
     let mut parse_result = ParseResult::new();
 
     let mut modes = HashMap::new();
-    for &(key, value) in user_modes {
-        modes.insert(key, value);
+    for mode in user_modes {
+        modes.insert(mode.prefix, mode.clone());
     }
-    assert!(modes.insert("n", NORMAL_MODE).is_none(), "Duplicate mode prefix n.");
-    assert!(modes.insert("c", COMMAND_MODE).is_none(), "Duplicate mode prefix c.");
-    assert!(modes.insert("i", INSERT_MODE).is_none(), "Duplicate mode prefix i.");
+    assert!(modes.insert("n", Mode { name: NORMAL_MODE, prefix: "n", show_count: true }).is_none(),
+        "Duplicate mode prefix n.");
+    assert!(modes.insert("c", Mode { name: COMMAND_MODE, prefix: "c", show_count: false }).is_none(),
+        "Duplicate mode prefix c.");
     let config = Config {
         application_commands: vec![COMPLETE_NEXT_COMMAND, COMPLETE_PREVIOUS_COMMAND, COPY, CUT, ENTRY_DELETE_NEXT_CHAR,
             ENTRY_DELETE_NEXT_WORD, ENTRY_DELETE_PREVIOUS_WORD, ENTRY_END, ENTRY_NEXT_CHAR, ENTRY_NEXT_WORD,
