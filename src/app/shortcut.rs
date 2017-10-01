@@ -22,7 +22,7 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use gdk::{EventKey, CONTROL_MASK, MOD1_MASK, SHIFT_MASK};
+use gdk::{EventKey, keyval_to_unicode, CONTROL_MASK, MOD1_MASK, SHIFT_MASK};
 use gdk::enums::key::{Escape, Tab, ISO_Left_Tab};
 use gtk::{Inhibit, LabelExt};
 use mg_settings::{self, EnumFromStr, EnumMetaData, SettingCompletion, SpecialCommand};
@@ -37,7 +37,7 @@ use app::{
     INPUT_MODE,
 };
 use app::ShortcutCommand::{Complete, Incomplete};
-use key_converter::{is_char, gdk_key_to_key, to_key};
+use key_converter::gdk_key_to_key;
 
 /// Convert a shortcut of keys to a `String`.
 pub fn shortcut_to_string(mode: Mode, keys: &[Key]) -> String {
@@ -45,6 +45,8 @@ pub fn shortcut_to_string(mode: Mode, keys: &[Key]) -> String {
         String::new()
     }
     else {
+        // TODO: Only show the command in normal mode instead?
+        // Not sure, it would also make sense for visual mode.
         let strings: Vec<_> = keys.iter().map(ToString::to_string).collect();
         strings.join("")
     }
@@ -88,12 +90,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
         let control_pressed = key.get_state() & CONTROL_MASK == CONTROL_MASK;
         let shift_pressed = key.get_state() & SHIFT_MASK == SHIFT_MASK;
         let current_mode = current_mode.get();
-        let key = to_key(key);
-        let is_char =
-            match key {
-                Some(ref key) => is_char(key),
-                None => false,
-            };
+        let is_char = keyval_to_unicode(keyval).is_some();
         let should_inhibit =
             current_mode == Mode::Normal || keyval == Escape ||
                 ((current_mode == Mode::Command || current_mode == Mode::Input || current_mode == Mode::BlockingInput) &&

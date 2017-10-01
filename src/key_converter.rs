@@ -65,7 +65,7 @@ pub fn gdk_key_to_key(key: &EventKey) -> Option<Key> {
     Some(control_constructor(alt_constructor(shift_constructor(key))))
 }
 
-pub fn is_char(key: &Key) -> bool {
+fn is_char(key: &Key) -> bool {
     if let Char(_) = *key {
         true
     }
@@ -75,7 +75,7 @@ pub fn is_char(key: &Key) -> bool {
 }
 
 #[allow(non_upper_case_globals)]
-pub fn to_key(key: &EventKey) -> Option<Key> {
+fn to_key(key: &EventKey) -> Option<Key> {
     let key =
         match key.get_keyval() {
             _0 | KP_0 => Char('0'),
