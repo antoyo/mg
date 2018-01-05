@@ -19,7 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-use gdk::{EventKey, CONTROL_MASK, MOD1_MASK, SHIFT_MASK};
+use gdk::{EventKey, ModifierType};
 use gdk::enums::key::{self, A,
     _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, B, C, D, E, F, G, H, I, J, K, KP_0, KP_1, KP_2, KP_3,
     KP_4, KP_5, KP_6, KP_7, KP_8, KP_9, L, M, N, O, P, Q, R, Return, S, T, U, V, W, X, Y, Z, a, b,
@@ -29,9 +29,9 @@ use mg_settings::key::Key::{self, Alt, Backspace, Char, Control, Delete, Down, E
 
 /// Convert a GDK key to an MG Key.
 pub fn gdk_key_to_key(key: &EventKey) -> Option<Key> {
-    let alt_pressed = key.get_state() & MOD1_MASK == MOD1_MASK;
-    let control_pressed = key.get_state() & CONTROL_MASK == CONTROL_MASK;
-    let shift_pressed = key.get_state() & SHIFT_MASK == SHIFT_MASK;
+    let alt_pressed = key.get_state().contains(ModifierType::MOD1_MASK);
+    let control_pressed = key.get_state().contains(ModifierType::CONTROL_MASK);
+    let shift_pressed = key.get_state().contains(ModifierType::SHIFT_MASK);
     let key =
         match to_key(key) {
             Some(key) => key,

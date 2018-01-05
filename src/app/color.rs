@@ -26,10 +26,10 @@ use gtk::{
     Object,
     Settings,
     SettingsExt,
+    StateFlags,
     StyleContextExt,
     Widget,
     WidgetExt,
-    STATE_FLAG_NORMAL,
 };
 use mg_settings::{self, EnumFromStr, EnumMetaData, SettingCompletion, SpecialCommand};
 
@@ -44,15 +44,15 @@ impl<COMM, SETT> Mg<COMM, SETT>
     /// Get the color of the text.
     pub fn get_foreground_color(&self) -> RGBA {
         let style_context = self.window.get_style_context().unwrap();
-        style_context.get_color(STATE_FLAG_NORMAL)
+        style_context.get_color(StateFlags::NORMAL)
     }
 
     /// Reset the background and foreground colors of the status bar.
     pub fn reset_colors(&self) {
         let status_bar = self.status_bar.widget();
         // TODO: switch to CSS.
-        status_bar.override_background_color(STATE_FLAG_NORMAL, TRANSPARENT);
-        status_bar.override_color(STATE_FLAG_NORMAL, &self.model.foreground_color);
+        status_bar.override_background_color(StateFlags::NORMAL, TRANSPARENT);
+        status_bar.override_color(StateFlags::NORMAL, &self.model.foreground_color);
     }
 
     /// Use the dark variant of the theme if available.
@@ -64,14 +64,14 @@ impl<COMM, SETT> Mg<COMM, SETT>
 }
 
 /// Color the status bar in blue.
-pub fn color_blue<W: IsA<Object> + IsA<Widget>>(widget: &W) {
-    widget.override_background_color(STATE_FLAG_NORMAL, &RGBA::blue());
+pub fn color_blue<W: IsA<Object> + IsA<Widget> + WidgetExt>(widget: &W) {
+    widget.override_background_color(StateFlags::NORMAL, &RGBA::blue());
     white_foreground(widget);
 }
 
 /// Color the status bar in orange.
-pub fn color_orange<W: IsA<Object> + IsA<Widget>>(widget: &W) {
-    widget.override_background_color(STATE_FLAG_NORMAL, &RGBA {
+pub fn color_orange<W: IsA<Object> + IsA<Widget> + WidgetExt>(widget: &W) {
+    widget.override_background_color(StateFlags::NORMAL, &RGBA {
         red: 0.9,
         green: 0.55,
         blue: 0.0,
@@ -81,12 +81,12 @@ pub fn color_orange<W: IsA<Object> + IsA<Widget>>(widget: &W) {
 }
 
 /// Color the status bar in red.
-pub fn color_red<W: IsA<Object> + IsA<Widget>>(widget: &W) {
-    widget.override_background_color(STATE_FLAG_NORMAL, &RGBA::red());
+pub fn color_red<W: IsA<Object> + IsA<Widget> + WidgetExt>(widget: &W) {
+    widget.override_background_color(StateFlags::NORMAL, &RGBA::red());
     white_foreground(widget);
 }
 
 /// Set the foreground (text) color to white.
-fn white_foreground<W: IsA<Object> + IsA<Widget>>(widget: &W) {
-    widget.override_color(STATE_FLAG_NORMAL, &RGBA::white());
+fn white_foreground<W: IsA<Object> + IsA<Widget> + WidgetExt>(widget: &W) {
+    widget.override_color(StateFlags::NORMAL, &RGBA::white());
 }

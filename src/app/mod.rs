@@ -43,11 +43,11 @@ use gdk::enums::key::{Escape, colon};
 use gtk;
 use gtk::{
     BoxExt,
+    GtkWindowExt,
     Inhibit,
     OrientableExt,
     PackType,
     WidgetExt,
-    WindowExt,
 };
 use gtk::Orientation::Vertical;
 use mg_settings::{

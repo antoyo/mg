@@ -33,9 +33,9 @@ use gtk::{
     LabelExt,
     OrientableExt,
     PackType,
+    StateFlags,
     StyleContextExt,
     WidgetExt,
-    STATE_FLAG_NORMAL,
     STYLE_PROVIDER_PRIORITY_APPLICATION,
 };
 use gtk::Orientation::Horizontal;
@@ -374,7 +374,7 @@ impl Widget for StatusBarItem {
 
     fn update(&mut self, msg: ItemMsg) {
         match msg {
-            Color(color) => self.label.override_color(STATE_FLAG_NORMAL, color.as_ref()),
+            Color(color) => self.label.override_color(StateFlags::NORMAL, color.as_ref()),
             Text(text) => self.label.set_text(&text),
         }
     }
