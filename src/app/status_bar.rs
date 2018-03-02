@@ -384,7 +384,7 @@ impl Widget for StatusBarItem {
         #[name="label"]
         gtk::Label {
             ellipsize: EllipsizeMode::End,
-            packing: {
+            child: {
                 pack_type: PackType::End,
                 padding: 3,
             },

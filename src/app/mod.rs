@@ -561,20 +561,20 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                     EntryShown: self.model.entry_shown,
                     EntryText: self.model.status_bar_command.clone(),
                     Identifier: self.model.current_command_mode.to_string(),
-                    packing: {
+                    child: {
                         pack_type: PackType::End,
                     },
                     #[name="message"]
                     StatusBarItem {
                         Text: self.model.message.clone(),
-                        packing: {
+                        child: {
                             pack_type: PackType::Start,
                         },
                     },
                     #[name="mode"]
                     StatusBarItem {
                         Text: self.model.mode_label.clone(),
-                        packing: {
+                        child: {
                             pack_type: PackType::Start,
                         },
                     },
@@ -586,7 +586,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                     EntryChanged(ref text) => StatusBarEntryChanged(text.clone()),
                 },
                 gtk::Overlay {
-                    packing: {
+                    child: {
                         pack_type: PackType::End,
                     },
                     #[name="completion_view"]
