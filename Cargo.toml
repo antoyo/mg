@@ -17,9 +17,9 @@ gtk = "^0.3.0"
 log = "^0.3"
 mg-settings = "^0.4.0"
 pango = "^0.3.0"
-relm = "^0.11.0"
-relm-attributes = "^0.11.0"
-relm-derive = "^0.11.0"
+relm = "^0.12.0"
+relm-attributes = "^0.12.0"
+relm-derive = "^0.12.0"
 
 [dev-dependencies]
 libxdo = "^0.4.1"
@@ -27,5 +27,5 @@ mg-settings-macros = "^0.4.0"
 pretty_env_logger = "^0.1.0"
 
 [features]
-default = ["gtk/v3_22"]
+default = ["gtk/v3_22", "relm/unstable", "relm-attributes/unstable", "relm-derive/unstable"]
 nightly = []
