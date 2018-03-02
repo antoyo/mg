@@ -6,7 +6,7 @@ documentation = "https://antoyo.github.io/mg/mg/"
 license = "MIT"
 name = "mg"
 repository = "https://github.com/antoyo/mg"
-version = "0.6.0"
+version = "0.7.0"
 
 [dependencies]
 futures = "^0.1.14"
