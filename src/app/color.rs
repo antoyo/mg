@@ -19,13 +19,12 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-use glib::translate::ToGlib;
+use glib::object::ObjectExt;
 use gdk::RGBA;
 use gtk::{
     IsA,
     Object,
     Settings,
-    SettingsExt,
     StateFlags,
     StyleContextExt,
     Widget,
@@ -58,7 +57,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
     /// Use the dark variant of the theme if available.
     pub fn set_dark_theme(&mut self, use_dark: bool) {
         let settings = Settings::get_default().unwrap();
-        settings.set_long_property("gtk-application-prefer-dark-theme", use_dark.to_glib() as _, "");
+        let _ = settings.set_property("gtk-application-prefer-dark-theme", &use_dark);
         self.model.foreground_color = self.get_foreground_color();
     }
 }

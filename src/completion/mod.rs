@@ -81,6 +81,13 @@ pub trait Completer {
     /// The results are on two columns, hence the 2-tuple.
     fn completions(&mut self, input: &str) -> Vec<CompletionResult>;
 
+    /// Return true if the completer is for an input containing a command.
+    /// Return false otherwise.
+    /// This will have the effect of removing the command when there's one it set to true.
+    fn have_command(&self) -> bool {
+        true
+    }
+
     /// Set the column to use as the result of a selected text entry.
     fn text_column(&self) -> i32 {
         0
@@ -161,8 +168,12 @@ impl Completion {
                 let columns = vec![Type::String; completer.column_count() * 2];
                 let model = ListStore::new(&columns);
 
+                // Remove the command to only send the value to the completer.
                 let key =
-                    if let Some(index) = input.find(' ') {
+                    if !completer.have_command() {
+                        input
+                    }
+                    else if let Some(index) = input.find(' ') {
                         input[index + 1 ..].trim_left()
                     }
                     else {

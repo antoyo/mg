@@ -544,7 +544,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     }
 
     /// Set the current status bar input completer.
-    pub fn set_completer(&mut self, completer: &str) {
+    fn set_completer(&mut self, completer: &str) {
         self.model.completer = completer.to_string();
     }
 
