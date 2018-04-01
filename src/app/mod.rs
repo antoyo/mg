@@ -35,9 +35,7 @@ use std::collections::HashMap;
 use std::io;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::time::Duration;
 
-use futures_glib::Timeout;
 use gdk::{EventKey, RGBA};
 use gdk::enums::key::{Escape, colon};
 use gtk;
@@ -61,7 +59,7 @@ use mg_settings::{
 use mg_settings::ParseResult;
 use mg_settings::errors;
 use mg_settings::key::Key;
-use relm::{Relm, Widget};
+use relm::{Relm, Widget, timeout};
 use relm_attributes::widget;
 
 use app::config::create_default_config;
@@ -134,7 +132,7 @@ const ENTRY_NEXT_WORD: &str = "entry-next-word";
 const ENTRY_PREVIOUS_CHAR: &str = "entry-previous-char";
 const ENTRY_PREVIOUS_WORD: &str = "entry-previous-word";
 const ENTRY_SMART_HOME: &str = "entry-smart-home";
-const INFO_MESSAGE_DURATION: u64 = 5;
+const INFO_MESSAGE_DURATION: u32 = 5;
 const INPUT_MODE: &str = "input";
 const NORMAL_MODE: &str = "normal";
 const PASTE: &str = "entry-paste";
@@ -280,8 +278,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         self.model.message = message.clone();
         self.reset_colors();
 
-        let timeout = Timeout::new(Duration::from_secs(INFO_MESSAGE_DURATION));
-        self.model.relm.connect_exec_ignore_err(timeout, move |_| HideInfo(message.clone()));
+        timeout(self.model.relm.stream(), INFO_MESSAGE_DURATION, move || HideInfo(message.clone()));
     }
 
     /// Show a message to the user.
@@ -297,8 +294,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         self.model.message = message.clone();
         color_orange(self.status_bar.widget());
 
-        let timeout = Timeout::new(Duration::from_secs(INFO_MESSAGE_DURATION));
-        self.model.relm.connect_exec_ignore_err(timeout, move |_| HideColoredMessage(message.clone()));
+        timeout(self.model.relm.stream(), INFO_MESSAGE_DURATION, move || HideColoredMessage(message.clone()));
     }
 
     /// Hide the command entry and the completion view.

@@ -30,7 +30,6 @@
  * TODO: take advantage of IntoOption and IntoPair.
  * TODO: automatically connect the AppClose message to Quit if it exists.
  * TODO: thread example (using a oneshot).
- * TODO: generate async gtk methods as returning futures.
  * TODO: change all unneeded &mut self to &self.
  * TODO: set the size of the status bar according to the size of the font.
  * TODO: different event for activate event of special commands.
@@ -49,7 +48,6 @@
     unused_qualifications,
 )]
 
-extern crate futures_glib;
 extern crate gdk;
 extern crate glib;
 extern crate gtk;
