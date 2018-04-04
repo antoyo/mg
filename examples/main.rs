@@ -224,7 +224,7 @@ impl Widget for Win {
 }
 
 fn main() {
-    pretty_env_logger::init().unwrap();
+    pretty_env_logger::init();
     Win::run(()).unwrap();
 }
 
