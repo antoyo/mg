@@ -333,7 +333,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
 
         if let Some(completer) = dialog_builder.completer {
             self.set_completer(&completer);
-            self.completion_view.emit(SetOriginalInput(dialog_builder.default_answer));
+            self.model.completion_view.emit(SetOriginalInput(dialog_builder.default_answer));
             self.show_completion();
         }
         else {

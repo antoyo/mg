@@ -6,7 +6,7 @@ documentation = "https://antoyo.github.io/mg/mg/"
 license = "MIT"
 name = "mg"
 repository = "https://github.com/antoyo/mg"
-version = "0.9.4"
+version = "0.9.5"
 
 [dependencies]
 gdk = "^0.8.0"

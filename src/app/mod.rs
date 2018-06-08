@@ -44,6 +44,7 @@ use gtk::{
     GtkWindowExt,
     Inhibit,
     OrientableExt,
+    OverlayExt,
     PackType,
     WidgetExt,
 };
@@ -59,7 +60,13 @@ use mg_settings::{
 use mg_settings::ParseResult;
 use mg_settings::errors;
 use mg_settings::key::Key;
-use relm::{Relm, Widget, timeout};
+use relm::{
+    Component,
+    Relm,
+    Widget,
+    create_component,
+    timeout,
+};
 use relm_attributes::widget;
 
 use app::config::create_default_config;
@@ -145,13 +152,12 @@ pub enum ActivationType {
 }
 
 pub struct Model<COMM, SETT>
-    where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
-          SETT: Default + EnumMetaData + mg_settings::settings::Settings + SettingCompletion + 'static,
+where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
+      SETT: Default + EnumMetaData + mg_settings::settings::Settings + SettingCompletion + 'static,
 {
     answer: Option<String>,
     choices: Vec<char>,
-    completer: String,
-    completion_shown: bool,
+    completion_view: Component<CompletionView>,
     current_command_mode: char,
     current_mode: Rc<Cell<Mode>>,
     current_shortcut: Vec<Key>,
@@ -299,7 +305,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
 
     /// Hide the command entry and the completion view.
     fn hide_entry_and_completion(&mut self) {
-        self.model.completion_shown = false;
+        self.model.completion_view.stream().emit(Visible(false));
         self.model.entry_shown = false;
     }
 
@@ -323,6 +329,17 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     fn init_view(&mut self) {
         self.model.foreground_color = self.get_foreground_color();
         self.model.relm.stream().emit(InitAfter);
+
+        let completion_widget = self.model.completion_view.widget();
+        self.set_completer(DEFAULT_COMPLETER_IDENT);
+        self.model.completion_view.stream().emit(Visible(false));
+        let completion_view = &self.model.completion_view;
+        connect!(completion_view@CompletionChange(ref completion), self.model.relm,
+            CompletionViewChange(completion.clone()));
+        completion_widget.set_hexpand(true);
+        completion_widget.set_vexpand(true);
+        self.overlay.add_overlay(completion_widget);
+        completion_widget.show_all();
     }
 
     /// Input the specified command.
@@ -359,8 +376,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         Model {
             answer: None,
             choices: vec![],
-            completer: DEFAULT_COMPLETER_IDENT.to_string(),
-            completion_shown: false,
+            completion_view: create_component::<CompletionView>(Self::default_completers()),
             current_command_mode: ':',
             current_mode: Rc::new(Cell::new(Mode::Normal)),
             current_shortcut: vec![],
@@ -398,7 +414,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             keyval => {
                 let character = keyval as u8 as char;
                 if COMM::is_identifier(character) {
-                    self.model.completer = NO_COMPLETER_IDENT.to_string();
+                    self.set_completer(NO_COMPLETER_IDENT);
                     self.set_current_identifier(character);
                     self.set_mode(COMMAND_MODE);
                     self.reset();
@@ -486,7 +502,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             BlockingQuestion(responder, question, choices) => self.blocking_question(responder, question, choices),
             BlockingYesNoQuestion(responder, question) => self.blocking_yes_no_question(responder, question),
             CloseWin => self.window.destroy(),
-            Completers(completers) => self.completion_view.emit(AddCompleters(completers)),
+            Completers(completers) => self.model.completion_view.emit(AddCompleters(completers)),
             CompletionViewChange(completion) => self.set_input(&completion),
             // To be listened to by the user.
             CustomCommand(_) => (),
@@ -499,7 +515,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                 self.set_mode(COMMAND_MODE);
                 self.reset();
                 self.clear_shortcut();
-                self.model.completion_shown = true;
+                self.model.completion_view.stream().emit(Visible(true));
                 self.show_entry();
             },
             EnterNormalMode => {
@@ -540,15 +556,14 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     }
 
     /// Set the current status bar input completer.
-    fn set_completer(&mut self, completer: &str) {
-        self.model.completer = completer.to_string();
+    fn set_completer(&self, completer: &str) {
+        self.model.completion_view.stream().emit(Completer(completer.to_string()));
     }
 
     // TODO: try to replace emit() calls to view! connection.
     view! {
         #[name="window"]
         gtk::Window {
-            #[container]
             gtk::Box {
                 orientation: Vertical,
                 #[container="status-bar-item"]
@@ -581,15 +596,11 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                     EntryActivate(ref input) => StatusBarEntryActivate(input.clone()),
                     EntryChanged(ref text) => StatusBarEntryChanged(text.clone()),
                 },
+                #[name="overlay"]
                 gtk::Overlay {
-                    child: {
-                        pack_type: PackType::End,
-                    },
-                    #[name="completion_view"]
-                    CompletionView(Self::default_completers()) {
-                        Completer: self.model.completer.clone(),
-                        Visible: self.model.completion_shown,
-                        CompletionChange(ref completion) => CompletionViewChange(completion.clone()),
+                    #[container]
+                    gtk::Box {
+                        orientation: Vertical,
                     },
                 },
             },

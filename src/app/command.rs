@@ -99,8 +99,8 @@ impl<COMM, SETT> Mg<COMM, SETT>
     /// Handle an application command.
     fn app_command(&self, command: &str) {
         match command {
-            COMPLETE_NEXT_COMMAND => self.completion_view.emit(SelectNext),
-            COMPLETE_PREVIOUS_COMMAND => self.completion_view.emit(SelectPrevious),
+            COMPLETE_NEXT_COMMAND => self.model.completion_view.emit(SelectNext),
+            COMPLETE_PREVIOUS_COMMAND => self.model.completion_view.emit(SelectPrevious),
             COPY => self.status_bar.emit(Copy),
             CUT => self.status_bar.emit(Cut),
             ENTRY_DELETE_NEXT_CHAR => self.status_bar.emit(DeleteNextChar),
