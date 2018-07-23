@@ -39,7 +39,7 @@
 
 //! Minimal UI library based on GTK+.
 
-#![feature(proc_macro, unboxed_closures)]
+#![feature(unboxed_closures, use_extern_macros)]
 #![warn(
     trivial_casts,
     trivial_numeric_casts,
