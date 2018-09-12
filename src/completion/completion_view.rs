@@ -30,7 +30,7 @@ use gtk::{
     CellRendererTextExt,
     IsA,
     ListStore,
-    ListStoreExt,
+    GtkListStoreExt,
     ScrolledWindowExt,
     TreeIter,
     TreeModel,

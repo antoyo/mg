@@ -30,8 +30,8 @@ use std::collections::HashMap;
 use glib::ToValue;
 use gtk::{
     ListStore,
-    ListStoreExt,
-    ListStoreExtManual,
+    GtkListStoreExt,
+    GtkListStoreExtManual,
     TreeModelExt,
     TreeSelection,
     TreeSelectionExt,
