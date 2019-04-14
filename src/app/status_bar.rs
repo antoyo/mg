@@ -24,7 +24,6 @@ use gtk;
 use gtk::{
     BoxExt,
     Clipboard,
-    ClipboardExt,
     CssProvider,
     CssProviderExt,
     EditableExt,
@@ -79,7 +78,7 @@ pub struct Model {
 impl Widget for StatusBar {
     fn init_view(&mut self) {
         // Adjust the look of the entry.
-        let style_context = self.command_entry.get_style_context().unwrap();
+        let style_context = self.command_entry.get_style_context();
         // TODO: remove the next line when relm supports css.
         let style = include_bytes!("../../style/command-input.css");
         let provider = CssProvider::new();
@@ -148,8 +147,8 @@ impl Widget for StatusBar {
             },
             #[name="command_entry"]
             gtk::Entry {
-                activate(entry) => EntryActivate(entry.get_text()),
-                changed(entry) => EntryChanged(entry.get_text()),
+                activate(entry) => EntryActivate(entry.get_text().map(|text| text.to_string())),
+                changed(entry) => EntryChanged(entry.get_text().map(|text| text.to_string())),
                 has_frame: false,
                 hexpand: true,
                 name: "mg-input-command",
@@ -247,7 +246,7 @@ impl StatusBar {
 
     /// Emit the EntryChanged event with the current text.
     fn emit_entry_changed(&self) {
-        self.model.relm.stream().emit(EntryChanged(self.command_entry.get_text()));
+        self.model.relm.stream().emit(EntryChanged(self.command_entry.get_text().map(|text| text.to_string())));
     }
 
     /// Go to the end of the command entry.
@@ -258,7 +257,7 @@ impl StatusBar {
 
     /// Get the text of the command entry.
     fn get_command(&self) -> Option<String> {
-        self.command_entry.get_text()
+        self.command_entry.get_text().map(|text| text.to_string())
     }
 
     /// Go forward one character in the command entry.

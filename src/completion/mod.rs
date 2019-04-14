@@ -174,7 +174,7 @@ impl Completion {
                         input
                     }
                     else if let Some(index) = input.find(' ') {
-                        input[index + 1 ..].trim_left()
+                        input[index + 1 ..].trim_start()
                     }
                     else {
                         input

@@ -241,7 +241,7 @@ impl CompletionView {
     /// Scroll to the selected row.
     fn scroll(&self, model: &TreeModel, iter: &TreeIter) {
         if let Some(path) = model.get_path(iter) {
-            self.tree_view.scroll_to_cell(Some(&path), None, false, 0.0, 0.0);
+            self.tree_view.scroll_to_cell(Some(&path), None::<&TreeViewColumn>, false, 0.0, 0.0);
         }
     }
 
@@ -250,7 +250,7 @@ impl CompletionView {
         if let Some(model) = self.tree_view.get_model() {
             if let Some(iter) = model.get_iter_first() {
                 if let Some(path) = model.get_path(&iter) {
-                    self.tree_view.scroll_to_cell(Some(&path), None, false, 0.0, 0.0);
+                    self.tree_view.scroll_to_cell(Some(&path), None::<&TreeViewColumn>, false, 0.0, 0.0);
                 }
             }
         }
@@ -258,7 +258,7 @@ impl CompletionView {
 
     /// Select the completer based on the currently typed command.
     fn select_completer(&mut self, command_entry_text: &str, is_normal_command: bool) {
-        let text = command_entry_text.trim_left();
+        let text = command_entry_text.trim_start();
         let completer =
             if let Some(space_index) = text.find(' ') {
                 &text[..space_index]

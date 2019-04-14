@@ -42,7 +42,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
 {
     /// Get the color of the text.
     pub fn get_foreground_color(&self) -> RGBA {
-        let style_context = self.window.get_style_context().unwrap();
+        let style_context = self.window.get_style_context();
         style_context.get_color(StateFlags::NORMAL)
     }
 

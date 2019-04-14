@@ -9,15 +9,15 @@ repository = "https://github.com/antoyo/mg"
 version = "0.10.0"
 
 [dependencies]
-gdk = "^0.9.0"
-glib = "^0.6.0"
-gtk = "^0.5.0"
+gdk = "^0.10.0"
+glib = "^0.7.0"
+gtk = "^0.6.0"
 log = "0.4"
 mg-settings = "^0.4.0"
-pango = "^0.5.0"
-relm =  "^0.15.0"
-relm-attributes = "^0.15.0"
-relm-derive = "^0.15.0"
+pango = "^0.6.0"
+relm =  "^0.16.0"
+relm-attributes = "^0.16.0"
+relm-derive = "^0.16.0"
 
 [dev-dependencies]
 libxdo = "0.6"
