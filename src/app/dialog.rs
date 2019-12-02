@@ -93,7 +93,7 @@ impl Responder for BlockingInputDialog {
 /// Input dialog responder.
 /// This is used to specify which message to send to which widget when the user answers the dialog.
 pub struct InputDialog<WIDGET: Widget> {
-    callback: Box<Fn(Option<String>) -> WIDGET::Msg>,
+    callback: Box<dyn Fn(Option<String>) -> WIDGET::Msg>,
     stream: EventStream<WIDGET::Msg>,
 }
 
@@ -123,7 +123,7 @@ impl<WIDGET: Widget> Responder for InputDialog<WIDGET> {
 /// Yes/no question input dialog responder.
 /// This is used to specify which message to send to which widget when the user answers the dialog.
 pub struct YesNoInputDialog<WIDGET: Widget> {
-    callback: Box<Fn(bool) -> WIDGET::Msg>,
+    callback: Box<dyn Fn(bool) -> WIDGET::Msg>,
     stream: EventStream<WIDGET::Msg>,
 }
 
@@ -160,7 +160,7 @@ pub struct DialogBuilder {
     /// The message/question to show to the user.
     message: String,
     /// The wrapper over the callback function to call for an asynchronous input dialog.
-    responder: Option<Box<Responder>>,
+    responder: Option<Box<dyn Responder>>,
     /// The available shortcuts.
     shortcuts: HashMap<Key, String>,
 }
@@ -211,7 +211,7 @@ impl DialogBuilder {
     }
 
     /// Set a responder for an asynchronous dialog.
-    pub fn responder(mut self, responder: Box<Responder>) -> Self {
+    pub fn responder(mut self, responder: Box<dyn Responder>) -> Self {
         self.responder = Some(responder);
         self
     }
@@ -238,7 +238,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
       SETT: Default + EnumMetaData + settings::Settings + SettingCompletion + 'static,
 {
     /// Ask a question to the user and block until the user provides it (or cancel).
-    pub fn blocking_custom_dialog(&mut self, responder: Box<Responder>, builder: DialogBuilder) {
+    pub fn blocking_custom_dialog(&mut self, responder: Box<dyn Responder>, builder: DialogBuilder) {
         let builder = builder
             .blocking(true)
             .responder(responder);
@@ -246,7 +246,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
     }
 
     /// Ask a question to the user and block until the user provides it (or cancel).
-    pub fn blocking_input(&mut self, responder: Box<Responder>, message: String, default_answer: String) {
+    pub fn blocking_input(&mut self, responder: Box<dyn Responder>, message: String, default_answer: String) {
         let builder = DialogBuilder::new()
             .blocking(true)
             .default_answer(default_answer)
@@ -256,7 +256,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
     }
 
     /// Ask a multiple-choice question to the user and block until the user provides it (or cancel).
-    pub fn blocking_question(&mut self, responder: Box<Responder>, message: String, choices: Vec<char>) {
+    pub fn blocking_question(&mut self, responder: Box<dyn Responder>, message: String, choices: Vec<char>) {
         let builder = DialogBuilder::new()
             .blocking(true)
             .choices(choices)
@@ -266,7 +266,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
     }
 
     /// Show a blocking yes/no question.
-    pub fn blocking_yes_no_question(&mut self, responder: Box<Responder>, message: String) {
+    pub fn blocking_yes_no_question(&mut self, responder: Box<dyn Responder>, message: String) {
         let builder = DialogBuilder::new()
             .blocking(true)
             .choices(vec!['y', 'n'])
@@ -277,7 +277,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
 
     /// Ask a question to the user.
     // TODO: use Option<String> for default_answer?
-    pub fn input(&mut self, responder: Box<Responder>, message: String, default_answer: String) {
+    pub fn input(&mut self, responder: Box<dyn Responder>, message: String, default_answer: String) {
         let builder = DialogBuilder::new()
             .default_answer(default_answer)
             .message(message)
@@ -286,7 +286,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
     }
 
     /// Ask a multiple-choice question to the user.
-    pub fn question(&mut self, responder: Box<Responder>, message: String, choices: &[char]) {
+    pub fn question(&mut self, responder: Box<dyn Responder>, message: String, choices: &[char]) {
         let builder = DialogBuilder::new()
             .responder(responder)
             .message(message)
@@ -377,7 +377,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
     }
 
     /// Show a yes/no question.
-    pub fn yes_no_question(&mut self, responder: Box<Responder>, message: String) {
+    pub fn yes_no_question(&mut self, responder: Box<dyn Responder>, message: String) {
         let builder = DialogBuilder::new()
             .choices(vec!['y', 'n'])
             .message(message)

@@ -98,6 +98,7 @@ pub use app::Msg::{
     SetMode,
     SetSetting,
     SettingChanged,
+    StatusBarVisible,
     Title,
     Variables,
     Warning,

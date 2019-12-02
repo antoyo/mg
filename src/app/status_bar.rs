@@ -47,6 +47,7 @@ use self::ItemMsg::{Color, Text};
 
 #[derive(Msg)]
 pub enum Msg {
+    BarVisible(bool),
     Copy,
     Cut,
     DeleteNextChar,
@@ -72,6 +73,7 @@ pub struct Model {
     identifier_label: &'static str,
     identifier_visible: bool,
     relm: Relm<StatusBar>,
+    visible: bool,
 }
 
 #[widget]
@@ -91,6 +93,7 @@ impl Widget for StatusBar {
             identifier_label: ":",
             identifier_visible: false,
             relm: relm.clone(),
+            visible: true,
         }
     }
 
@@ -114,6 +117,7 @@ impl Widget for StatusBar {
 
     fn update(&mut self, msg: Msg) {
         match msg {
+            BarVisible(visible) => self.model.visible = visible,
             Copy => self.copy(),
             Cut => self.cut(),
             DeleteNextChar => self.delete_next_char(),
@@ -140,6 +144,7 @@ impl Widget for StatusBar {
         gtk::Box {
             property_height_request: 20, // TODO: is this still useful?
             orientation: Horizontal,
+            visible: self.model.visible,
             #[name="identifier_label"]
             gtk::Label {
                 text: self.model.identifier_label,

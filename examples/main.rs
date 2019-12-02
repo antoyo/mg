@@ -19,8 +19,6 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#![feature(use_extern_macros)]
-
 extern crate gdk;
 extern crate gtk;
 #[macro_use]
@@ -55,6 +53,7 @@ use mg::{
     SetSetting,
     SettingChanged,
     StatusBarItem,
+    StatusBarVisible,
     Title,
     Variables,
     Warning,
@@ -72,6 +71,7 @@ use Msg::*;
 
 pub struct Model {
     relm: Relm<Win>,
+    statusbar_visible: bool,
     text: String,
     title: String,
 }
@@ -89,6 +89,7 @@ pub enum Msg {
     ShowInput,
     ShowQuestion,
     ShowWarning,
+    ToggleStatusBar,
 }
 
 static MODES: Modes = &[
@@ -105,6 +106,7 @@ impl Widget for Win {
     fn model(relm: &Relm<Self>, _model: ()) -> Model {
         Model {
             relm: relm.clone(),
+            statusbar_visible: true,
             text: "Mg App".to_string(),
             title: "First Mg Program".to_string(),
         }
@@ -164,6 +166,7 @@ impl Widget for Win {
             ShowQuestion => question(&self.mg, &self.model.relm, "Do you want to quit?".to_string(),
                 char_slice!['y', 'n'], CheckQuit),
             ShowWarning => self.mg.emit(Warning("Warning".to_string())),
+            ToggleStatusBar => self.model.statusbar_visible = !self.model.statusbar_visible,
         }
     }
 
@@ -171,6 +174,7 @@ impl Widget for Win {
         #[name="mg"]
         Mg<AppCommand, AppSettings>(MODES, Ok("examples/main.conf".into()), Some("/home/bouanto".into()), vec![]) {
             DarkTheme: true,
+            StatusBarVisible: self.model.statusbar_visible,
             Title: self.model.title.clone(),
             Variables: vec![("url", Box::new(|| "http://duckduckgo.com/lite".to_string()))],
             gtk::Box {
@@ -204,6 +208,10 @@ impl Widget for Win {
                 gtk::Button {
                     label: "Blocking Input",
                     clicked => ShowBlockingInput,
+                },
+                gtk::Button {
+                    label: "Toggle status bar",
+                    clicked => ToggleStatusBar,
                 },
             },
             StatusBarItem {

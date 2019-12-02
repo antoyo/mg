@@ -49,7 +49,7 @@ pub const DEFAULT_COMPLETER_IDENT: &str = "__mg_default";
 pub const NO_COMPLETER_IDENT: &str = "__mg_no_completer";
 
 #[doc(hidden)]
-pub type Completers = HashMap<&'static str, Box<Completer>>;
+pub type Completers = HashMap<&'static str, Box<dyn Completer>>;
 
 /// The type of a column.
 #[derive(Clone, Copy, PartialEq)]
@@ -111,7 +111,7 @@ impl Completion {
     }
 
     /// Add a new completer.
-    pub fn add_completer(&mut self, ident: &'static str, completer: Box<Completer>) {
+    pub fn add_completer(&mut self, ident: &'static str, completer: Box<dyn Completer>) {
         self.completers.insert(ident, completer);
     }
 
@@ -144,14 +144,14 @@ impl Completion {
     }
 
     /// Get the current completer.
-    pub fn current_completer(&self) -> Option<&Completer> {
+    pub fn current_completer(&self) -> Option<&dyn Completer> {
         self.completers.get(self.completer_ident.as_str())
             .map(AsRef::as_ref)
     }
 
     /// Get the current completer.
     #[allow(unknown_lints, borrowed_box)]
-    pub fn current_completer_mut(&mut self) -> Option<&mut Box<Completer>> {
+    pub fn current_completer_mut(&mut self) -> Option<&mut Box<dyn Completer>> {
         self.completers.get_mut(self.completer_ident.as_str())
     }
 
@@ -266,7 +266,7 @@ impl CompletionResult {
     }
 
     /// Create a new completion result with foregrounds.
-    pub fn from_cells(cols: &[&ToCell]) -> Self {
+    pub fn from_cells(cols: &[&dyn ToCell]) -> Self {
         CompletionResult {
             columns: cols.iter().map(|value| value.to_cell()).collect(),
         }

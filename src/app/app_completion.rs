@@ -44,7 +44,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
     /// Get the default completers.
     /// One to complete the commands, the other to complete the settings.
     pub fn default_completers() -> completion::Completers {
-        let mut completers: HashMap<_, Box<completion::Completer>> = HashMap::new();
+        let mut completers: HashMap<_, Box<dyn completion::Completer>> = HashMap::new();
         completers.insert(DEFAULT_COMPLETER_IDENT, Box::new(CommandCompleter::<COMM>::new()));
         completers.insert("set", Box::new(SettingCompleter::<SETT>::new()));
         completers

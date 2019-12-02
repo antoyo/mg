@@ -168,7 +168,7 @@ impl CompletionView {
     }
 
     /// Add the specified number of columns.
-    fn add_columns_from_completer(&self, completer: &Completer) {
+    fn add_columns_from_completer(&self, completer: &dyn Completer) {
         self.remove_columns();
         let columns = completer.columns();
         let column_count = columns.len() as i32;
@@ -179,7 +179,7 @@ impl CompletionView {
     }
 
     /// Adjust the columns from the completer.
-    fn adjust_columns(&self, completer: &Completer) {
+    fn adjust_columns(&self, completer: &dyn Completer) {
         self.add_columns_from_completer(completer);
     }
 

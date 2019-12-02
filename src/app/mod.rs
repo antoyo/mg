@@ -90,6 +90,7 @@ use self::color::{color_blue, color_orange, color_red};
 use self::dialog::DialogBuilder;
 use self::status_bar::StatusBar;
 use self::status_bar::Msg::{
+    BarVisible,
     EntryActivate,
     EntryChanged,
     EntryShown,
@@ -103,7 +104,7 @@ use super::Modes;
 
 type Mappings = HashMap<&'static str, HashMap<Vec<Key>, String>>;
 type ModesHash = HashMap<&'static str, super::Mode>;
-type Variables = Vec<(&'static str, Box<Fn() -> String>)>;
+type Variables = Vec<(&'static str, Box<dyn Fn() -> String>)>;
 
 /// A known mode or an unknown mode.
 #[derive(Clone, Copy, PartialEq)]
@@ -165,7 +166,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
     foreground_color: RGBA,
     initial_errors: Vec<errors::Error>,
     initial_parse_result: Option<ParseResult<COMM>>,
-    input_callback: Option<Box<Fn(Option<String>, bool)>>,
+    input_callback: Option<Box<dyn Fn(Option<String>, bool)>>,
     mappings: Mappings,
     message: String,
     mode_label: String,
@@ -178,7 +179,8 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
     shortcut_pressed: bool,
     show_count: bool,
     status_bar_command: String,
-    variables: HashMap<String, Box<Fn() -> String>>,
+    status_bar_visible: bool,
+    variables: HashMap<String, Box<dyn Fn() -> String>>,
 }
 
 #[allow(missing_docs)]
@@ -189,12 +191,12 @@ pub enum Msg<COMM, SETT>
 {
     Alert(String),
     AppClose,
-    BlockingCustomDialog(Box<Responder>, DialogBuilder),
-    BlockingInput(Box<Responder>, String, String),
-    BlockingQuestion(Box<Responder>, String, Vec<char>),
-    BlockingYesNoQuestion(Box<Responder>, String),
+    BlockingCustomDialog(Box<dyn Responder>, DialogBuilder),
+    BlockingInput(Box<dyn Responder>, String, String),
+    BlockingQuestion(Box<dyn Responder>, String, Vec<char>),
+    BlockingYesNoQuestion(Box<dyn Responder>, String),
     CloseWin,
-    Completers(HashMap<&'static str, Box<completion::Completer>>),
+    Completers(HashMap<&'static str, Box<dyn completion::Completer>>),
     CompletionViewChange(String),
     CustomCommand(COMM),
     CustomDialog(DialogBuilder),
@@ -208,22 +210,23 @@ pub enum Msg<COMM, SETT>
     HideInfo(String),
     Info(String),
     InitAfter,
-    Input(Box<Responder>, String, String),
+    Input(Box<dyn Responder>, String, String),
     KeyPress(EventKey),
     KeyRelease(EventKey),
     Message(String),
     ModeChanged(String),
-    Question(Box<Responder>, String, &'static [char]),
+    Question(Box<dyn Responder>, String, &'static [char]),
     ResetInput,
     SetMode(&'static str),
     SetSetting(SETT::Variant),
     SettingChanged(SETT::Variant),
     StatusBarEntryActivate(Option<String>),
     StatusBarEntryChanged(Option<String>),
+    StatusBarVisible(bool),
     Title(String),
     Variables(Variables),
     Warning(String),
-    YesNoQuestion(Box<Responder>, String),
+    YesNoQuestion(Box<dyn Responder>, String),
 }
 
 /// An Mg application window contains a status bar where the user can type a command and a central widget.
@@ -397,6 +400,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             shortcut_pressed: false,
             show_count: true,
             status_bar_command: String::new(),
+            status_bar_visible: true,
             variables: HashMap::new(),
         }
     }
@@ -510,13 +514,15 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             DarkTheme(dark) => self.set_dark_theme(dark),
             DeleteCompletionItem => self.delete_current_completion_item(),
             EnterCommandMode => {
-                self.set_completer(DEFAULT_COMPLETER_IDENT);
-                self.set_current_identifier(':');
-                self.set_mode(COMMAND_MODE);
-                self.reset();
-                self.clear_shortcut();
-                self.model.completion_view.stream().emit(Visible(true));
-                self.show_entry();
+                if self.model.status_bar_visible {
+                    self.set_completer(DEFAULT_COMPLETER_IDENT);
+                    self.set_current_identifier(':');
+                    self.set_mode(COMMAND_MODE);
+                    self.reset();
+                    self.clear_shortcut();
+                    self.model.completion_view.stream().emit(Visible(true));
+                    self.show_entry();
+                }
             },
             EnterNormalMode => {
                 self.return_to_normal_mode();
@@ -548,6 +554,12 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                 self.model.status_bar_command = input.unwrap_or_default();
                 self.update_completions()
             },
+            StatusBarVisible(visible) => {
+                self.model.status_bar_visible = visible;
+                if !visible {
+                    self.model.completion_view.widget().set_visible(visible);
+                }
+            },
             Title(title) => self.set_title(&title),
             Variables(variables) => self.set_variables(variables),
             Warning(message) => self.warning(&message),
@@ -569,6 +581,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                 #[container="status-bar-item"]
                 #[name="status_bar"]
                 StatusBar {
+                    BarVisible: self.model.status_bar_visible,
                     EntryShown: self.model.entry_shown,
                     EntryText: self.model.status_bar_command.clone(),
                     Identifier: self.model.current_command_mode.to_string(),
