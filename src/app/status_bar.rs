@@ -40,7 +40,7 @@ use gtk::{
 use gtk::Orientation::Horizontal;
 use pango::EllipsizeMode;
 use relm::{Relm, Widget};
-use relm_attributes::widget;
+use relm_derive::widget;
 
 use self::Msg::*;
 use self::ItemMsg::{Color, Text};

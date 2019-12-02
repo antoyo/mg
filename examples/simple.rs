@@ -28,7 +28,6 @@ extern crate mg_settings;
 extern crate mg_settings_macros;
 #[macro_use]
 extern crate relm;
-extern crate relm_attributes;
 #[macro_use]
 extern crate relm_derive;
 
@@ -50,7 +49,7 @@ use mg::{
     Variables,
 };
 use relm::Widget;
-use relm_attributes::widget;
+use relm_derive::widget;
 
 use AppCommand::*;
 use Msg::*;

@@ -6,18 +6,17 @@ documentation = "https://antoyo.github.io/mg/mg/"
 license = "MIT"
 name = "mg"
 repository = "https://github.com/antoyo/mg"
-version = "0.11.1"
+version = "0.12.0"
 
 [dependencies]
-gdk = "^0.10.0"
-glib = "^0.7.0"
-gtk = "^0.6.0"
+gdk = "^0.11.0"
+glib = "^0.8.0"
+gtk = "^0.7.0"
 log = "0.4"
 mg-settings = "^0.4.0"
-pango = "^0.6.0"
-relm =  "^0.16.0"
-relm-attributes = "^0.16.0"
-relm-derive = "^0.16.0"
+pango = "^0.7.0"
+relm =  "^0.18.0"
+relm-derive = "^0.18.0"
 
 [dev-dependencies]
 libxdo = "0.6"
@@ -25,5 +24,5 @@ mg-settings-macros = "^0.4.0"
 pretty_env_logger = "0.2"
 
 [features]
-default = ["gtk/v3_22", "relm/unstable", "relm-attributes/unstable", "relm-derive/unstable"]
+default = ["gtk/v3_22"]
 nightly = []

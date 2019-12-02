@@ -50,8 +50,8 @@ impl<COMM, SETT> Mg<COMM, SETT>
     pub fn reset_colors(&self) {
         let status_bar = self.status_bar.widget();
         // TODO: switch to CSS.
-        status_bar.override_background_color(StateFlags::NORMAL, TRANSPARENT);
-        status_bar.override_color(StateFlags::NORMAL, &self.model.foreground_color);
+        status_bar.override_background_color(StateFlags::NORMAL, Some(TRANSPARENT));
+        status_bar.override_color(StateFlags::NORMAL, Some(&self.model.foreground_color));
     }
 
     /// Use the dark variant of the theme if available.
@@ -64,28 +64,28 @@ impl<COMM, SETT> Mg<COMM, SETT>
 
 /// Color the status bar in blue.
 pub fn color_blue<W: IsA<Object> + IsA<Widget> + WidgetExt>(widget: &W) {
-    widget.override_background_color(StateFlags::NORMAL, &RGBA::blue());
+    widget.override_background_color(StateFlags::NORMAL, Some(&RGBA::blue()));
     white_foreground(widget);
 }
 
 /// Color the status bar in orange.
 pub fn color_orange<W: IsA<Object> + IsA<Widget> + WidgetExt>(widget: &W) {
-    widget.override_background_color(StateFlags::NORMAL, &RGBA {
+    widget.override_background_color(StateFlags::NORMAL, Some(&RGBA {
         red: 0.9,
         green: 0.55,
         blue: 0.0,
         alpha: 1.0 ,
-    });
+    }));
     white_foreground(widget);
 }
 
 /// Color the status bar in red.
 pub fn color_red<W: IsA<Object> + IsA<Widget> + WidgetExt>(widget: &W) {
-    widget.override_background_color(StateFlags::NORMAL, &RGBA::red());
+    widget.override_background_color(StateFlags::NORMAL, Some(&RGBA::red()));
     white_foreground(widget);
 }
 
 /// Set the foreground (text) color to white.
 fn white_foreground<W: IsA<Object> + IsA<Widget> + WidgetExt>(widget: &W) {
-    widget.override_color(StateFlags::NORMAL, &RGBA::white());
+    widget.override_color(StateFlags::NORMAL, Some(&RGBA::white()));
 }

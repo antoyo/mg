@@ -44,7 +44,7 @@ use gtk::{
 use gtk::PolicyType::{Automatic, Never};
 use pango::EllipsizeMode;
 use relm::{Relm, Widget};
-use relm_attributes::widget;
+use relm_derive::widget;
 
 use app::COMMAND_MODE;
 use completion::Completers;

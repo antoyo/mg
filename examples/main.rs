@@ -29,7 +29,6 @@ extern crate mg_settings_macros;
 extern crate pretty_env_logger;
 #[macro_use]
 extern crate relm;
-extern crate relm_attributes;
 #[macro_use]
 extern crate relm_derive;
 
@@ -62,7 +61,7 @@ use mg::{
     question,
 };
 use relm::{Relm, Widget};
-use relm_attributes::widget;
+use relm_derive::widget;
 
 use AppSettingsVariant::*;
 

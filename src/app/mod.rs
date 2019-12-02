@@ -67,7 +67,7 @@ use relm::{
     create_component,
     timeout,
 };
-use relm_attributes::widget;
+use relm_derive::widget;
 
 use app::config::create_default_config;
 pub use app::config::parse_config;
