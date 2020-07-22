@@ -22,13 +22,13 @@
 use std::cmp::max;
 
 use glib::{Cast, Object};
+use glib::object::IsA;
 use gtk;
 use gtk::{
     Align,
     CellLayoutExt,
     CellRendererText,
     CellRendererTextExt,
-    IsA,
     ListStore,
     GtkListStoreExt,
     ScrolledWindowExt,

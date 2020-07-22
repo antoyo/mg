@@ -37,7 +37,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use gdk::{EventKey, RGBA};
-use gdk::enums::key::{Escape, colon};
+use gdk::keys::constants::{Escape, colon};
 use gtk;
 use gtk::{
     BoxExt,
@@ -156,7 +156,7 @@ pub struct Model<COMM, SETT>
 where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
       SETT: Default + EnumMetaData + mg_settings::settings::Settings + SettingCompletion + 'static,
 {
-    answer: Option<String>,
+    answer: String, // TODO: is this field even used?
     choices: Vec<char>,
     completion_view: Component<CompletionView>,
     current_command_mode: char,
@@ -220,8 +220,8 @@ pub enum Msg<COMM, SETT>
     SetMode(&'static str),
     SetSetting(SETT::Variant),
     SettingChanged(SETT::Variant),
-    StatusBarEntryActivate(Option<String>),
-    StatusBarEntryChanged(Option<String>),
+    StatusBarEntryActivate(String),
+    StatusBarEntryChanged(String),
     StatusBarVisible(bool),
     Title(String),
     Variables(Variables),
@@ -318,13 +318,13 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         match key.get_keyval() {
             colon | Escape => Inhibit(true),
             keyval => {
-                let character = keyval as u8 as char;
-                if COMM::is_identifier(character) {
-                    Inhibit(true)
+                let character = keyval.to_unicode();
+                if let Some(character) = character {
+                    if COMM::is_identifier(character) {
+                        return Inhibit(true);
+                    }
                 }
-                else {
-                    Self::inhibit_handle_shortcut(current_mode, key)
-                }
+                Self::inhibit_handle_shortcut(current_mode, key)
             },
         }
     }
@@ -377,7 +377,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                 },
             };
         Model {
-            answer: None,
+            answer: String::new(),
             choices: vec![],
             completion_view: create_component::<CompletionView>(Self::default_completers()),
             current_command_mode: ':',
@@ -416,19 +416,18 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                 self.handle_shortcut(key)
             },
             keyval => {
-                let character = keyval as u8 as char;
-                if COMM::is_identifier(character) {
-                    self.set_completer(NO_COMPLETER_IDENT);
-                    self.set_current_identifier(character);
-                    self.set_mode(COMMAND_MODE);
-                    self.reset();
-                    self.clear_shortcut();
-                    self.show_entry();
-                    None
+                if let Some(character) = keyval.to_unicode() {
+                    if COMM::is_identifier(character) {
+                        self.set_completer(NO_COMPLETER_IDENT);
+                        self.set_current_identifier(character);
+                        self.set_mode(COMMAND_MODE);
+                        self.reset();
+                        self.clear_shortcut();
+                        self.show_entry();
+                        return None;
+                    }
                 }
-                else {
-                    self.handle_shortcut(key)
-                }
+                self.handle_shortcut(key)
             },
         }
     }
@@ -505,7 +504,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                 self.blocking_input(responder, question, default_answer),
             BlockingQuestion(responder, question, choices) => self.blocking_question(responder, question, choices),
             BlockingYesNoQuestion(responder, question) => self.blocking_yes_no_question(responder, question),
-            CloseWin => self.window.destroy(),
+            CloseWin => self.window.close(),
             Completers(completers) => self.model.completion_view.emit(AddCompleters(completers)),
             CompletionViewChange(completion) => self.set_input(&completion),
             // To be listened to by the user.
@@ -551,7 +550,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             StatusBarEntryChanged(input) => {
                 // NOTE: Lock to prevent moving the cursor of the command entry.
                 let _lock = self.status_bar.stream().lock();
-                self.model.status_bar_command = input.unwrap_or_default();
+                self.model.status_bar_command = input;
                 self.update_completions()
             },
             StatusBarVisible(visible) => {

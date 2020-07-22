@@ -107,10 +107,11 @@ fn test_basic_command() {
 
     let win = init_test::<Win>(()).unwrap();
 
-    // TODO: send a message with a Sender to fetch te text?
+    // TODO: send a message with a Sender to fetch the text?
     //assert_eq!(Some("Label".to_string()), win.widget().label.get_text());
 
     thread::spawn(|| {
+        // FIXME: this doesn't work.
         let xdo = XDo::new(None).unwrap();
         xdo.enter_command("show test");
         xdo.enter_command("quit");
@@ -118,6 +119,6 @@ fn test_basic_command() {
 
     gtk::main();
 
-    // TODO: send a message with a Sender to fetch te text?
+    // TODO: send a message with a Sender to fetch the text?
     //assert_eq!(Some("Showing text: test".to_string()), win.widget().label.get_text());
 }

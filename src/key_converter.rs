@@ -20,7 +20,7 @@
  */
 
 use gdk::{EventKey, ModifierType};
-use gdk::enums::key::{self, A,
+use gdk::keys::constants::{self as key, A,
     _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, B, C, D, E, F, G, H, I, J, K, KP_0, KP_1, KP_2, KP_3,
     KP_4, KP_5, KP_6, KP_7, KP_8, KP_9, L, M, N, O, P, Q, R, Return, S, T, U, V, W, X, Y, Z, a, b,
     c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z};

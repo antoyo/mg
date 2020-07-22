@@ -54,8 +54,8 @@ pub enum Msg {
     DeleteNextWord,
     DeletePreviousWord,
     End,
-    EntryActivate(Option<String>),
-    EntryChanged(Option<String>),
+    EntryActivate(String),
+    EntryChanged(String),
     EntryText(String),
     EntryShown(bool),
     Identifier(String),
@@ -152,11 +152,11 @@ impl Widget for StatusBar {
             },
             #[name="command_entry"]
             gtk::Entry {
-                activate(entry) => EntryActivate(entry.get_text().map(|text| text.to_string())),
-                changed(entry) => EntryChanged(entry.get_text().map(|text| text.to_string())),
+                activate(entry) => EntryActivate(entry.get_text().to_string()),
+                changed(entry) => EntryChanged(entry.get_text().to_string()),
                 has_frame: false,
                 hexpand: true,
-                name: "mg-input-command",
+                widget_name: "mg-input-command",
             },
         }
     }
@@ -176,15 +176,14 @@ impl StatusBar {
     /// Delete the character after the cursor.
     fn delete_next_char(&self) {
         if !self.delete_selection() {
-            if let Some(text) = self.get_command() {
-                if !text.is_empty() {
-                    let pos = self.command_entry.get_position();
-                    let len = text.chars().count();
-                    if pos < len as i32 {
-                        // NOTE: Lock to avoid moving the cursor when updating the text entry.
-                        let _lock = self.model.relm.stream().lock();
-                        self.command_entry.delete_text(pos, pos + 1);
-                    }
+            let text = self.get_command();
+            if !text.is_empty() {
+                let pos = self.command_entry.get_position();
+                let len = text.chars().count();
+                if pos < len as i32 {
+                    // NOTE: Lock to avoid moving the cursor when updating the text entry.
+                    let _lock = self.model.relm.stream().lock();
+                    self.command_entry.delete_text(pos, pos + 1);
                 }
             }
         }
@@ -194,20 +193,19 @@ impl StatusBar {
     /// Delete the word after the cursor.
     fn delete_next_word(&self) {
         if !self.delete_selection() {
-            if let Some(text) = self.get_command() {
-                if !text.is_empty() {
-                    let pos = self.command_entry.get_position();
-                    let end = text.chars().enumerate()
-                        .skip(pos as usize)
-                        .skip_while(|&(_, c)| !c.is_alphanumeric())
-                        .skip_while(|&(_, c)| c.is_alphanumeric())
-                        .map(|(index, _)| index)
-                        .next()
-                        .unwrap_or_else(|| text.chars().count());
-                    // NOTE: Lock to avoid moving the cursor when updating the text entry.
-                    let _lock = self.model.relm.stream().lock();
-                    self.command_entry.delete_text(pos, end as i32);
-                }
+            let text = self.get_command();
+            if !text.is_empty() {
+                let pos = self.command_entry.get_position();
+                let end = text.chars().enumerate()
+                    .skip(pos as usize)
+                    .skip_while(|&(_, c)| !c.is_alphanumeric())
+                    .skip_while(|&(_, c)| c.is_alphanumeric())
+                    .map(|(index, _)| index)
+                    .next()
+                    .unwrap_or_else(|| text.chars().count());
+                // NOTE: Lock to avoid moving the cursor when updating the text entry.
+                let _lock = self.model.relm.stream().lock();
+                self.command_entry.delete_text(pos, end as i32);
             }
         }
         self.emit_entry_changed();
@@ -216,21 +214,20 @@ impl StatusBar {
     /// Delete the word before the cursor.
     fn delete_previous_word(&self) {
         if !self.delete_selection() {
-            if let Some(text) = self.get_command() {
-                if !text.is_empty() {
-                    let pos = self.command_entry.get_position();
-                    let len = text.chars().count();
-                    let start = text.chars().rev().enumerate()
-                        .skip(len - pos as usize)
-                        .skip_while(|&(_, c)| !c.is_alphanumeric())
-                        .skip_while(|&(_, c)| c.is_alphanumeric())
-                        .map(|(index, _)| len - index)
-                        .next()
-                        .unwrap_or_default();
-                    // NOTE: Lock to avoid moving the cursor when updating the text entry.
-                    let _lock = self.model.relm.stream().lock();
-                    self.command_entry.delete_text(start as i32, pos);
-                }
+            let text = self.get_command();
+            if !text.is_empty() {
+                let pos = self.command_entry.get_position();
+                let len = text.chars().count();
+                let start = text.chars().rev().enumerate()
+                    .skip(len - pos as usize)
+                    .skip_while(|&(_, c)| !c.is_alphanumeric())
+                    .skip_while(|&(_, c)| c.is_alphanumeric())
+                    .map(|(index, _)| len - index)
+                    .next()
+                    .unwrap_or_default();
+                // NOTE: Lock to avoid moving the cursor when updating the text entry.
+                let _lock = self.model.relm.stream().lock();
+                self.command_entry.delete_text(start as i32, pos);
             }
         }
         self.emit_entry_changed();
@@ -251,24 +248,24 @@ impl StatusBar {
 
     /// Emit the EntryChanged event with the current text.
     fn emit_entry_changed(&self) {
-        self.model.relm.stream().emit(EntryChanged(self.command_entry.get_text().map(|text| text.to_string())));
+        self.model.relm.stream().emit(EntryChanged(self.command_entry.get_text().to_string()));
     }
 
     /// Go to the end of the command entry.
     fn end(&self) {
-        let text = self.get_command().unwrap_or_default();
+        let text = self.get_command();
         self.command_entry.set_position(text.chars().count() as i32);
     }
 
     /// Get the text of the command entry.
-    fn get_command(&self) -> Option<String> {
-        self.command_entry.get_text().map(|text| text.to_string())
+    fn get_command(&self) -> String {
+        self.command_entry.get_text().to_string()
     }
 
     /// Go forward one character in the command entry.
     fn next_char(&self) {
         let pos = self.command_entry.get_position();
-        let text = self.get_command().unwrap_or_default();
+        let text = self.get_command();
         if pos < text.chars().count() as i32 {
             self.command_entry.set_position(pos + 1);
         }
@@ -277,7 +274,7 @@ impl StatusBar {
     /// Go forward one word in the command entry.
     fn next_word(&self) {
         let pos = self.command_entry.get_position();
-        let text = self.get_command().unwrap_or_default();
+        let text = self.get_command();
         let position = text.chars().enumerate()
             .skip(pos as usize)
             .skip_while(|&(_, c)| !c.is_alphanumeric())
@@ -315,7 +312,7 @@ impl StatusBar {
     /// Go back one word in the command entry.
     fn previous_word(&self) {
         let pos = self.command_entry.get_position();
-        let text = self.get_command().unwrap_or_default();
+        let text = self.get_command();
         let len = text.chars().count();
         let position = text.chars().rev().enumerate()
             .skip(len - pos as usize)
@@ -345,7 +342,7 @@ impl StatusBar {
     fn smart_home(&self) {
         let pos = self.command_entry.get_position();
         if pos == 0 {
-            let text = self.get_command().unwrap_or_default();
+            let text = self.get_command();
             let position = text.chars().enumerate()
                 .skip_while(|&(_, c)| c.is_whitespace())
                 .skip_while(|&(_, c)| !c.is_whitespace())

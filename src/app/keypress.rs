@@ -24,7 +24,7 @@ use std::char;
 use std::rc::Rc;
 
 use gdk::EventKey;
-use gdk::enums::key::Escape;
+use gdk::keys::constants::Escape;
 use gtk::Inhibit;
 use mg_settings::{
     self,
@@ -103,7 +103,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
                 if self.handle_input_shortcut(key) {
                     return None;
                 }
-                else if let Some(character) = char::from_u32(keyval) {
+                else if let Some(character) = keyval.to_unicode() {
                     if self.model.choices.contains(&character) {
                         self.set_dialog_answer(&character.to_string());
                         return None;

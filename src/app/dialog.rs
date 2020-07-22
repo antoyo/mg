@@ -340,7 +340,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
             self.set_completer(NO_COMPLETER_IDENT);
         }
 
-        self.model.answer = None;
+        self.model.answer = String::new();
         if dialog_builder.blocking {
             self.set_mode(BLOCKING_INPUT_MODE);
         }

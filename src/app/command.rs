@@ -147,14 +147,14 @@ impl<COMM, SETT> Mg<COMM, SETT>
     }
 
     /// Handle the command entry activate event.
-    pub fn command_activate(&mut self, input: Option<String>) {
+    pub fn command_activate(&mut self, input: String) {
         let current_mode = self.model.current_mode.get();
         let message =
             if current_mode == Mode::Input || current_mode == Mode::BlockingInput {
                 let mut should_reset = false;
                 if let Some(callback) = self.model.input_callback.take() {
                     self.model.answer = input.clone();
-                    callback(input, self.model.shortcut_pressed);
+                    callback(Some(input), self.model.shortcut_pressed);
                     should_reset = true;
                 }
                 self.model.choices.clear();
@@ -187,20 +187,18 @@ impl<COMM, SETT> Mg<COMM, SETT>
     }
 
     /// Handle the command activate event.
-    pub fn handle_command(&mut self, command: Option<String>, activated: bool, prefix: Option<u32>)
+    pub fn handle_command(&mut self, command: String, activated: bool, prefix: Option<u32>)
         -> Option<Msg<COMM, SETT>>
     {
-        if let Some(command) = command {
-            if self.is_normal_command() || !activated {
-                let parse_result = self.model.settings_parser.parse_line(&command, prefix);
-                self.execute_commands(parse_result, activated);
-            }
-            else {
-                // If activated is true, it means the user pressed Enter to finish the special
-                // command. If it was false, that means that the user activated a command via a
-                // shortcut.
-                return self.handle_special_command(Final, &command);
-            }
+        if self.is_normal_command() || !activated {
+            let parse_result = self.model.settings_parser.parse_line(&command, prefix);
+            self.execute_commands(parse_result, activated);
+        }
+        else {
+            // If activated is true, it means the user pressed Enter to finish the special
+            // command. If it was false, that means that the user activated a command via a
+            // shortcut.
+            return self.handle_special_command(Final, &command);
         }
         None
     }

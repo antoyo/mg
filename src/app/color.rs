@@ -19,11 +19,9 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-use glib::object::ObjectExt;
+use glib::object::{IsA, Object, ObjectExt};
 use gdk::RGBA;
 use gtk::{
-    IsA,
-    Object,
     Settings,
     StateFlags,
     StyleContextExt,

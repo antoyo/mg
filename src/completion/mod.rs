@@ -28,14 +28,14 @@ pub mod completion_view;
 use std::collections::HashMap;
 
 use glib::ToValue;
+use glib::types::Type;
 use gtk::{
+    prelude::GtkListStoreExtManual,
     ListStore,
     GtkListStoreExt,
-    GtkListStoreExtManual,
     TreeModelExt,
     TreeSelection,
     TreeSelectionExt,
-    Type,
 };
 
 use self::Column::Expand;
@@ -133,7 +133,7 @@ impl Completion {
         if self.current_completer_ident() != NO_COMPLETER_IDENT {
             if let Some((model, iter)) = selection.get_selected() {
                 if let Some(completer) = self.current_completer() {
-                    let value: Option<String> = model.get_value(&iter, completer.text_column()).get();
+                    let value: Option<String> = model.get_value(&iter, completer.text_column()).get().ok().flatten();
                     if let Some(value) = value {
                         completion = Some(completer.complete_result(&value));
                     }

@@ -23,7 +23,7 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use gdk::{EventKey, ModifierType, keyval_to_unicode};
-use gdk::enums::key::{Escape, Tab, ISO_Left_Tab};
+use gdk::keys::constants::{Escape, Tab, ISO_Left_Tab};
 use gtk::{Inhibit, LabelExt};
 use mg_settings::{self, EnumFromStr, EnumMetaData, SettingCompletion, SpecialCommand};
 use mg_settings::key::Key::{self, Char};
@@ -88,7 +88,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
         let control_pressed = key.get_state().contains(ModifierType::CONTROL_MASK);
         let shift_pressed = key.get_state().contains(ModifierType::SHIFT_MASK);
         let current_mode = current_mode.get();
-        let is_char = keyval_to_unicode(keyval).is_some();
+        let is_char = keyval.to_unicode().is_some();
         let should_inhibit =
             current_mode == Mode::Normal || keyval == Escape ||
                 ((current_mode == Mode::Command || current_mode == Mode::Input || current_mode == Mode::BlockingInput) &&
@@ -127,7 +127,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
                     self.clear_shortcut();
                     match self.action_to_command(&action) {
                         Complete(command) => {
-                            return self.handle_command(Some(command), false, prefix);
+                            return self.handle_command(command, false, prefix);
                         },
                         Incomplete(command) => {
                             self.input_command(command);
