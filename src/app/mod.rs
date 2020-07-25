@@ -40,6 +40,7 @@ use gdk::{EventKey, RGBA};
 use gdk::keys::constants::{Escape, colon};
 use gtk;
 use gtk::{
+    prelude::WidgetExtManual,
     BoxExt,
     GtkWindowExt,
     Inhibit,
@@ -504,7 +505,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                 self.blocking_input(responder, question, default_answer),
             BlockingQuestion(responder, question, choices) => self.blocking_question(responder, question, choices),
             BlockingYesNoQuestion(responder, question) => self.blocking_yes_no_question(responder, question),
-            CloseWin => self.window.close(),
+            CloseWin => unsafe { self.window.destroy() },
             Completers(completers) => self.model.completion_view.emit(AddCompleters(completers)),
             CompletionViewChange(completion) => self.set_input(&completion),
             // To be listened to by the user.
