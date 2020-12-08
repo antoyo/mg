@@ -1,4 +1,4 @@
-dist: xenial
+dist: focal
 sudo: false
 language: rust
 addons:
@@ -23,11 +23,11 @@ before_script:
 
 script:
   - |
-      travis-cargo build &&
-      travis-cargo test
-after_success:
-  - travis-cargo coveralls --no-sudo --verify
-  - ./kcov/build/src/kcov --verify --coveralls-id=$TRAVIS_JOB_ID --exclude-pattern=/.cargo target/kcov target/debug/lib-*
+      travis-cargo build
+
+# after_success:
+#   - travis-cargo coveralls --no-sudo --verify
+#   - ./kcov/build/src/kcov --verify --coveralls-id=$TRAVIS_JOB_ID --exclude-pattern=/.cargo target/kcov target/debug/lib-*
 
 env:
   global:

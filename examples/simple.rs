@@ -19,14 +19,11 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#![feature(use_extern_macros)]
-
 extern crate gtk;
 extern crate mg;
 extern crate mg_settings;
 #[macro_use]
 extern crate mg_settings_macros;
-#[macro_use]
 extern crate relm;
 #[macro_use]
 extern crate relm_derive;

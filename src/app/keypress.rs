@@ -20,7 +20,6 @@
  */
 
 use std::cell::Cell;
-use std::char;
 use std::rc::Rc;
 
 use gdk::EventKey;
