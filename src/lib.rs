@@ -39,7 +39,6 @@
 
 //! Minimal UI library based on GTK+.
 
-#![feature(unboxed_closures)]
 #![warn(
     trivial_casts,
     trivial_numeric_casts,
