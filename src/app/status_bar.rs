@@ -358,7 +358,6 @@ impl StatusBar {
     }
 }
 #[derive(Msg)]
-#[allow(unused_doc_comments)]
 pub enum ItemMsg {
     /// Set the color of the status bar item.
     Color(Option<RGBA>),
