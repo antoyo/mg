@@ -24,7 +24,6 @@ extern crate mg;
 extern crate mg_settings;
 #[macro_use]
 extern crate mg_settings_macros;
-#[macro_use]
 extern crate relm;
 #[macro_use]
 extern crate relm_derive;
