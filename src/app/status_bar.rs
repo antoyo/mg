@@ -357,6 +357,7 @@ impl StatusBar {
         }
     }
 }
+
 #[derive(Msg)]
 pub enum ItemMsg {
     /// Set the color of the status bar item.
