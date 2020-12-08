@@ -27,7 +27,6 @@ extern crate mg_settings;
 #[macro_use]
 extern crate mg_settings_macros;
 extern crate pretty_env_logger;
-#[macro_use]
 extern crate relm;
 #[macro_use]
 extern crate relm_derive;

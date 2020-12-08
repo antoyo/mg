@@ -360,9 +360,9 @@ impl StatusBar {
 
 #[derive(Msg)]
 pub enum ItemMsg {
-    /// Set the color of the status bar item.
+    // Set the color of the status bar item.
     Color(Option<RGBA>),
-    /// Set the text of the status bar item.
+    // Set the text of the status bar item.
     Text(String),
 }
 

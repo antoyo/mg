@@ -22,7 +22,7 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use gdk::{EventKey, ModifierType, keyval_to_unicode};
+use gdk::{EventKey, ModifierType};
 use gdk::keys::constants::{Escape, Tab, ISO_Left_Tab};
 use gtk::{Inhibit, LabelExt};
 use mg_settings::{self, EnumFromStr, EnumMetaData, SettingCompletion, SpecialCommand};
