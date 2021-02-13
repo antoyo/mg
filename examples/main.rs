@@ -98,7 +98,7 @@ static MODES: Modes = &[
 #[widget]
 impl Widget for Win {
     fn init_view(&mut self) {
-        self.entry.grab_focus();
+        self.widgets.entry.grab_focus();
     }
 
     fn model(relm: &Relm<Self>, _model: ()) -> Model {
@@ -113,7 +113,7 @@ impl Widget for Win {
     fn mode_changed(&mut self, mode: &str) {
         if mode != "normal" {
             self.model.text = format!("Title was: {}", self.model.title);
-            self.mg.emit(SetSetting(WindowTitle(mode.to_string())));
+            self.streams.mg.emit(SetSetting(WindowTitle(mode.to_string())));
         }
     }
 
@@ -136,7 +136,7 @@ impl Widget for Win {
             Command(command) => {
                 match command {
                     BackwardSearch(input) => println!("Searching backward for {}", input),
-                    DeleteEntry => self.mg.emit(DeleteCompletionItem),
+                    DeleteEntry => self.streams.mg.emit(DeleteCompletionItem),
                     Follow => (),
                     Insert | Normal => (),
                     Open(url) => self.model.text = format!("Opening URL {}", url),
@@ -149,21 +149,21 @@ impl Widget for Win {
             Echo(answer) => self.model.text = format!("You said: {}", answer.unwrap_or("Nothing".to_string())),
             NewMode(mode) => self.mode_changed(&mode),
             Setting(setting) => self.setting_changed(setting),
-            ShowAlert => self.mg.emit(Alert("Blue Alert".to_string())),
+            ShowAlert => self.streams.mg.emit(Alert("Blue Alert".to_string())),
             ShowBlockingInput => {
                 let builder = DialogBuilder::new()
                     .message("Do you wanto to quit?".to_string());
-                let res = blocking_dialog(self.mg.stream(), builder);
+                let res = blocking_dialog(&self.streams.mg, builder);
                 if res == Some("yes".to_string()) {
                     gtk::main_quit();
                 }
             },
-            ShowInfo => self.mg.emit(Info("Info".to_string())),
-            ShowInput => input(&self.mg, &self.model.relm, "Say something".to_string(),
+            ShowInfo => self.streams.mg.emit(Info("Info".to_string())),
+            ShowInput => input(&self.streams.mg, &self.model.relm, "Say something".to_string(),
                 "Oh yeah?".to_string(), Echo),
-            ShowQuestion => question(&self.mg, &self.model.relm, "Do you want to quit?".to_string(),
+            ShowQuestion => question(&self.streams.mg, &self.model.relm, "Do you want to quit?".to_string(),
                 char_slice!['y', 'n'], CheckQuit),
-            ShowWarning => self.mg.emit(Warning("Warning".to_string())),
+            ShowWarning => self.streams.mg.emit(Warning("Warning".to_string())),
             ToggleStatusBar => self.model.statusbar_visible = !self.model.statusbar_visible,
         }
     }

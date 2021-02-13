@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017 Boucher, Antoni <bouanto@zoho.com>
+ * Copyright (c) 2016-2020 Boucher, Antoni <bouanto@zoho.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -251,7 +251,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     /// Show an alert message to the user.
     fn alert(&mut self, message: &str) {
         self.model.message = message.to_string();
-        color_blue(self.status_bar.widget());
+        color_blue(&self.widgets.status_bar);
     }
 
     /// Show an error to the user.
@@ -263,7 +263,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
 
         self.model.message = error_str;
         self.model.entry_shown = false;
-        color_red(self.status_bar.widget());
+        color_red(&self.widgets.status_bar);
     }
 
     /// Hide the information message.
@@ -302,7 +302,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         warn!("{}", message);
         let message = message.to_string();
         self.model.message = message.clone();
-        color_orange(self.status_bar.widget());
+        color_orange(&self.widgets.status_bar);
 
         timeout(self.model.relm.stream(), INFO_MESSAGE_DURATION, move || HideColoredMessage(message.clone()));
     }
@@ -342,7 +342,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             CompletionViewChange(completion.clone()));
         completion_widget.set_hexpand(true);
         completion_widget.set_vexpand(true);
-        self.overlay.add_overlay(completion_widget);
+        self.widgets.overlay.add_overlay(completion_widget);
         completion_widget.show_all();
     }
 
@@ -505,7 +505,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                 self.blocking_input(responder, question, default_answer),
             BlockingQuestion(responder, question, choices) => self.blocking_question(responder, question, choices),
             BlockingYesNoQuestion(responder, question) => self.blocking_yes_no_question(responder, question),
-            CloseWin => unsafe { self.window.destroy() },
+            CloseWin => unsafe { self.widgets.window.destroy() },
             Completers(completers) => self.model.completion_view.emit(AddCompleters(completers)),
             CompletionViewChange(completion) => self.set_input(&completion),
             // To be listened to by the user.
@@ -550,7 +550,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             StatusBarEntryActivate(input) => self.command_activate(input),
             StatusBarEntryChanged(input) => {
                 // NOTE: Lock to prevent moving the cursor of the command entry.
-                let _lock = self.status_bar.stream().lock();
+                let _lock = self.streams.status_bar.stream().lock();
                 self.model.status_bar_command = input;
                 self.update_completions()
             },
@@ -641,7 +641,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
 
     /// Set the window title.
     fn set_title(&self, title: &str) {
-        self.window.set_title(title);
+        self.widgets.window.set_title(title);
     }
 
     /// Set the variables that will be available in the settings.

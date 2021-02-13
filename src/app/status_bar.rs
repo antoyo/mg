@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Boucher, Antoni <bouanto@zoho.com>
+ * Copyright (c) 2016-2020 Boucher, Antoni <bouanto@zoho.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -80,7 +80,7 @@ pub struct Model {
 impl Widget for StatusBar {
     fn init_view(&mut self) {
         // Adjust the look of the entry.
-        let style_context = self.command_entry.get_style_context();
+        let style_context = self.widgets.command_entry.get_style_context();
         // TODO: remove the next line when relm supports css.
         let style = include_bytes!("../../style/command-input.css");
         let provider = CssProvider::new();
@@ -101,12 +101,12 @@ impl Widget for StatusBar {
     fn set_entry_shown(&mut self, visible: bool) {
         // TODO: document this use of lock.
         let _lock = self.model.relm.stream().lock();
-        self.command_entry.set_text("");
+        self.widgets.command_entry.set_text("");
         self.model.identifier_visible = visible;
-        self.command_entry.set_visible(visible);
+        self.widgets.command_entry.set_visible(visible); // TODO: use a field model and a binding.
 
         if visible {
-            self.command_entry.grab_focus();
+            self.widgets.command_entry.grab_focus();
         }
     }
 
@@ -165,12 +165,12 @@ impl Widget for StatusBar {
 impl StatusBar {
     /// Copy the selection to the clipboard.
     fn copy(&self) {
-        self.command_entry.copy_clipboard();
+        self.widgets.command_entry.copy_clipboard();
     }
 
     /// Cut the selection to the clipboard.
     fn cut(&self) {
-        self.command_entry.cut_clipboard();
+        self.widgets.command_entry.cut_clipboard();
     }
 
     /// Delete the character after the cursor.
@@ -178,12 +178,12 @@ impl StatusBar {
         if !self.delete_selection() {
             let text = self.get_command();
             if !text.is_empty() {
-                let pos = self.command_entry.get_position();
+                let pos = self.widgets.command_entry.get_position();
                 let len = text.chars().count();
                 if pos < len as i32 {
                     // NOTE: Lock to avoid moving the cursor when updating the text entry.
                     let _lock = self.model.relm.stream().lock();
-                    self.command_entry.delete_text(pos, pos + 1);
+                    self.widgets.command_entry.delete_text(pos, pos + 1);
                 }
             }
         }
@@ -195,7 +195,7 @@ impl StatusBar {
         if !self.delete_selection() {
             let text = self.get_command();
             if !text.is_empty() {
-                let pos = self.command_entry.get_position();
+                let pos = self.widgets.command_entry.get_position();
                 let end = text.chars().enumerate()
                     .skip(pos as usize)
                     .skip_while(|&(_, c)| !c.is_alphanumeric())
@@ -205,7 +205,7 @@ impl StatusBar {
                     .unwrap_or_else(|| text.chars().count());
                 // NOTE: Lock to avoid moving the cursor when updating the text entry.
                 let _lock = self.model.relm.stream().lock();
-                self.command_entry.delete_text(pos, end as i32);
+                self.widgets.command_entry.delete_text(pos, end as i32);
             }
         }
         self.emit_entry_changed();
@@ -216,7 +216,7 @@ impl StatusBar {
         if !self.delete_selection() {
             let text = self.get_command();
             if !text.is_empty() {
-                let pos = self.command_entry.get_position();
+                let pos = self.widgets.command_entry.get_position();
                 let len = text.chars().count();
                 let start = text.chars().rev().enumerate()
                     .skip(len - pos as usize)
@@ -227,7 +227,7 @@ impl StatusBar {
                     .unwrap_or_default();
                 // NOTE: Lock to avoid moving the cursor when updating the text entry.
                 let _lock = self.model.relm.stream().lock();
-                self.command_entry.delete_text(start as i32, pos);
+                self.widgets.command_entry.delete_text(start as i32, pos);
             }
         }
         self.emit_entry_changed();
@@ -235,10 +235,10 @@ impl StatusBar {
 
     /// Delete the selected text.
     fn delete_selection(&self) -> bool {
-        if self.command_entry.get_selection_bounds().is_some() {
+        if self.widgets.command_entry.get_selection_bounds().is_some() {
             // NOTE: Lock to avoid moving the cursor when updating the text entry.
             let _lock = self.model.relm.stream().lock();
-            self.command_entry.delete_selection();
+            self.widgets.command_entry.delete_selection();
             true
         }
         else {
@@ -248,32 +248,32 @@ impl StatusBar {
 
     /// Emit the EntryChanged event with the current text.
     fn emit_entry_changed(&self) {
-        self.model.relm.stream().emit(EntryChanged(self.command_entry.get_text().to_string()));
+        self.model.relm.stream().emit(EntryChanged(self.widgets.command_entry.get_text().to_string()));
     }
 
     /// Go to the end of the command entry.
     fn end(&self) {
         let text = self.get_command();
-        self.command_entry.set_position(text.chars().count() as i32);
+        self.widgets.command_entry.set_position(text.chars().count() as i32);
     }
 
     /// Get the text of the command entry.
     fn get_command(&self) -> String {
-        self.command_entry.get_text().to_string()
+        self.widgets.command_entry.get_text().to_string()
     }
 
     /// Go forward one character in the command entry.
     fn next_char(&self) {
-        let pos = self.command_entry.get_position();
+        let pos = self.widgets.command_entry.get_position();
         let text = self.get_command();
         if pos < text.chars().count() as i32 {
-            self.command_entry.set_position(pos + 1);
+            self.widgets.command_entry.set_position(pos + 1);
         }
     }
 
     /// Go forward one word in the command entry.
     fn next_word(&self) {
-        let pos = self.command_entry.get_position();
+        let pos = self.widgets.command_entry.get_position();
         let text = self.get_command();
         let position = text.chars().enumerate()
             .skip(pos as usize)
@@ -282,12 +282,12 @@ impl StatusBar {
             .next()
             .map(|(index, _)| index)
             .unwrap_or_else(|| text.chars().count());
-        self.command_entry.set_position(position as i32);
+        self.widgets.command_entry.set_position(position as i32);
     }
 
     /// Paste the clipboard to the selection or the cursor position.
     fn paste(&self) {
-        self.command_entry.paste_clipboard();
+        self.widgets.command_entry.paste_clipboard();
     }
 
     /// Paste the selection clipboard to the selection or the cursor position.
@@ -295,23 +295,23 @@ impl StatusBar {
         self.delete_selection();
         let clipboard = Clipboard::get(&SELECTION_PRIMARY);
         if let Some(text) = clipboard.wait_for_text() {
-            let mut position = self.command_entry.get_position();
-            self.command_entry.insert_text(&text, &mut position);
-            self.command_entry.set_position(position);
+            let mut position = self.widgets.command_entry.get_position();
+            self.widgets.command_entry.insert_text(&text, &mut position);
+            self.widgets.command_entry.set_position(position);
         }
     }
 
     /// Go back one character in the command entry.
     fn previous_char(&self) {
-        let pos = self.command_entry.get_position();
+        let pos = self.widgets.command_entry.get_position();
         if pos > 0 {
-            self.command_entry.set_position(pos - 1);
+            self.widgets.command_entry.set_position(pos - 1);
         }
     }
 
     /// Go back one word in the command entry.
     fn previous_word(&self) {
-        let pos = self.command_entry.get_position();
+        let pos = self.widgets.command_entry.get_position();
         let text = self.get_command();
         let len = text.chars().count();
         let position = text.chars().rev().enumerate()
@@ -321,26 +321,26 @@ impl StatusBar {
             .next()
             .map(|(index, _)| len - index)
             .unwrap_or_default();
-        self.command_entry.set_position(position as i32);
+        self.widgets.command_entry.set_position(position as i32);
     }
 
     /// Seth the prefix identifier shown at the left of the command entry.
     fn set_identifier(&self, identifier: &str) {
-        self.identifier_label.set_text(identifier);
+        self.widgets.identifier_label.set_text(identifier);
     }
 
     /// Set the text of the input entry and move the cursor at the end.
     fn set_input(&self, command: &str) {
         // NOTE: Prevent updating the completions when the user selects a completion entry.
         let _lock = self.model.relm.stream().lock();
-        self.command_entry.set_text(command);
-        self.command_entry.set_position(command.chars().count() as i32);
+        self.widgets.command_entry.set_text(command);
+        self.widgets.command_entry.set_position(command.chars().count() as i32);
     }
 
     /// Go to the beginning of the command entry.
     /// If the cursor is already at the beginning, go after the spaces after the command name.
     fn smart_home(&self) {
-        let pos = self.command_entry.get_position();
+        let pos = self.widgets.command_entry.get_position();
         if pos == 0 {
             let text = self.get_command();
             let position = text.chars().enumerate()
@@ -350,10 +350,10 @@ impl StatusBar {
                 .map(|(index, _)| index)
                 .next()
                 .unwrap_or_default();
-            self.command_entry.set_position(position as i32);
+            self.widgets.command_entry.set_position(position as i32);
         }
         else {
-            self.command_entry.set_position(0);
+            self.widgets.command_entry.set_position(0);
         }
     }
 }
@@ -375,8 +375,8 @@ impl Widget for StatusBarItem {
 
     fn update(&mut self, msg: ItemMsg) {
         match msg {
-            Color(color) => self.label.override_color(StateFlags::NORMAL, color.as_ref()),
-            Text(text) => self.label.set_text(&text),
+            Color(color) => self.widgets.label.override_color(StateFlags::NORMAL, color.as_ref()),
+            Text(text) => self.widgets.label.set_text(&text), // TODO: use model field and a binding.
         }
     }
 

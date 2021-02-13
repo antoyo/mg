@@ -6,7 +6,7 @@ documentation = "https://antoyo.github.io/mg/mg/"
 license = "MIT"
 name = "mg"
 repository = "https://github.com/antoyo/mg"
-version = "0.13.1"
+version = "0.14.0"
 
 [dependencies]
 gdk = "^0.13.0"
@@ -15,8 +15,8 @@ gtk = "^0.9.0"
 log = "0.4"
 mg-settings = "^0.4.0"
 pango = "^0.9.0"
-relm =  "^0.20.0"
-relm-derive = "^0.20.0"
+relm = "0.21"
+relm-derive = "0.21"
 
 [dev-dependencies]
 libxdo = "0.6"

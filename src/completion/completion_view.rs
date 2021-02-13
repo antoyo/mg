@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Boucher, Antoni <bouanto@zoho.com>
+ * Copyright (c) 2016-2020 Boucher, Antoni <bouanto@zoho.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -156,7 +156,7 @@ impl CompletionView {
         view_column.pack_start(&cell, true);
         view_column.add_attribute(&cell, "text", index);
         view_column.add_attribute(&cell, "foreground", foreground_index);
-        self.tree_view.append_column(&view_column);
+        self.widgets.tree_view.append_column(&view_column);
     }
 
     /// Add the specified number of columns.
@@ -185,7 +185,7 @@ impl CompletionView {
 
     /// Adjust the policy of the scrolled window to avoid having extra space around the tree view.
     fn adjust_policy<M: IsA<Object> + IsA<TreeModel>>(&self, model: &M) {
-        self.tree_view.set_model(Some(model));
+        self.widgets.tree_view.set_model(Some(model));
         let policy =
             if model.iter_n_children(None) < 2 {
                 Never
@@ -193,12 +193,12 @@ impl CompletionView {
             else {
                 Automatic
             };
-        self.scrolled_window.set_policy(Never, policy);
+        self.widgets.scrolled_window.set_policy(Never, policy);
     }
 
     /// Complete the result for the selection using the current completer.
     fn complete_result(&self) {
-        let selection = self.tree_view.get_selection();
+        let selection = self.widgets.tree_view.get_selection();
         if let Some(completion) = self.model.completion.complete_result(&selection) {
             self.model.relm.stream().emit(CompletionChange(completion));
         }
@@ -206,7 +206,7 @@ impl CompletionView {
 
     /// Delete the current completion item.
     fn delete_current_completion_item(&self) {
-        if let Some((model, iter)) = self.tree_view.get_selection().get_selected() {
+        if let Some((model, iter)) = self.widgets.tree_view.get_selection().get_selected() {
             if let Ok(model) = model.downcast::<ListStore>() {
                 self.select_next();
                 model.remove(&iter);
@@ -217,7 +217,7 @@ impl CompletionView {
 
     /// Adjust the policy of the scrolled window to avoid having extra space around the tree view.
     fn disable_scrollbars(&self) {
-        self.scrolled_window.set_policy(Never, Never);
+        self.widgets.scrolled_window.set_policy(Never, Never);
     }
 
     /// Filter the completion view.
@@ -233,24 +233,24 @@ impl CompletionView {
 
     /// Remove all the columns.
     fn remove_columns(&self) {
-        for column in &self.tree_view.get_columns() {
-            self.tree_view.remove_column(column);
+        for column in &self.widgets.tree_view.get_columns() {
+            self.widgets.tree_view.remove_column(column);
         }
     }
 
     /// Scroll to the selected row.
     fn scroll(&self, model: &TreeModel, iter: &TreeIter) {
         if let Some(path) = model.get_path(iter) {
-            self.tree_view.scroll_to_cell(Some(&path), None::<&TreeViewColumn>, false, 0.0, 0.0);
+            self.widgets.tree_view.scroll_to_cell(Some(&path), None::<&TreeViewColumn>, false, 0.0, 0.0);
         }
     }
 
     /// Scroll to the first row.
     fn scroll_to_first(&self) {
-        if let Some(model) = self.tree_view.get_model() {
+        if let Some(model) = self.widgets.tree_view.get_model() {
             if let Some(iter) = model.get_iter_first() {
                 if let Some(path) = model.get_path(&iter) {
-                    self.tree_view.scroll_to_cell(Some(&path), None::<&TreeViewColumn>, false, 0.0, 0.0);
+                    self.widgets.tree_view.scroll_to_cell(Some(&path), None::<&TreeViewColumn>, false, 0.0, 0.0);
                 }
             }
         }
@@ -275,8 +275,8 @@ impl CompletionView {
     /// Select the next item.
     /// This loops with the value that started the completion.
     fn select_next(&self) {
-        if let Some(model) = self.tree_view.get_model() {
-            let selection = self.tree_view.get_selection();
+        if let Some(model) = self.widgets.tree_view.get_model() {
+            let selection = self.widgets.tree_view.get_selection();
             if let Some((model, selected_iter)) = selection.get_selected() {
                 if model.iter_next(&selected_iter) {
                     selection.select_iter(&selected_iter);
@@ -298,8 +298,8 @@ impl CompletionView {
     /// Select the previous item.
     /// This loops with the value that started the completion.
     fn select_previous(&self) {
-        if let Some(model) = self.tree_view.get_model() {
-            let selection = self.tree_view.get_selection();
+        if let Some(model) = self.widgets.tree_view.get_model() {
+            let selection = self.widgets.tree_view.get_selection();
             if let Some((model, selected_iter)) = selection.get_selected() {
                 if model.iter_previous(&selected_iter) {
                     selection.select_iter(&selected_iter);
@@ -322,7 +322,7 @@ impl CompletionView {
     fn set_completer(&mut self, completer: &str, command_entry_text: &str) {
         if self.model.completion.adjust_model(completer) {
             let model: Option<&ListStore> = None;
-            self.tree_view.set_model(model);
+            self.widgets.tree_view.set_model(model);
         }
         {
             let completer = self.model.completion.current_completer().expect("completer should be set");
@@ -338,7 +338,7 @@ impl CompletionView {
 
     /// Unselect the item.
     fn unselect(&self) {
-        let selection = self.tree_view.get_selection();
+        let selection = self.widgets.tree_view.get_selection();
         selection.unselect_all();
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Boucher, Antoni <bouanto@zoho.com>
+ * Copyright (c) 2016-2020 Boucher, Antoni <bouanto@zoho.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -199,7 +199,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
     // TODO: remove this when updating the model in methods outside the trait will update the view.
     /// Update the shortcut label.
     fn update_shortcut_label(&self) {
-        self.shortcut.widget().set_text(&shortcut_to_string(&self.model.current_shortcut, self.model.show_count));
+        self.widgets.shortcut.set_text(&shortcut_to_string(&self.model.current_shortcut, self.model.show_count));
     }
 }
 

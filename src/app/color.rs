@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Boucher, Antoni <bouanto@zoho.com>
+ * Copyright (c) 2017-2020 Boucher, Antoni <bouanto@zoho.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -40,13 +40,13 @@ impl<COMM, SETT> Mg<COMM, SETT>
 {
     /// Get the color of the text.
     pub fn get_foreground_color(&self) -> RGBA {
-        let style_context = self.window.get_style_context();
+        let style_context = self.widgets.window.get_style_context();
         style_context.get_color(StateFlags::NORMAL)
     }
 
     /// Reset the background and foreground colors of the status bar.
     pub fn reset_colors(&self) {
-        let status_bar = self.status_bar.widget();
+        let status_bar = &self.widgets.status_bar;
         // TODO: switch to CSS.
         status_bar.override_background_color(StateFlags::NORMAL, Some(TRANSPARENT));
         status_bar.override_color(StateFlags::NORMAL, Some(&self.model.foreground_color));

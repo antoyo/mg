@@ -71,7 +71,7 @@ pub enum AppCommand {
 #[widget]
 impl Widget for Win {
     fn init_view(&mut self) {
-        self.entry.grab_focus();
+        self.widgets.entry.grab_focus();
     }
 
     fn model() -> Model {

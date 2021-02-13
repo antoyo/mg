@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Boucher, Antoni <bouanto@zoho.com>
+ * Copyright (c) 2016-2020 Boucher, Antoni <bouanto@zoho.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -29,9 +29,8 @@ use mg_settings::{EnumFromStr, EnumMetaData, SettingCompletion, SpecialCommand};
 use mg_settings::key::Key;
 use mg_settings::settings;
 use relm::{
-    ContainerComponent,
-    EventStream,
     Relm,
+    StreamHandle,
     Update,
     Widget,
 };
@@ -94,7 +93,7 @@ impl Responder for BlockingInputDialog {
 /// This is used to specify which message to send to which widget when the user answers the dialog.
 pub struct InputDialog<WIDGET: Widget> {
     callback: Box<dyn Fn(Option<String>) -> WIDGET::Msg>,
-    stream: EventStream<WIDGET::Msg>,
+    stream: StreamHandle<WIDGET::Msg>,
 }
 
 impl<WIDGET: Widget> InputDialog<WIDGET> {
@@ -124,7 +123,7 @@ impl<WIDGET: Widget> Responder for InputDialog<WIDGET> {
 /// This is used to specify which message to send to which widget when the user answers the dialog.
 pub struct YesNoInputDialog<WIDGET: Widget> {
     callback: Box<dyn Fn(bool) -> WIDGET::Msg>,
-    stream: EventStream<WIDGET::Msg>,
+    stream: StreamHandle<WIDGET::Msg>,
 }
 
 impl<WIDGET: Widget> YesNoInputDialog<WIDGET> {
@@ -322,11 +321,11 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
             self.model.choices.append(&mut dialog_builder.choices);
             let choices: Vec<_> = choices.iter().map(|c| c.to_string()).collect();
             let choices = choices.join("/");
-            self.status_bar.emit(Identifier(format!("{} ({}) ", dialog_builder.message, choices)));
-            self.status_bar.emit(ShowIdentifier);
+            self.streams.status_bar.emit(Identifier(format!("{} ({}) ", dialog_builder.message, choices)));
+            self.streams.status_bar.emit(ShowIdentifier);
         }
         else {
-            self.status_bar.emit(Identifier(format!("{} ", dialog_builder.message)));
+            self.streams.status_bar.emit(Identifier(format!("{} ", dialog_builder.message)));
             self.show_entry();
             self.set_input(&dialog_builder.default_answer);
         }
@@ -364,7 +363,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
                 responder.respond(answer);
             }));
         }
-        color_blue(self.status_bar.widget());
+        color_blue(&self.widgets.status_bar);
     }
 
     /// Show a dialog created with a `DialogBuilder` which does not contain shortcut.
@@ -387,7 +386,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
 }
 
 /// Ask a question to the user and block until the user provides it (or cancel).
-pub fn blocking_dialog<COMM, SETT>(mg: &EventStream<<Mg<COMM, SETT> as Update>::Msg>, builder: DialogBuilder)
+pub fn blocking_dialog<COMM, SETT>(mg: &StreamHandle<<Mg<COMM, SETT> as Update>::Msg>, builder: DialogBuilder)
     -> Option<String>
 where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
       SETT: Default + EnumMetaData + settings::Settings + SettingCompletion + 'static,
@@ -402,7 +401,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
 }
 
 /// Ask a question to the user and block until the user provides it (or cancel).
-pub fn blocking_input<COMM, SETT>(mg: &EventStream<<Mg<COMM, SETT> as Update>::Msg>, msg: String,
+pub fn blocking_input<COMM, SETT>(mg: &StreamHandle<<Mg<COMM, SETT> as Update>::Msg>, msg: String,
     default_answer: String) -> Option<String>
 where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
       SETT: Default + EnumMetaData + settings::Settings + SettingCompletion + 'static,
@@ -416,7 +415,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
 }
 
 /// Ask a multiple-choice question to the user and block until the user provides it (or cancel).
-pub fn blocking_question<COMM, SETT>(mg: &EventStream<<Mg<COMM, SETT> as Update>::Msg>, msg: String,
+pub fn blocking_question<COMM, SETT>(mg: &StreamHandle<<Mg<COMM, SETT> as Update>::Msg>, msg: String,
     choices: &[char]) -> Option<String>
 where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
       SETT: Default + EnumMetaData + settings::Settings + SettingCompletion + 'static,
@@ -430,7 +429,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
 }
 
 /// Show a blocking yes/no question.
-pub fn blocking_yes_no_question<COMM, SETT>(mg: &EventStream<<Mg<COMM, SETT> as Update>::Msg>, msg: String)
+pub fn blocking_yes_no_question<COMM, SETT>(mg: &StreamHandle<<Mg<COMM, SETT> as Update>::Msg>, msg: String)
     -> bool
 where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
       SETT: Default + EnumMetaData + settings::Settings + SettingCompletion + 'static,
@@ -444,7 +443,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
 }
 
 /// Ask a question to the user.
-pub fn input<CALLBACK, COMM, SETT, WIDGET>(mg: &ContainerComponent<Mg<COMM, SETT>>, relm: &Relm<WIDGET>, msg: String,
+pub fn input<CALLBACK, COMM, SETT, WIDGET>(mg: &StreamHandle<<Mg<COMM, SETT> as Update>::Msg>, relm: &Relm<WIDGET>, msg: String,
     default_answer: String, callback: CALLBACK)
 where CALLBACK: Fn(Option<String>) -> WIDGET::Msg + 'static,
       COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
@@ -456,7 +455,7 @@ where CALLBACK: Fn(Option<String>) -> WIDGET::Msg + 'static,
 }
 
 /// Ask a multiple-choice question to the user.
-pub fn question<CALLBACK, COMM, SETT, WIDGET>(mg: &ContainerComponent<Mg<COMM, SETT>>, relm: &Relm<WIDGET>, msg: String,
+pub fn question<CALLBACK, COMM, SETT, WIDGET>(mg: &StreamHandle<<Mg<COMM, SETT> as Update>::Msg>, relm: &Relm<WIDGET>, msg: String,
     choices: &'static [char], callback: CALLBACK)
 where CALLBACK: Fn(Option<String>) -> WIDGET::Msg + 'static,
       COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
@@ -468,7 +467,7 @@ where CALLBACK: Fn(Option<String>) -> WIDGET::Msg + 'static,
 }
 
 /// Show a yes/no question.
-pub fn yes_no_question<CALLBACK, COMM, SETT, WIDGET>(mg: &ContainerComponent<Mg<COMM, SETT>>, relm: &Relm<WIDGET>,
+pub fn yes_no_question<CALLBACK, COMM, SETT, WIDGET>(mg: &StreamHandle<<Mg<COMM, SETT> as Update>::Msg>, relm: &Relm<WIDGET>,
     msg: String, callback: CALLBACK)
 where CALLBACK: Fn(bool) -> WIDGET::Msg + 'static,
       COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
