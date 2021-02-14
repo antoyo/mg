@@ -35,7 +35,7 @@ use relm::{
     Widget,
 };
 
-use app::{Mg, BLOCKING_INPUT_MODE, INPUT_MODE};
+use app::{Mg, BLOCKING_INPUT_MODE, INPUT_MODE, QUESTION_MODE};
 use app::color::color_blue;
 use app::Msg::{
     BlockingCustomDialog,
@@ -323,6 +323,7 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
             let choices = choices.join("/");
             self.streams.status_bar.emit(Identifier(format!("{} ({}) ", dialog_builder.message, choices)));
             self.streams.status_bar.emit(ShowIdentifier);
+            self.set_mode(QUESTION_MODE);
         }
         else {
             self.streams.status_bar.emit(Identifier(format!("{} ", dialog_builder.message)));
@@ -340,11 +341,13 @@ where COMM: Clone + EnumFromStr + EnumMetaData + SpecialCommand + 'static,
         }
 
         self.model.answer = String::new();
-        if dialog_builder.blocking {
-            self.set_mode(BLOCKING_INPUT_MODE);
-        }
-        else {
-            self.set_mode(INPUT_MODE);
+        if choices.is_empty() {
+            if dialog_builder.blocking {
+                self.set_mode(BLOCKING_INPUT_MODE);
+            }
+            else {
+                self.set_mode(INPUT_MODE);
+            }
         }
         if let Some(responder) = dialog_builder.responder {
             self.model.input_callback = Some(Box::new(move |answer, shortcut_pressed| {

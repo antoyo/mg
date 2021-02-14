@@ -91,6 +91,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
         let is_char = keyval.to_unicode().is_some();
         let should_inhibit =
             current_mode == Mode::Normal || keyval == Escape ||
+                // Disable the shortcuts (ctrl-a to select text, …) in the text entry.
                 ((current_mode == Mode::Command || current_mode == Mode::Input || current_mode == Mode::BlockingInput) &&
                  (alt_pressed || control_pressed || (!is_char && shift_pressed) || keyval == Tab ||
                   keyval == ISO_Left_Tab));

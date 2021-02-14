@@ -108,12 +108,13 @@ type ModesHash = HashMap<&'static str, super::Mode>;
 type Variables = Vec<(&'static str, Box<dyn Fn() -> String>)>;
 
 /// A known mode or an unknown mode.
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Mode {
     BlockingInput,
     Command,
     Input,
     Normal,
+    Question,
     Unknown,
 }
 
@@ -146,6 +147,7 @@ const INPUT_MODE: &str = "input";
 const NORMAL_MODE: &str = "normal";
 const PASTE: &str = "entry-paste";
 const PASTE_SELECTION: &str = "entry-paste-selection";
+const QUESTION_MODE: &str = "question";
 
 #[derive(PartialEq)]
 pub enum ActivationType {
@@ -313,23 +315,6 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
         self.model.entry_shown = false;
     }
 
-    /// Check if the key should be inhibitted for a normal mode.
-    #[allow(non_upper_case_globals)]
-    fn inhibit_normal_key_press(current_mode: &Rc<Cell<Mode>>, key: &EventKey) -> Inhibit {
-        match key.get_keyval() {
-            colon | Escape => Inhibit(true),
-            keyval => {
-                let character = keyval.to_unicode();
-                if let Some(character) = character {
-                    if COMM::is_identifier(character) {
-                        return Inhibit(true);
-                    }
-                }
-                Self::inhibit_handle_shortcut(current_mode, key)
-            },
-        }
-    }
-
     fn init_view(&mut self) {
         self.model.foreground_color = self.get_foreground_color();
         self.model.relm.stream().emit(InitAfter);
@@ -472,6 +457,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
                 COMMAND_MODE => Mode::Command,
                 INPUT_MODE => Mode::Input,
                 NORMAL_MODE => Mode::Normal,
+                QUESTION_MODE => Mode::Question,
                 _ => Mode::Unknown,
             };
         if current_mode == Mode::Unknown {

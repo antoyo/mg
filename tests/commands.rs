@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Boucher, Antoni <bouanto@zoho.com>
+ * Copyright (c) 2016-2021 Boucher, Antoni <bouanto@zoho.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -19,8 +19,9 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+extern crate gdk;
 extern crate gtk;
-extern crate libxdo;
+extern crate gtk_test;
 extern crate mg;
 extern crate mg_settings;
 #[macro_use]
@@ -29,22 +30,21 @@ extern crate relm;
 #[macro_use]
 extern crate relm_derive;
 
-mod utils;
-
-use std::thread;
-
-use gtk::{LabelExt, WidgetExt};
-use libxdo::XDo;
+use gdk::keys::constants as keys;
+use gtk::{ButtonExt, EntryExt, LabelExt, OrientableExt, WidgetExt};
+use gtk::Orientation::Vertical;
+use gtk_test::{assert_text, click, enter_key, enter_keys};
 use mg::{
     CustomCommand,
     Mg,
+    char_slice,
+    question,
 };
-use relm::{Widget, init_test};
+use relm::{Relm, Widget, init_test};
 use relm_derive::widget;
 
 use self::AppCommand::*;
 use self::Msg::*;
-use utils::XDoExt;
 
 #[derive(Commands)]
 pub enum AppCommand {
@@ -59,39 +59,66 @@ pub struct AppSettings {
 }
 
 pub struct Model {
+    relm: Relm<Win>,
     text: String,
 }
 
 #[derive(Msg)]
 pub enum Msg {
+    CheckQuit(Option<String>),
     Command(AppCommand),
+    ShowQuestion,
 }
 
 #[widget]
 impl Widget for Win {
-    fn model() -> Model {
+    fn init_view(&mut self) {
+        self.widgets.entry.grab_focus();
+    }
+
+    fn model(relm: &Relm<Self>, _model: ()) -> Model {
         Model {
+            relm: relm.clone(),
             text: "Label".to_string(),
         }
     }
 
     fn update(&mut self, event: Msg) {
         match event {
+            CheckQuit(answer) => {
+                if answer == Some("y".to_string()) {
+                    gtk::main_quit();
+                }
+            },
             Command(command) => {
                 match command {
                     Show(text) => self.model.text = format!("Showing text: {}", text),
                     Quit => gtk::main_quit(),
                 }
             },
+            ShowQuestion => question(&self.streams.mg, &self.model.relm, "Do you want to quit?".to_string(),
+                char_slice!['y', 'n'], CheckQuit),
         }
     }
 
     view! {
         #[name="mg"]
         Mg<AppCommand, AppSettings>(&[], Ok("examples/main.conf".into()), None, vec![]) {
-            #[name="label"]
-            gtk::Label {
-                text: &self.model.text,
+            gtk::Box {
+                orientation: Vertical,
+                #[name="label"]
+                gtk::Label {
+                    text: &self.model.text,
+                },
+                #[name="entry"]
+                gtk::Entry {
+                },
+                #[name="button"]
+                gtk::Button {
+                    label: "Question",
+                    clicked => ShowQuestion,
+                    focus_on_click: false,
+                },
             },
             CustomCommand(ref command) => Command(command.clone()),
         }
@@ -102,20 +129,27 @@ impl Widget for Win {
 fn test_basic_command() {
     gtk::init().unwrap();
 
-    let win = init_test::<Win>(()).unwrap();
+    let (_component, _, widgets) = init_test::<Win>(()).expect("init_test failed");
+    let win = widgets.mg.clone();
+    let entry = widgets.entry.clone();
+    let button = widgets.button.clone();
 
-    // TODO: send a message with a Sender to fetch the text?
-    //assert_eq!(Some("Label".to_string()), win.widget().label.get_text());
+    assert_text!(widgets.label, "Label");
 
-    thread::spawn(|| {
-        // FIXME: this doesn't work.
-        let xdo = XDo::new(None).unwrap();
-        xdo.enter_command("show test");
-        xdo.enter_command("quit");
+    glib::timeout_add_local(0, move || {
+        click(&button);
+        gtk_test::wait(500);
+        enter_keys(&win, "n");
+        gtk_test::wait(500);
+        assert_text!(entry, "");
+        enter_keys(&win, ":show test");
+        enter_key(&win, keys::Return);
+        enter_keys(&win, ":quit");
+        enter_key(&win, keys::Return);
+        glib::Continue(false)
     });
 
     gtk::main();
 
-    // TODO: send a message with a Sender to fetch the text?
-    //assert_eq!(Some("Showing text: test".to_string()), win.widget().label.get_text());
+    assert_text!(widgets.label, "Showing text: test");
 }

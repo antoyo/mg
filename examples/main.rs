@@ -198,6 +198,7 @@ impl Widget for Win {
                 gtk::Button {
                     label: "Question",
                     clicked => ShowQuestion,
+                    focus_on_click: false,
                 },
                 gtk::Button {
                     label: "Input",

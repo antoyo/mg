@@ -81,7 +81,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
     /// Check if the key should be inhibitted.
     pub fn inhibit_key_press(current_mode: &Rc<Cell<Mode>>, key: &EventKey) -> Inhibit {
         match current_mode.get() {
-            Mode::Normal => Self::inhibit_normal_key_press(current_mode, key),
+            Mode::Normal | Mode::Question => Inhibit(true),
             Mode::Command => Self::inhibit_command_key_press(current_mode, key),
             Mode::BlockingInput | Mode::Input => Self::inhibit_input_key_press(current_mode, key),
             _ => Self::inhibit_handle_shortcut(current_mode, key)
@@ -119,7 +119,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
             match self.model.current_mode.get() {
                 Mode::Normal => self.normal_key_press(key),
                 Mode::Command => self.command_key_press(key),
-                Mode::BlockingInput | Mode::Input => self.input_key_press(key),
+                Mode::BlockingInput | Mode::Input | Mode::Question => self.input_key_press(key),
                 _ => self.handle_shortcut(key)
             };
         if let Some(msg) = msg {
