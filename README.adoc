@@ -2,10 +2,9 @@
 
 Minimal UI library based on https://github.com/antoyo/relm[relm] (GTK+), written in Rust.
 
-image:https://img.shields.io/travis/antoyo/mg.svg[link="https://travis-ci.org/antoyo/mg"]
-image:https://img.shields.io/coveralls/antoyo/mg.svg[link="https://coveralls.io/github/antoyo/mg"]
+image:https://img.shields.io/github/workflow/status/antoyo/mg/CI[link="https://github.com/antoyo/mg/actions"]
 image:https://img.shields.io/crates/v/mg.svg[link="https://crates.io/crates/mg"]
-image:https://img.shields.io/badge/rust-documentation-blue.svg[link="https://antoyo.github.io/mg/mg/"]
+image:https://img.shields.io/badge/rust-documentation-blue.svg[link="https://docs.rs/mg/latest/mg/"]
 image:https://img.shields.io/crates/d/mg.svg[link="https://crates.io/crates/mg"]
 image:https://img.shields.io/crates/l/mg.svg[link="LICENSE"]
 
