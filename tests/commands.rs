@@ -138,9 +138,7 @@ fn test_basic_command() {
 
     glib::timeout_add_local(0, move || {
         click(&button);
-        gtk_test::wait(500);
         enter_keys(&win, "n");
-        gtk_test::wait(500);
         assert_text!(entry, "");
         enter_keys(&win, ":show test");
         enter_key(&win, keys::Return);
