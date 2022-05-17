@@ -24,7 +24,7 @@ use std::rc::Rc;
 
 use gdk::{EventKey, ModifierType};
 use gdk::keys::constants::{Escape, Tab, ISO_Left_Tab};
-use gtk::{Inhibit, LabelExt};
+use gtk::{Inhibit, traits::LabelExt};
 use mg_settings::{self, EnumFromStr, EnumMetaData, SettingCompletion, SpecialCommand};
 use mg_settings::key::Key::{self, Char};
 
@@ -83,10 +83,10 @@ impl<COMM, SETT> Mg<COMM, SETT>
 
     /// Check if the key should be inhibitted for the shortcut.
     pub fn inhibit_handle_shortcut(current_mode: &Rc<Cell<Mode>>, key: &EventKey) -> Inhibit {
-        let keyval = key.get_keyval();
-        let alt_pressed = key.get_state().contains(ModifierType::MOD1_MASK);
-        let control_pressed = key.get_state().contains(ModifierType::CONTROL_MASK);
-        let shift_pressed = key.get_state().contains(ModifierType::SHIFT_MASK);
+        let keyval = key.keyval();
+        let alt_pressed = key.state().contains(ModifierType::MOD1_MASK);
+        let control_pressed = key.state().contains(ModifierType::CONTROL_MASK);
+        let shift_pressed = key.state().contains(ModifierType::SHIFT_MASK);
         let current_mode = current_mode.get();
         let is_char = keyval.to_unicode().is_some();
         let should_inhibit =
@@ -100,10 +100,10 @@ impl<COMM, SETT> Mg<COMM, SETT>
 
     /// Handle a possible input of a shortcut.
     pub fn handle_shortcut(&mut self, key: &EventKey) -> Option<Msg<COMM, SETT>> {
-        let keyval = key.get_keyval();
-        let alt_pressed = key.get_state().contains(ModifierType::MOD1_MASK);
-        let control_pressed = key.get_state().contains(ModifierType::CONTROL_MASK);
-        let shift_pressed = key.get_state().contains(ModifierType::SHIFT_MASK);
+        let keyval = key.keyval();
+        let alt_pressed = key.state().contains(ModifierType::MOD1_MASK);
+        let control_pressed = key.state().contains(ModifierType::CONTROL_MASK);
+        let shift_pressed = key.state().contains(ModifierType::SHIFT_MASK);
         if !self.model.entry_shown || alt_pressed || control_pressed || shift_pressed || keyval == Tab ||
             keyval == ISO_Left_Tab
         {

@@ -41,13 +41,15 @@ use gdk::keys::constants::{Escape, colon};
 use gtk;
 use gtk::{
     prelude::WidgetExtManual,
-    BoxExt,
-    GtkWindowExt,
+    traits::{
+        BoxExt,
+        GtkWindowExt,
+        OrientableExt,
+        OverlayExt,
+        WidgetExt,
+    },
     Inhibit,
-    OrientableExt,
-    OverlayExt,
     PackType,
-    WidgetExt,
 };
 use gtk::Orientation::Vertical;
 use mg_settings::{
@@ -370,7 +372,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
             current_mode: Rc::new(Cell::new(Mode::Normal)),
             current_shortcut: vec![],
             entry_shown: false,
-            foreground_color: RGBA::white(),
+            foreground_color: RGBA::WHITE,
             initial_errors,
             initial_parse_result,
             input_callback: None,
@@ -394,7 +396,7 @@ impl<COMM, SETT> Widget for Mg<COMM, SETT>
     /// Handle the key press event for the normal mode.
     #[allow(non_upper_case_globals)]
     fn normal_key_press(&mut self, key: &EventKey) -> Option<Msg<COMM, SETT>> {
-        match key.get_keyval() {
+        match key.keyval() {
             colon => Some(EnterCommandMode),
             Escape => {
                 self.reset();

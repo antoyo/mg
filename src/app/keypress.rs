@@ -44,7 +44,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
     /// Handle the key press event for the command mode.
     #[allow(non_upper_case_globals)]
     fn command_key_press(&mut self, key: &EventKey) -> Option<Msg<COMM, SETT>> {
-        match key.get_keyval() {
+        match key.keyval() {
             Escape => Some(EnterNormalModeAndReset),
             _ => self.handle_shortcut(key),
         }
@@ -63,7 +63,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
     /// Check if the key should be inhibitted for the command mode.
     #[allow(non_upper_case_globals)]
     fn inhibit_command_key_press(current_mode: &Rc<Cell<Mode>>, key: &EventKey) -> Inhibit {
-        match key.get_keyval() {
+        match key.keyval() {
             Escape => Inhibit(false),
             _ => Self::inhibit_handle_shortcut(current_mode, key),
         }
@@ -72,7 +72,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
     /// Check if the key should be inhibitted for the input mode.
     #[allow(non_upper_case_globals)]
     fn inhibit_input_key_press(current_mode: &Rc<Cell<Mode>>, key: &EventKey) -> Inhibit {
-        match key.get_keyval() {
+        match key.keyval() {
             Escape => Inhibit(false),
             _ => Self::inhibit_handle_shortcut(current_mode, key),
         }
@@ -91,7 +91,7 @@ impl<COMM, SETT> Mg<COMM, SETT>
     /// Handle the key press event for the input mode.
     #[allow(non_upper_case_globals)]
     fn input_key_press(&mut self, key: &EventKey) -> Option<Msg<COMM, SETT>> {
-        match key.get_keyval() {
+        match key.keyval() {
             Escape => {
                 if let Some(callback) = self.model.input_callback.take() {
                     callback(None, self.model.shortcut_pressed);

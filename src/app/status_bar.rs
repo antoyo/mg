@@ -19,22 +19,23 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-use gdk::{RGBA, SELECTION_PRIMARY};
+use gdk::SELECTION_PRIMARY;
 use gtk;
 use gtk::{
-    BoxExt,
+    traits::{
+        BoxExt,
+        CssProviderExt,
+        EditableExt,
+        EntryExt,
+        LabelExt,
+        OrientableExt,
+        StyleContextExt,
+        WidgetExt,
+    },
     Clipboard,
     CssProvider,
-    CssProviderExt,
-    EditableExt,
     EditableSignals,
-    EntryExt,
-    LabelExt,
-    OrientableExt,
     PackType,
-    StateFlags,
-    StyleContextExt,
-    WidgetExt,
     STYLE_PROVIDER_PRIORITY_APPLICATION,
 };
 use gtk::Orientation::Horizontal;
@@ -80,9 +81,17 @@ pub struct Model {
 impl Widget for StatusBar {
     fn init_view(&mut self) {
         // Adjust the look of the entry.
-        let style_context = self.widgets.command_entry.get_style_context();
+        let style_context = self.widgets.command_entry.style_context();
         // TODO: remove the next line when relm supports css.
         let style = include_bytes!("../../style/command-input.css");
+        let provider = CssProvider::new();
+        provider.load_from_data(style).unwrap();
+        style_context.add_provider(&provider, STYLE_PROVIDER_PRIORITY_APPLICATION);
+
+        // Adjust the look of the status bar for warnings/errors.
+        let style_context = self.widgets.root.style_context();
+        // TODO: remove the next line when relm supports css.
+        let style = include_bytes!("../../style/statusbar.css");
         let provider = CssProvider::new();
         provider.load_from_data(style).unwrap();
         style_context.add_provider(&provider, STYLE_PROVIDER_PRIORITY_APPLICATION);
@@ -141,8 +150,9 @@ impl Widget for StatusBar {
 
     view! {
         #[container]
+        #[name="root"]
         gtk::Box {
-            property_height_request: 20, // TODO: is this still useful?
+            height_request: 20, // TODO: is this still useful?
             orientation: Horizontal,
             visible: self.model.visible,
             #[name="identifier_label"]
@@ -152,8 +162,8 @@ impl Widget for StatusBar {
             },
             #[name="command_entry"]
             gtk::Entry {
-                activate(entry) => EntryActivate(entry.get_text().to_string()),
-                changed(entry) => EntryChanged(entry.get_text().to_string()),
+                activate(entry) => EntryActivate(entry.text().to_string()),
+                changed(entry) => EntryChanged(entry.text().to_string()),
                 has_frame: false,
                 hexpand: true,
                 widget_name: "mg-input-command",
@@ -178,7 +188,7 @@ impl StatusBar {
         if !self.delete_selection() {
             let text = self.get_command();
             if !text.is_empty() {
-                let pos = self.widgets.command_entry.get_position();
+                let pos = self.widgets.command_entry.position();
                 let len = text.chars().count();
                 if pos < len as i32 {
                     // NOTE: Lock to avoid moving the cursor when updating the text entry.
@@ -195,7 +205,7 @@ impl StatusBar {
         if !self.delete_selection() {
             let text = self.get_command();
             if !text.is_empty() {
-                let pos = self.widgets.command_entry.get_position();
+                let pos = self.widgets.command_entry.position();
                 let end = text.chars().enumerate()
                     .skip(pos as usize)
                     .skip_while(|&(_, c)| !c.is_alphanumeric())
@@ -216,7 +226,7 @@ impl StatusBar {
         if !self.delete_selection() {
             let text = self.get_command();
             if !text.is_empty() {
-                let pos = self.widgets.command_entry.get_position();
+                let pos = self.widgets.command_entry.position();
                 let len = text.chars().count();
                 let start = text.chars().rev().enumerate()
                     .skip(len - pos as usize)
@@ -235,7 +245,7 @@ impl StatusBar {
 
     /// Delete the selected text.
     fn delete_selection(&self) -> bool {
-        if self.widgets.command_entry.get_selection_bounds().is_some() {
+        if self.widgets.command_entry.selection_bounds().is_some() {
             // NOTE: Lock to avoid moving the cursor when updating the text entry.
             let _lock = self.model.relm.stream().lock();
             self.widgets.command_entry.delete_selection();
@@ -248,7 +258,7 @@ impl StatusBar {
 
     /// Emit the EntryChanged event with the current text.
     fn emit_entry_changed(&self) {
-        self.model.relm.stream().emit(EntryChanged(self.widgets.command_entry.get_text().to_string()));
+        self.model.relm.stream().emit(EntryChanged(self.widgets.command_entry.text().to_string()));
     }
 
     /// Go to the end of the command entry.
@@ -259,12 +269,12 @@ impl StatusBar {
 
     /// Get the text of the command entry.
     fn get_command(&self) -> String {
-        self.widgets.command_entry.get_text().to_string()
+        self.widgets.command_entry.text().to_string()
     }
 
     /// Go forward one character in the command entry.
     fn next_char(&self) {
-        let pos = self.widgets.command_entry.get_position();
+        let pos = self.widgets.command_entry.position();
         let text = self.get_command();
         if pos < text.chars().count() as i32 {
             self.widgets.command_entry.set_position(pos + 1);
@@ -273,7 +283,7 @@ impl StatusBar {
 
     /// Go forward one word in the command entry.
     fn next_word(&self) {
-        let pos = self.widgets.command_entry.get_position();
+        let pos = self.widgets.command_entry.position();
         let text = self.get_command();
         let position = text.chars().enumerate()
             .skip(pos as usize)
@@ -295,7 +305,7 @@ impl StatusBar {
         self.delete_selection();
         let clipboard = Clipboard::get(&SELECTION_PRIMARY);
         if let Some(text) = clipboard.wait_for_text() {
-            let mut position = self.widgets.command_entry.get_position();
+            let mut position = self.widgets.command_entry.position();
             self.widgets.command_entry.insert_text(&text, &mut position);
             self.widgets.command_entry.set_position(position);
         }
@@ -303,7 +313,7 @@ impl StatusBar {
 
     /// Go back one character in the command entry.
     fn previous_char(&self) {
-        let pos = self.widgets.command_entry.get_position();
+        let pos = self.widgets.command_entry.position();
         if pos > 0 {
             self.widgets.command_entry.set_position(pos - 1);
         }
@@ -311,7 +321,7 @@ impl StatusBar {
 
     /// Go back one word in the command entry.
     fn previous_word(&self) {
-        let pos = self.widgets.command_entry.get_position();
+        let pos = self.widgets.command_entry.position();
         let text = self.get_command();
         let len = text.chars().count();
         let position = text.chars().rev().enumerate()
@@ -340,7 +350,7 @@ impl StatusBar {
     /// Go to the beginning of the command entry.
     /// If the cursor is already at the beginning, go after the spaces after the command name.
     fn smart_home(&self) {
-        let pos = self.widgets.command_entry.get_position();
+        let pos = self.widgets.command_entry.position();
         if pos == 0 {
             let text = self.get_command();
             let position = text.chars().enumerate()
@@ -358,10 +368,29 @@ impl StatusBar {
     }
 }
 
+#[derive(Clone, Copy, PartialEq)]
+pub enum ForegroundColor {
+    Red,
+    Yellow,
+    None,
+}
+
+impl ForegroundColor {
+    fn to_css_class(&self) -> Option<&'static str> {
+        let class =
+            match *self {
+                ForegroundColor::Red => "red_foreground",
+                ForegroundColor::Yellow => "yellow_foreground",
+                ForegroundColor::None => return None,
+            };
+        Some(class)
+    }
+}
+
 #[derive(Msg)]
 pub enum ItemMsg {
     /// Set the color of the status bar item.
-    Color(Option<RGBA>),
+    Color(ForegroundColor),
     /// Set the text of the status bar item.
     Text(String),
 }
@@ -375,7 +404,17 @@ impl Widget for StatusBarItem {
 
     fn update(&mut self, msg: ItemMsg) {
         match msg {
-            Color(color) => self.widgets.label.override_color(StateFlags::NORMAL, color.as_ref()),
+            Color(color) => {
+                let context = self.widgets.label.style_context();
+                match color.to_css_class() {
+                    Some(class) => context.add_class(class),
+                    None => {
+                        for class in context.list_classes() {
+                            context.remove_class(&class);
+                        }
+                    },
+                }
+            },
             Text(text) => self.widgets.label.set_text(&text), // TODO: use model field and a binding.
         }
     }

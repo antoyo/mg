@@ -28,7 +28,7 @@ extern crate relm;
 #[macro_use]
 extern crate relm_derive;
 
-use gtk::{
+use gtk::traits::{
     LabelExt,
     OrientableExt,
     WidgetExt,
@@ -43,7 +43,7 @@ use mg::{
     SetMode,
     StatusBarItem,
     Title,
-    Variables,
+    Variables, Modes, Mode,
 };
 use relm::Widget;
 use relm_derive::widget;
@@ -67,6 +67,10 @@ pub enum AppCommand {
     Open(String),
     Quit,
 }
+
+static MODES: Modes = &[
+    Mode { name: "insert", prefix: "i", show_count: false },
+];
 
 #[widget]
 impl Widget for Win {
@@ -94,7 +98,7 @@ impl Widget for Win {
 
     view! {
         #[name="mg"]
-        Mg<AppCommand, NoSettings>(&[], Ok("examples/main.conf".into()), None, vec![]) {
+        Mg<AppCommand, NoSettings>(&MODES, Ok("examples/main.conf".into()), None, vec![]) {
             DarkTheme: true,
             Title: "First Mg Program".to_string(),
             Variables: vec![("url", Box::new(|| "http://duckduckgo.com/lite".to_string()))],

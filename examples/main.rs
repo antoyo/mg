@@ -31,8 +31,7 @@ extern crate relm;
 #[macro_use]
 extern crate relm_derive;
 
-use gdk::RGBA;
-use gtk::{ButtonExt, LabelExt, OrientableExt, WidgetExt};
+use gtk::traits::{ButtonExt, LabelExt, OrientableExt, WidgetExt};
 use gtk::Orientation::Vertical;
 use mg::{
     Alert,
@@ -42,6 +41,7 @@ use mg::{
     DarkTheme,
     DeleteCompletionItem,
     DialogBuilder,
+    ForegroundColor,
     Info,
     Mg,
     Mode,
@@ -214,7 +214,7 @@ impl Widget for Win {
                 },
             },
             StatusBarItem {
-                Color: Some(RGBA::red()),
+                Color: ForegroundColor::Red,
                 text: "Rightmost",
             },
             StatusBarItem {

@@ -31,11 +31,13 @@ use glib::ToValue;
 use glib::types::Type;
 use gtk::{
     prelude::GtkListStoreExtManual,
+    traits::{
+        GtkListStoreExt,
+        TreeModelExt,
+        TreeSelectionExt,
+    },
     ListStore,
-    GtkListStoreExt,
-    TreeModelExt,
     TreeSelection,
-    TreeSelectionExt,
 };
 
 use self::Column::Expand;
@@ -131,9 +133,9 @@ impl Completion {
     pub fn complete_result(&self, selection: &TreeSelection) -> Option<String> {
         let mut completion = None;
         if self.current_completer_ident() != NO_COMPLETER_IDENT {
-            if let Some((model, iter)) = selection.get_selected() {
+            if let Some((model, iter)) = selection.selected() {
                 if let Some(completer) = self.current_completer() {
-                    let value: Option<String> = model.get_value(&iter, completer.text_column()).get().ok().flatten();
+                    let value: Option<String> = model.value(&iter, completer.text_column()).get().ok().flatten();
                     if let Some(value) = value {
                         completion = Some(completer.complete_result(&value));
                     }
@@ -165,7 +167,7 @@ impl Completion {
         self.current_completer_mut()
             .map(|completer| {
                 // Multiply by 2 because each column has a foreground column.
-                let columns = vec![Type::String; completer.column_count() * 2];
+                let columns = vec![Type::STRING; completer.column_count() * 2];
                 let model = ListStore::new(&columns);
 
                 // Remove the command to only send the value to the completer.

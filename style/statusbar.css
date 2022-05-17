@@ -1,0 +1,22 @@
+.blue_background {
+    background: blue;
+    color: white;
+}
+
+.orange_background {
+    background: #E68C00;
+    color: white;
+}
+
+.red_background {
+    background: red;
+    color: white;
+}
+
+.red_foreground {
+    color: red;
+}
+
+.yellow_foreground {
+    color: yellow;
+}

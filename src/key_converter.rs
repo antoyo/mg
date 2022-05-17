@@ -29,9 +29,9 @@ use mg_settings::key::Key::{self, Alt, Backspace, Char, Control, Delete, Down, E
 
 /// Convert a GDK key to an MG Key.
 pub fn gdk_key_to_key(key: &EventKey) -> Option<Key> {
-    let alt_pressed = key.get_state().contains(ModifierType::MOD1_MASK);
-    let control_pressed = key.get_state().contains(ModifierType::CONTROL_MASK);
-    let shift_pressed = key.get_state().contains(ModifierType::SHIFT_MASK);
+    let alt_pressed = key.state().contains(ModifierType::MOD1_MASK);
+    let control_pressed = key.state().contains(ModifierType::CONTROL_MASK);
+    let shift_pressed = key.state().contains(ModifierType::SHIFT_MASK);
     let key =
         match to_key(key) {
             Some(key) => key,
@@ -77,7 +77,7 @@ fn is_char(key: &Key) -> bool {
 #[allow(non_upper_case_globals)]
 fn to_key(key: &EventKey) -> Option<Key> {
     let key =
-        match key.get_keyval() {
+        match key.keyval() {
             _0 | KP_0 => Char('0'),
             _1 | KP_1 => Char('1'),
             _2 | KP_2 => Char('2'),

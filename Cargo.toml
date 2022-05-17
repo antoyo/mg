@@ -6,20 +6,20 @@ documentation = "https://antoyo.github.io/mg/mg/"
 license = "MIT"
 name = "mg"
 repository = "https://github.com/antoyo/mg"
-version = "0.14.0"
+version = "0.15.0"
 
 [dependencies]
-gdk = "^0.13.0"
-glib = "^0.10.0"
-gtk = "^0.9.0"
+gdk = "^0.15.0"
+glib = "^0.15.0"
+gtk = "^0.15.0"
 log = "0.4"
 mg-settings = "^0.4.0"
-pango = "^0.9.0"
-relm = "0.21"
-relm-derive = "0.21"
+pango = "^0.15.0"
+relm = "0.23"
+relm-derive = "0.23"
 
 [dev-dependencies]
-gtk-test = "0.6.1"
+gtk-test = "0.15.0"
 mg-settings-macros = "^0.4.0"
 pretty_env_logger = "0.2"
 
