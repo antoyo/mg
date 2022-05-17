@@ -30,8 +30,10 @@ extern crate relm;
 #[macro_use]
 extern crate relm_derive;
 
+use std::time::Duration;
+
 use gdk::keys::constants as keys;
-use gtk::{ButtonExt, EntryExt, LabelExt, OrientableExt, WidgetExt};
+use gtk::traits::{ButtonExt, EntryExt, LabelExt, OrientableExt, WidgetExt};
 use gtk::Orientation::Vertical;
 use gtk_test::{assert_text, click, enter_key, enter_keys};
 use mg::{
@@ -136,7 +138,7 @@ fn test_basic_command() {
 
     assert_text!(widgets.label, "Label");
 
-    glib::timeout_add_local(0, move || {
+    glib::timeout_add_local(Duration::from_secs(0), move || {
         click(&button);
         enter_keys(&win, "n");
         assert_text!(entry, "");
